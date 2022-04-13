@@ -25,7 +25,6 @@ def parse_epu_xml(xml_path: Path) -> Dict[str, Any]:
 
 
 def parse_epu_dir(epu_path: Path, extractor: Extractor):
-    grid_squares = []
     foil_holes = []
     exposures = []
     for grid_square_dir in epu_path.glob("GridSquare*"):
@@ -34,17 +33,19 @@ def parse_epu_dir(epu_path: Path, extractor: Extractor):
             grid_square_data = parse_epu_xml(grid_square_jpeg.with_suffix(".xml"))
             tile_id = extractor.get_tile_id(grid_square_data["stage_position"])
             if tile_id is not None:
-                grid_squares.append(
-                    GridSquare(
-                        grid_square_name=grid_square_dir.name,
-                        stage_position_x=grid_square_data["stage_position"][0],
-                        stage_position_y=grid_square_data["stage_position"][1],
-                        thumbnail=str(grid_square_jpeg),
-                        pixel_size=grid_square_data["pixel_size"],
-                        readout_area_x=grid_square_data["readout_area"][0],
-                        readout_area_y=grid_square_data["readout_area"][1],
-                        tile_id=tile_id,
-                    )
+                extractor.put_image_data(
+                    [
+                        GridSquare(
+                            grid_square_name=grid_square_dir.name,
+                            stage_position_x=grid_square_data["stage_position"][0],
+                            stage_position_y=grid_square_data["stage_position"][1],
+                            thumbnail=str(grid_square_jpeg),
+                            pixel_size=grid_square_data["pixel_size"],
+                            readout_area_x=grid_square_data["readout_area"][0],
+                            readout_area_y=grid_square_data["readout_area"][1],
+                            tile_id=tile_id,
+                        )
+                    ]
                 )
             for foil_hole_jpeg in (grid_square_dir / "FoilHoles").glob("FoilHole*.jpg"):
                 foil_hole_data = parse_epu_xml(foil_hole_jpeg.with_suffix(".xml"))
@@ -61,6 +62,7 @@ def parse_epu_dir(epu_path: Path, extractor: Extractor):
                     )
                 )
             foil_hole_names = [fh.foil_hole_name for fh in foil_holes]
+            extractor.put_image_data(foil_holes)
             for exposure_jpeg in (grid_square_dir / "Data").glob("*.jpg"):
                 for fh_name in foil_hole_names:
                     if fh_name in exposure_jpeg.name:
@@ -80,3 +82,4 @@ def parse_epu_dir(epu_path: Path, extractor: Extractor):
                         readout_area_y=exposure_data["readout_area"][1],
                     )
                 )
+            extractor.put_image_data(exposures)

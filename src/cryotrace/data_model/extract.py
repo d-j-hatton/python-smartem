@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple, Union
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -39,9 +39,9 @@ class Extractor:
                     return tile.tile_id
         return None
 
-    def put_grid_square_data(self, grid_squares: List[GridSquare]):
-        for gs in grid_squares:
-            self.session.add(gs)
+    def put_image_data(self, images: Sequence[Union[GridSquare, FoilHole, Exposure]]):
+        for im in images:
+            self.session.add(im)
         self.session.commit()
 
     def get_grid_square_data(
