@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 import yaml
 from sqlalchemy import create_engine
@@ -10,8 +10,10 @@ from cryotrace.data_model import (
     Exposure,
     ExposureInfo,
     FoilHole,
+    GridSquare,
     Particle,
     ParticleInfo,
+    Tile,
 )
 
 
@@ -31,10 +33,33 @@ def url(credentials_file: Optional[Union[str, Path]] = None) -> str:
 
 
 class Extractor:
-    def __init__(self):
+    def __init__(self, atlas_id: int):
         _url = url()
+        self._atlas_id = atlas_id
         self.engine = create_engine(_url)
         self.session = sessionmaker(bind=self.engine)()
+
+    def get_tile_id(self, stage_position: Tuple[float, float]) -> Optional[int]:
+        query = self.session.query(Tile).filter(Tile.atlas_id == self._atlas_id)
+        tiles = query.all()
+        for tile in tiles:
+            left = tile.stage_position_x - 0.5 * (tile.pixel_size * tile.readout_area_x)
+            right = tile.stage_position_x + 0.5 * (
+                tile.pixel_size * tile.readout_area_x
+            )
+            top = tile.stage_position_y + 0.5 * (tile.pixel_size * tile.readout_area_y)
+            bottom = tile.stage_position_y - 0.5 * (
+                tile.pixel_size * tile.readout_area_y
+            )
+            if stage_position[0] > left and stage_position[0] < right:
+                if stage_position[1] < top and stage_position[1] > bottom:
+                    return tile.tile_id
+        return None
+
+    def put_grid_square_data(self, grid_squares: List[GridSquare]):
+        for gs in grid_squares:
+            self.session.add(gs)
+        self.session.commit()
 
     def get_grid_square_data(
         self, grid_square_name: str, keys: Optional[List[str]] = None
