@@ -1,20 +1,28 @@
-from typing import Any
+import os
+from pathlib import Path
+from typing import Any, Optional, Type, Union, cast
 
-from sqlalchemy import Column, Float, ForeignKey, Integer, String
-from sqlalchemy.ext.declaritive import declarative_base
+import yaml
+from sqlalchemy import Column
+from sqlalchemy import Float as Float_org
+from sqlalchemy import ForeignKey, Integer, String, create_engine
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql.type_api import TypeEngine
+
+Float = cast(Type[TypeEngine[float]], Float_org)
 
 Base: Any = declarative_base()
 
 
-class EPUImage(Base):
-    stage_position_x = Column(
+class EPUImage:
+    stage_position_x: Column = Column(
         Float,
         comment="x postion of the microscope stage [nm]",
         nullable=False,
     )
 
-    stage_position_y = Column(
+    stage_position_y: Column = Column(
         Float,
         comment="y postion of the microscope stage [nm]",
         nullable=False,
@@ -26,7 +34,7 @@ class EPUImage(Base):
         comment="Full path to EPU jpeg image of EPU image",
     )
 
-    pixel_size = Column(
+    pixel_size: Column = Column(
         Float,
         nullable=False,
         comment="Pixel size of full readout image extracted from EPU XML [nm]",
@@ -45,7 +53,7 @@ class EPUImage(Base):
     )
 
 
-class Atlas(EPUImage):
+class Atlas(EPUImage, Base):
     __tablename__ = "Atlas"
 
     atlas_id = Column(
@@ -56,7 +64,7 @@ class Atlas(EPUImage):
     )
 
 
-class Tile(EPUImage):
+class Tile(EPUImage, Base):
     __tablename__ = "Tile"
 
     tile_id = Column(
@@ -70,7 +78,7 @@ class Tile(EPUImage):
     Atlas = relationship("Atlas")
 
 
-class GridSquare(EPUImage):
+class GridSquare(EPUImage, Base):
     __tablename__ = "GridSquare"
 
     grid_square_name = Column(
@@ -83,7 +91,7 @@ class GridSquare(EPUImage):
     Tile = relationship("Tile")
 
 
-class FoilHole(EPUImage):
+class FoilHole(EPUImage, Base):
     __tablename__ = "FoilHole"
 
     foil_hole_name = Column(
@@ -98,7 +106,7 @@ class FoilHole(EPUImage):
     GridSquare = relationship("GridSquare")
 
 
-class Exposure(EPUImage):
+class Exposure(EPUImage, Base):
     __tablename__ = "Exposure"
 
     exposure_name = Column(
@@ -121,12 +129,12 @@ class Particle(Base):
         nullable=False,
     )
 
-    x = Column(
+    x: Column = Column(
         Float,
         nullable=False,
     )
 
-    y = Column(
+    y: Column = Column(
         Float,
         nullable=False,
     )
@@ -150,7 +158,7 @@ class ParticleInfo(Base):
         nullable=False,
     )
 
-    value = Column(
+    value: Column = Column(
         Float,
         primary_key=True,
         nullable=False,
@@ -177,7 +185,7 @@ class ExposureInfo(Base):
         nullable=False,
     )
 
-    value = Column(
+    value: Column = Column(
         Float,
         primary_key=True,
         nullable=False,
@@ -187,3 +195,36 @@ class ExposureInfo(Base):
         ForeignKey("Exposure.exposure_name"), primary_key=True, index=True
     )
     Exposure = relationship("Exposure")
+
+
+_tables = [
+    Atlas,
+    Tile,
+    GridSquare,
+    FoilHole,
+    Exposure,
+    Particle,
+    ParticleInfo,
+    ExposureInfo,
+]
+
+
+def url(credentials_file: Optional[Union[str, Path]] = None) -> str:
+    if not credentials_file:
+        credentials_file = os.getenv("CRYOTRACE_CREDENTIALS")
+
+    if not credentials_file:
+        raise AttributeError(
+            "No credentials file specified for cryotrace database (environment variable CRYOTRACE_CREDENTIALS)"
+        )
+
+    with open(credentials_file, "r") as stream:
+        creds = yaml.safe_load(stream)
+
+    return f"postgresql+psycopg2://{creds['username']}:{creds['password']}@{creds['host']}:{creds['port']}/{creds['database']}"
+
+
+def setup():
+    engine = create_engine(url())
+    for tab in _tables:
+        tab.__table__.create(engine)

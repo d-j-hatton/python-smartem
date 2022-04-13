@@ -1,8 +1,5 @@
-import os
-from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 
-import yaml
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -14,22 +11,8 @@ from cryotrace.data_model import (
     Particle,
     ParticleInfo,
     Tile,
+    url,
 )
-
-
-def url(credentials_file: Optional[Union[str, Path]] = None) -> str:
-    if not credentials_file:
-        credentials_file = os.getenv("CRYOTRACE_CREDENTIALS")
-
-    if not credentials_file:
-        raise AttributeError(
-            "No credentials file specified for cryotrace database (environment variable CRYOTRACE_CREDENTIALS)"
-        )
-
-    with open(credentials_file, "r") as stream:
-        creds = yaml.safe_load(stream)
-
-    return f"postgresql+psycopg2://{creds['username']}:{creds['password']}@{creds['host']}:{creds['port']}/{creds['database']}"
 
 
 class Extractor:
