@@ -39,7 +39,6 @@ class Extractor:
     def get_for_grid_square(
         self, grid_square_name: str, keys: Optional[List[str]] = None
     ) -> list:
-        res = []
         if not keys:
             query = (
                 self.session.query(
@@ -51,5 +50,17 @@ class Extractor:
                 .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
                 .filter(FoilHole.grid_square_name == grid_square_name)
             )
-            res = query.all()
-        return res
+        else:
+            query = (
+                self.session.query(
+                    FoilHole, Exposure, Particle, ParticleInfo, ExposureInfo
+                )
+                .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
+                .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
+                .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
+                .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
+                .filter(FoilHole.grid_square_name == grid_square_name)
+                .filter(ExposureInfo.key.in_(keys))
+                .filter(ParticleInfo.key.in_(keys))
+            )
+        return query.all()
