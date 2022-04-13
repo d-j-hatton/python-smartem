@@ -96,3 +96,81 @@ class Exposure(EPUImage):
 
     foil_hole_id: Column = Column(ForeignKey("FoilHole.foil_hole_id"), index=True)
     FoilHole = relationship("FoilHole")
+
+
+class Particle(Base):
+    __tablename__ = "Particle"
+
+    particle_id = Column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+        nullable=False,
+    )
+
+    x = Column(
+        Float,
+        nullable=False,
+    )
+
+    y = Column(
+        Float,
+        nullable=False,
+    )
+
+    exposure_id: Column = Column(ForeignKey("Exposure.exposure_id"), index=True)
+    Exposure = relationship("Exposure")
+
+
+class ParticleInfo(Base):
+    __tablename__ = "ParticleInfo"
+
+    source = Column(
+        String,
+        primary_key=True,
+        nullable=False,
+    )
+
+    key = Column(
+        String,
+        primary_key=True,
+        nullable=False,
+    )
+
+    value = Column(
+        Float,
+        primary_key=True,
+        nullable=False,
+    )
+
+    particle_id: Column = Column(
+        ForeignKey("Particle.particle_id"), primary_key=True, index=True
+    )
+    Particle = relationship("Particle")
+
+
+class ExposureInfo(Base):
+    __tablename__ = "ExposureInfo"
+
+    source = Column(
+        String,
+        primary_key=True,
+        nullable=False,
+    )
+
+    key = Column(
+        String,
+        primary_key=True,
+        nullable=False,
+    )
+
+    value = Column(
+        Float,
+        primary_key=True,
+        nullable=False,
+    )
+
+    exposure_id: Column = Column(
+        ForeignKey("Exposure.exposure_id"), primary_key=True, index=True
+    )
+    Exposure = relationship("Exposure")
