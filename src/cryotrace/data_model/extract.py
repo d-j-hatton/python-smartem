@@ -87,3 +87,26 @@ class Extractor:
                 .filter(ParticleInfo.key.in_(keys))
             )
         return query.all()
+
+    def get_exposure_data(
+        self, exposure_name: str, keys: Optional[List[str]] = None
+    ) -> list:
+        if not keys:
+            query = (
+                self.session.query(Exposure, Particle, ParticleInfo, ExposureInfo)
+                .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
+                .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
+                .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
+                .filter(Exposure.exposure_name == exposure_name)
+            )
+        else:
+            query = (
+                self.session.query(Exposure, Particle, ParticleInfo, ExposureInfo)
+                .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
+                .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
+                .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
+                .filter(Exposure.exposure_name == exposure_name)
+                .filter(ExposureInfo.key.in_(keys))
+                .filter(ParticleInfo.key.in_(keys))
+            )
+        return query.all()
