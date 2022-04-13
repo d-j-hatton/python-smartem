@@ -36,7 +36,7 @@ class Extractor:
         self.engine = create_engine(_url)
         self.session = sessionmaker(bind=self.engine)()
 
-    def get_for_grid_square(
+    def get_grid_square_data(
         self, grid_square_name: str, keys: Optional[List[str]] = None
     ) -> list:
         if not keys:
@@ -60,6 +60,29 @@ class Extractor:
                 .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
                 .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
                 .filter(FoilHole.grid_square_name == grid_square_name)
+                .filter(ExposureInfo.key.in_(keys))
+                .filter(ParticleInfo.key.in_(keys))
+            )
+        return query.all()
+
+    def get_foil_hole_data(
+        self, foil_hole_name: str, keys: Optional[List[str]] = None
+    ) -> list:
+        if not keys:
+            query = (
+                self.session.query(Exposure, Particle, ParticleInfo, ExposureInfo)
+                .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
+                .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
+                .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
+                .filter(Exposure.foil_hole_name == foil_hole_name)
+            )
+        else:
+            query = (
+                self.session.query(Exposure, Particle, ParticleInfo, ExposureInfo)
+                .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
+                .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
+                .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
+                .filter(Exposure.foil_hole_name == foil_hole_name)
                 .filter(ExposureInfo.key.in_(keys))
                 .filter(ParticleInfo.key.in_(keys))
             )
