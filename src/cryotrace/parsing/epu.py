@@ -1,68 +1,82 @@
 from pathlib import Path
+from typing import Any, Dict
 
 import xmltodict
 
-from cryotrace.data_model import FoilHole, GridSquare
+from cryotrace.data_model import Exposure, FoilHole, GridSquare
 from cryotrace.data_model.extract import Extractor
+
+
+def parse_epu_xml(xml_path: Path) -> Dict[str, Any]:
+    with open(xml_path, "r") as xml:
+        for_parsing = xml.read()
+        data = xmltodict.parse(for_parsing)
+    stage_position = data["microscopeData"]["stage"]["Position"]
+    readout_area = data["microscopeData"]["acquisition"]["camera"]["ReadoutArea"]
+    return {
+        "stage_position": (
+            float(stage_position["X"]) * 1e9,
+            float(stage_position["Y"]) * 1e9,
+        ),
+        "pixel_size": float(data["SpatialScale"]["pixelSize"]["x"]["numericValue"])
+        * 1e9,
+        "readout_area": (int(readout_area["a:width"]), int(readout_area["a:height"])),
+    }
 
 
 def parse_epu_dir(epu_path: Path, extractor: Extractor):
     grid_squares = []
     foil_holes = []
+    exposures = []
     for grid_square_dir in epu_path.glob("GridSquare*"):
         if grid_square_dir.is_dir():
             grid_square_jpeg = next(grid_square_dir.glob("*.jpg"))
-            with open(grid_square_jpeg.with_suffix(".xml"), "r") as xml:
-                for_parsing = xml.read()
-                grid_square_data = xmltodict.parse(for_parsing)
-            stage_position = grid_square_data["microscopeData"]["stage"]["Position"]
-            tile_id = extractor.get_tile_id(
-                (float(stage_position["X"]) * 1e9, float(stage_position["Y"]) * 1e9)
-            )
-            readout_area = grid_square_data["microscopeData"]["acquisition"]["camera"][
-                "ReadoutArea"
-            ]
+            grid_square_data = parse_epu_xml(grid_square_jpeg.with_suffix(".xml"))
+            tile_id = extractor.get_tile_id(grid_square_data["stage_position"])
             if tile_id is not None:
                 grid_squares.append(
                     GridSquare(
                         grid_square_name=grid_square_dir.name,
-                        stage_position_x=float(stage_position["X"]) * 1e9,
-                        stage_position_y=float(stage_position["Y"]) * 1e9,
+                        stage_position_x=grid_square_data["stage_position"][0],
+                        stage_position_y=grid_square_data["stage_position"][1],
                         thumbnail=str(grid_square_jpeg),
-                        pixel_size=float(
-                            grid_square_data["SpatialScale"]["pixelSize"]["x"][
-                                "numericValue"
-                            ]
-                        )
-                        * 1e9,
-                        readout_area_x=int(readout_area["a:width"]),
-                        readout_area_y=int(readout_area["a:height"]),
+                        pixel_size=grid_square_data["pixel_size"],
+                        readout_area_x=grid_square_data["readout_area"][0],
+                        readout_area_y=grid_square_data["readout_area"][1],
                         tile_id=tile_id,
                     )
                 )
             for foil_hole_jpeg in (grid_square_dir / "FoilHoles").glob("FoilHole*.jpg"):
-                with open(foil_hole_jpeg.with_suffix(".xml"), "r") as xml:
-                    for_parsing = xml.read()
-                    foil_hole_data = xmltodict.parse(for_parsing)
-                    stage_position = foil_hole_data["microscopeData"]["stage"][
-                        "Position"
-                    ]
-                    readout_area = foil_hole_data["microscopeData"]["acquisition"][
-                        "camera"
-                    ]["ReadoutArea"]
-                    foil_holes.append(
-                        FoilHole(
-                            grid_square_name=grid_square_dir.name,
-                            stage_position_x=float(stage_position["X"]) * 1e9,
-                            stage_position_y=float(stage_position["Y"]) * 1e9,
-                            thumbnail=str(foil_hole_jpeg),
-                            pixel_size=float(
-                                foil_hole_data["SpatialScale"]["pixelSize"]["x"][
-                                    "numericValue"
-                                ]
-                            )
-                            * 1e9,
-                            readout_area_x=int(readout_area["a:width"]),
-                            readout_area_y=int(readout_area["a:height"]),
-                        )
+                foil_hole_data = parse_epu_xml(foil_hole_jpeg.with_suffix(".xml"))
+                foil_holes.append(
+                    FoilHole(
+                        grid_square_name=grid_square_dir.name,
+                        stage_position_x=foil_hole_data["stage_position"][0],
+                        stage_position_y=foil_hole_data["stage_position"][1],
+                        thumbnail=str(foil_hole_jpeg),
+                        pixel_size=foil_hole_data["pixel_size"],
+                        readout_area_x=foil_hole_data["readout_area"][0],
+                        readout_area_y=foil_hole_data["readout_warea"][0],
+                        foil_hole_name="_".join(foil_hole_jpeg.stem.split("_")[:2]),
                     )
+                )
+            foil_hole_names = [fh.foil_hole_name for fh in foil_holes]
+            for exposure_jpeg in (grid_square_dir / "Data").glob("*.jpg"):
+                for fh_name in foil_hole_names:
+                    if fh_name in exposure_jpeg.name:
+                        foil_hole_name = fh_name
+                        break
+                else:
+                    continue
+                exposure_data = parse_epu_xml(exposure_jpeg.with_suffix(".xml"))
+                exposures.append(
+                    Exposure(
+                        foil_hole_name=foil_hole_name,
+                        stage_position_x=exposure_data["stage_position"][0],
+                        stage_position_y=exposure_data["stage_position"][1],
+                        thumbnail=str(exposure_jpeg),
+                        pixel_size=exposure_data["pizel_size"],
+                        readout_area_x=exposure_data["readout_area"][0],
+                        readout_area_y=exposure_data["readout_area"][1],
+                    )
+                )
