@@ -56,10 +56,10 @@ class Atlas(EPUImage):
     )
 
 
-class GridSquare(EPUImage):
-    __tablename__ = "GridSquare"
+class Tile(EPUImage):
+    __tablename__ = "Tile"
 
-    grid_square_id = Column(
+    tile_id = Column(
         Integer,
         primary_key=True,
         autoincrement=True,
@@ -70,31 +70,44 @@ class GridSquare(EPUImage):
     Atlas = relationship("Atlas")
 
 
-class FoilHole(EPUImage):
-    __tablename__ = "FoliHole"
+class GridSquare(EPUImage):
+    __tablename__ = "GridSquare"
 
-    foil_hole_id = Column(
-        Integer,
+    grid_square_name = Column(
+        String,
         primary_key=True,
-        autoincrement=True,
         nullable=False,
     )
 
-    grid_square_id: Column = Column(ForeignKey("GridSquare.grid_square_id"), index=True)
+    tile_id: Column = Column(ForeignKey("Tile.tile_id"), index=True)
+    Tile = relationship("Tile")
+
+
+class FoilHole(EPUImage):
+    __tablename__ = "FoilHole"
+
+    foil_hole_name = Column(
+        String,
+        primary_key=True,
+        nullable=False,
+    )
+
+    grid_square_name: Column = Column(
+        ForeignKey("GridSquare.grid_square_name"), index=True
+    )
     GridSquare = relationship("GridSquare")
 
 
 class Exposure(EPUImage):
     __tablename__ = "Exposure"
 
-    exposure_id = Column(
-        Integer,
+    exposure_name = Column(
+        String,
         primary_key=True,
-        autoincrement=True,
         nullable=False,
     )
 
-    foil_hole_id: Column = Column(ForeignKey("FoilHole.foil_hole_id"), index=True)
+    foil_hole_name: Column = Column(ForeignKey("FoilHole.foil_hole_name"), index=True)
     FoilHole = relationship("FoilHole")
 
 
@@ -118,7 +131,7 @@ class Particle(Base):
         nullable=False,
     )
 
-    exposure_id: Column = Column(ForeignKey("Exposure.exposure_id"), index=True)
+    exposure_name: Column = Column(ForeignKey("Exposure.exposure_name"), index=True)
     Exposure = relationship("Exposure")
 
 
@@ -170,7 +183,7 @@ class ExposureInfo(Base):
         nullable=False,
     )
 
-    exposure_id: Column = Column(
-        ForeignKey("Exposure.exposure_id"), primary_key=True, index=True
+    exposure_name: Column = Column(
+        ForeignKey("Exposure.exposure_name"), primary_key=True, index=True
     )
     Exposure = relationship("Exposure")
