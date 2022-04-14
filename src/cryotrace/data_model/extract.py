@@ -1,7 +1,8 @@
+from functools import lru_cache
 from typing import List, Optional, Sequence, Tuple, Union
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import load_only, sessionmaker
+from sqlalchemy.orm import Load, load_only, sessionmaker
 
 from cryotrace.data_model import (
     Atlas,
@@ -9,6 +10,7 @@ from cryotrace.data_model import (
     Exposure,
     ExposureInfo,
     FoilHole,
+    GridSquare,
     Particle,
     ParticleInfo,
     Tile,
@@ -24,13 +26,27 @@ class Extractor:
         self.session = sessionmaker(bind=self.engine)()
 
     def get_atlases(self) -> List[str]:
-        query = self.session.query(Atlas).options(load_only("Atlas.thumbnail"))
+        query = self.session.query(Atlas).options(load_only("thumbnail"))
         return [q.thumbnail for q in query.all()]
 
-    def set_atlas_id(self, atlas_path: str) -> bool:
-        query = self.session.query(Atlas).options(
-            load_only("Atlas.thumbnail", "Atlas.atlas_id")
+    def get_grid_squares(self) -> List[GridSquare]:
+        query = (
+            self.session.query(Tile, GridSquare)
+            .options(Load(Tile).load_only("tile_id", "atlas_id"))  # type: ignore
+            .join(GridSquare, GridSquare.tile_id == Tile.tile_id)
+            .filter(Tile.atlas_id == self._atlas_id)
         )
+        return [q[1] for q in query.all()]
+
+    @lru_cache(maxsize=50)
+    def get_foil_holes(self, grid_square_name: str) -> List[FoilHole]:
+        query = self.session.query(FoilHole).filter(
+            FoilHole.grid_square_name == grid_square_name
+        )
+        return query.all()
+
+    def set_atlas_id(self, atlas_path: str) -> bool:
+        query = self.session.query(Atlas).options(load_only("thumbnail", "atlas_id"))
         for q in query.all():
             if q.thumbnail == atlas_path:
                 self._atlas_id = q.atlas_id
