@@ -1,13 +1,14 @@
 from typing import List, Optional, Sequence, Tuple, Union
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import load_only, sessionmaker
 
 from cryotrace.data_model import (
+    Atlas,
+    EPUImage,
     Exposure,
     ExposureInfo,
     FoilHole,
-    GridSquare,
     Particle,
     ParticleInfo,
     Tile,
@@ -16,11 +17,25 @@ from cryotrace.data_model import (
 
 
 class Extractor:
-    def __init__(self, atlas_id: int):
+    def __init__(self, atlas_id: int = 0):
         _url = url()
         self._atlas_id = atlas_id
         self.engine = create_engine(_url)
         self.session = sessionmaker(bind=self.engine)()
+
+    def get_atlases(self) -> List[str]:
+        query = self.session.query(Atlas).options(load_only("Atlas.thumbnail"))
+        return [q.thumbnail for q in query.all()]
+
+    def set_atlas_id(self, atlas_path: str) -> bool:
+        query = self.session.query(Atlas).options(
+            load_only("Atlas.thumbnail", "Atlas.atlas_id")
+        )
+        for q in query.all():
+            if q.thumbnail == atlas_path:
+                self._atlas_id = q.atlas_id
+                return True
+        return False
 
     def get_tile_id(self, stage_position: Tuple[float, float]) -> Optional[int]:
         query = self.session.query(Tile).filter(Tile.atlas_id == self._atlas_id)
@@ -39,10 +54,16 @@ class Extractor:
                     return tile.tile_id
         return None
 
-    def put_image_data(self, images: Sequence[Union[GridSquare, FoilHole, Exposure]]):
+    def put_image_data(
+        self, images: Sequence[EPUImage], return_key: Optional[str] = None
+    ) -> Optional[List[Union[str, int]]]:
         for im in images:
             self.session.add(im)
         self.session.commit()
+        if return_key:
+            return [getattr(im, return_key) for im in images]
+        else:
+            return None
 
     def get_grid_square_data(
         self, grid_square_name: str, keys: Optional[List[str]] = None

@@ -229,3 +229,9 @@ def setup():
     engine = create_engine(url())
     for tab in _tables:
         tab.__table__.create(engine)
+
+
+def teardown():
+    engine = create_engine(url())
+    for tab in _tables[::-1]:
+        tab.__table__.drop(engine)

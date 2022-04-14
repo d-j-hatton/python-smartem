@@ -3,7 +3,7 @@ from typing import Any, Dict
 
 import xmltodict
 
-from cryotrace.data_model import Exposure, FoilHole, GridSquare
+from cryotrace.data_model import Atlas, Exposure, FoilHole, GridSquare, Tile
 from cryotrace.data_model.extract import Extractor
 
 
@@ -11,6 +11,7 @@ def parse_epu_xml(xml_path: Path) -> Dict[str, Any]:
     with open(xml_path, "r") as xml:
         for_parsing = xml.read()
         data = xmltodict.parse(for_parsing)
+    data = data["MicroscopeImage"]
     stage_position = data["microscopeData"]["stage"]["Position"]
     readout_area = data["microscopeData"]["acquisition"]["camera"]["ReadoutArea"]
     return {
@@ -24,9 +25,43 @@ def parse_epu_xml(xml_path: Path) -> Dict[str, Any]:
     }
 
 
+def create_atlas_and_tiles(atlas_image: Path, extractor: Extractor):
+    atlas_data = parse_epu_xml(atlas_image.with_suffix(".xml"))
+    atlas_id = extractor.put_image_data(
+        [
+            Atlas(
+                stage_position_x=atlas_data["stage_position"][0],
+                stage_position_y=atlas_data["stage_position"][1],
+                thumbnail=str(atlas_image),
+                pixel_size=atlas_data["pixel_size"],
+                readout_area_x=atlas_data["readout_area"][0],
+                readout_area_y=atlas_data["readout_area"][1],
+            )
+        ],
+        return_key="atlas_id",
+    )
+    if not atlas_id:
+        raise RuntimeError(f"Atlas record was not correctly inserted: {atlas_image}")
+    tiles = []
+    for tile in atlas_image.parent.glob("Tile_*.jpg"):
+        tile_data = parse_epu_xml(tile.with_suffix(".xml"))
+        tiles.append(
+            Tile(
+                atlas_id=atlas_id[0],
+                stage_position_x=tile_data["stage_position"][0],
+                stage_position_y=tile_data["stage_position"][1],
+                thumbnail=str(tile),
+                pixel_size=tile_data["pixel_size"],
+                readout_area_x=tile_data["readout_area"][0],
+                readout_area_y=tile_data["readout_area"][1],
+            )
+        )
+    extractor.put_image_data(tiles)
+
+
 def parse_epu_dir(epu_path: Path, extractor: Extractor):
-    foil_holes = []
-    exposures = []
+    foil_holes: Dict[str, FoilHole] = {}
+    exposures = {}
     for grid_square_dir in epu_path.glob("GridSquare*"):
         if grid_square_dir.is_dir():
             grid_square_jpeg = next(grid_square_dir.glob("*.jpg"))
@@ -48,38 +83,41 @@ def parse_epu_dir(epu_path: Path, extractor: Extractor):
                     ]
                 )
             for foil_hole_jpeg in (grid_square_dir / "FoilHoles").glob("FoilHole*.jpg"):
+                foil_hole_name = "_".join(foil_hole_jpeg.stem.split("_")[:2])
+                if foil_holes.get(foil_hole_name):
+                    if (
+                        Path(foil_holes[foil_hole_name].thumbnail).stat().st_mtime
+                        > foil_hole_jpeg.stat().st_mtime
+                    ):
+                        continue
                 foil_hole_data = parse_epu_xml(foil_hole_jpeg.with_suffix(".xml"))
-                foil_holes.append(
-                    FoilHole(
-                        grid_square_name=grid_square_dir.name,
-                        stage_position_x=foil_hole_data["stage_position"][0],
-                        stage_position_y=foil_hole_data["stage_position"][1],
-                        thumbnail=str(foil_hole_jpeg),
-                        pixel_size=foil_hole_data["pixel_size"],
-                        readout_area_x=foil_hole_data["readout_area"][0],
-                        readout_area_y=foil_hole_data["readout_warea"][0],
-                        foil_hole_name="_".join(foil_hole_jpeg.stem.split("_")[:2]),
-                    )
+                foil_holes[foil_hole_name] = FoilHole(
+                    grid_square_name=grid_square_dir.name,
+                    stage_position_x=foil_hole_data["stage_position"][0],
+                    stage_position_y=foil_hole_data["stage_position"][1],
+                    thumbnail=str(foil_hole_jpeg),
+                    pixel_size=foil_hole_data["pixel_size"],
+                    readout_area_x=foil_hole_data["readout_area"][0],
+                    readout_area_y=foil_hole_data["readout_area"][0],
+                    foil_hole_name="_".join(foil_hole_jpeg.stem.split("_")[:2]),
                 )
-            foil_hole_names = [fh.foil_hole_name for fh in foil_holes]
-            extractor.put_image_data(foil_holes)
+            extractor.put_image_data(list(foil_holes.values()))
             for exposure_jpeg in (grid_square_dir / "Data").glob("*.jpg"):
-                for fh_name in foil_hole_names:
+                for fh_name in foil_holes.keys():
                     if fh_name in exposure_jpeg.name:
                         foil_hole_name = fh_name
                         break
                 else:
                     continue
                 exposure_data = parse_epu_xml(exposure_jpeg.with_suffix(".xml"))
-                exposures.append(
-                    Exposure(
-                        foil_hole_name=foil_hole_name,
-                        stage_position_x=exposure_data["stage_position"][0],
-                        stage_position_y=exposure_data["stage_position"][1],
-                        thumbnail=str(exposure_jpeg),
-                        pixel_size=exposure_data["pizel_size"],
-                        readout_area_x=exposure_data["readout_area"][0],
-                        readout_area_y=exposure_data["readout_area"][1],
-                    )
+                exposures[exposure_jpeg] = Exposure(
+                    exposure_name=exposure_jpeg.name,
+                    foil_hole_name=foil_hole_name,
+                    stage_position_x=exposure_data["stage_position"][0],
+                    stage_position_y=exposure_data["stage_position"][1],
+                    thumbnail=str(exposure_jpeg),
+                    pixel_size=exposure_data["pixel_size"],
+                    readout_area_x=exposure_data["readout_area"][0],
+                    readout_area_y=exposure_data["readout_area"][1],
                 )
-            extractor.put_image_data(exposures)
+            extractor.put_image_data(list(exposures.values()))
