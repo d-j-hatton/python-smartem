@@ -4,7 +4,7 @@ import importlib.resources
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from PyQt5.QtGui import QBrush, QPainter, QPixmap, QTransform
+from PyQt5.QtGui import QBrush, QColor, QPainter, QPixmap, QTransform
 from PyQt5.QtWidgets import (
     QApplication,
     QComboBox,
@@ -142,7 +142,7 @@ class MainDisplay(QWidget):
         self._update_fh_choices(self._square_combo.currentText())
 
     def _select_foil_hole(self, index: int):
-        hole_lbl = self._draw_foil_hole(self._foil_holes[index], flip=(1, -1))
+        hole_lbl = self._draw_foil_hole(self._foil_holes[index], flip=(-1, -1))
         self.grid.addWidget(hole_lbl, 2, 2)
         self._update_exposure_choices(self._foil_hole_combo.currentText())
 
@@ -152,14 +152,16 @@ class MainDisplay(QWidget):
         exposure: Optional[Exposure] = None,
         flip: Tuple[int, int] = (1, 1),
     ) -> QLabel:
+        print("drawing foil hole image")
         hole_lbl = QLabel(self)
         hole_pixmap = QPixmap(foil_hole.thumbnail)
-        foil_hole_size = hole_pixmap.size
+        foil_hole_qtsize = hole_pixmap.size()
+        foil_hole_size = (foil_hole_qtsize.width(), foil_hole_qtsize.height())
         if flip != (1, 1):
             hole_pixmap = hole_pixmap.transformed(QTransform().scale(*flip))
         if exposure:
             painter = QPainter(hole_pixmap)
-            painter.setBrush(QBrush("green"))
+            painter.setBrush(QBrush(QColor("green")))
             scaled_fh_pixel_size = foil_hole.pixel_size * (
                 foil_hole.readout_area_x / foil_hole_size[0]
             )
@@ -185,6 +187,7 @@ class MainDisplay(QWidget):
                 edge_lengths[0],
                 edge_lengths[1],
             )
+            painter.end()
         hole_lbl.setPixmap(hole_pixmap)
         return hole_lbl
 
