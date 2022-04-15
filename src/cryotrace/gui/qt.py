@@ -4,7 +4,7 @@ import importlib.resources
 from pathlib import Path
 from typing import List
 
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QTransform
 from PyQt5.QtWidgets import (
     QApplication,
     QComboBox,
@@ -143,7 +143,8 @@ class MainDisplay(QWidget):
     def _select_foil_hole(self, index: int):
         hole_lbl = QLabel(self)
         hole_pixmap = QPixmap(self._foil_holes[index].thumbnail)
-        hole_lbl.setPixmap(hole_pixmap)
+        hole_pixmap_flipped = hole_pixmap.transformed(QTransform().scale(1, -1))
+        hole_lbl.setPixmap(hole_pixmap_flipped)
         self.grid.addWidget(hole_lbl, 2, 2)
         self._update_exposure_choices(self._foil_hole_combo.currentText())
 
