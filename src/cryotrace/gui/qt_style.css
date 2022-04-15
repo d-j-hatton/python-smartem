@@ -4,10 +4,10 @@ QWidget {
 
 QPushButton {
   background-clip: padding-box;
-  background-color: #fa6400;
+  background-color: #13c4a3;
   border: 1px solid transparent;
   border-radius: .25rem;
-  color: #fff;
+  color: #000;
   font-family: system-ui,-apple-system,system-ui,"Helvetica Neue",Helvetica,Arial,sans-serif;
   font-size: 16px;
   font-weight: 600;
@@ -22,16 +22,16 @@ QPushButton {
 }
 
 QPushButton:hover{
-  background-color: #fb8332;
+  background-color: #36f1cd;
 }
 
 QComboBox {
-    background-color: #fa6400;
+    background-color: #13c4a3;
     font-family: system-ui,-apple-system,system-ui,"Helvetica Neue",Helvetica,Arial,sans-serif;
     font-size: 16px;
     font-weight: 600;
 }
 
 QComboBox:hover{
-    background-color: #fb8332;
+    background-color: #36f1cd;
 }
