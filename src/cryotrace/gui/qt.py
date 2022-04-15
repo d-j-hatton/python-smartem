@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from cryotrace.data_model import FoilHole, GridSquare
+from cryotrace.data_model import Exposure, FoilHole, GridSquare
 from cryotrace.data_model.extract import Extractor
 from cryotrace.parsing.epu import create_atlas_and_tiles, parse_epu_dir
 
@@ -112,10 +112,14 @@ class MainDisplay(QWidget):
         self._square_combo.currentIndexChanged.connect(self._select_square)
         self._foil_hole_combo = QComboBox()
         self._foil_hole_combo.currentIndexChanged.connect(self._select_foil_hole)
+        self._exposure_combo = QComboBox()
+        self._exposure_combo.currentIndexChanged.connect(self._select_exposure)
         self.grid.addWidget(self._square_combo, 1, 1)
         self.grid.addWidget(self._foil_hole_combo, 1, 2)
+        self.grid.addWidget(self._exposure_combo, 1, 3)
         self._grid_squares: List[GridSquare] = []
         self._foil_holes: List[FoilHole] = []
+        self._exposures: List[Exposure] = []
 
     def load(self):
         self._grid_squares = self._extractor.get_grid_squares()
@@ -136,9 +140,22 @@ class MainDisplay(QWidget):
         hole_pixmap = QPixmap(self._foil_holes[index].thumbnail)
         hole_lbl.setPixmap(hole_pixmap)
         self.grid.addWidget(hole_lbl, 2, 2)
+        self._update_exposure_choices(self._foil_hole_combo.currentText())
+
+    def _select_exposure(self, index: int):
+        exposure_lbl = QLabel(self)
+        exposure_pixmap = QPixmap(self._exposures[index].thumbnail)
+        exposure_lbl.setPixmap(exposure_pixmap)
+        self.grid.addWidget(exposure_lbl, 2, 3)
 
     def _update_fh_choices(self, grid_square_name: str):
         self._foil_holes = self._extractor.get_foil_holes(grid_square_name)
         self._foil_hole_combo.clear()
         for fh in self._foil_holes:
             self._foil_hole_combo.addItem(fh.foil_hole_name)
+
+    def _update_exposure_choices(self, foil_hole_name: str):
+        self._exposures = self._extractor.get_exposures(foil_hole_name)
+        self._exposure_combo.clear()
+        for ex in self._exposures:
+            self._exposure_combo.addItem(ex.exposure_name)

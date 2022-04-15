@@ -45,6 +45,13 @@ class Extractor:
         )
         return query.all()
 
+    @lru_cache(maxsize=50)
+    def get_exposures(self, foil_hole_name: str) -> List[Exposure]:
+        query = self.session.query(Exposure).filter(
+            Exposure.foil_hole_name == foil_hole_name
+        )
+        return query.all()
+
     def set_atlas_id(self, atlas_path: str) -> bool:
         query = self.session.query(Atlas).options(load_only("thumbnail", "atlas_id"))
         for q in query.all():
