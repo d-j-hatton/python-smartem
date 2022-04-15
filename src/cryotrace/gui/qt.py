@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.resources
 from pathlib import Path
 from typing import List
 
@@ -16,6 +17,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+import cryotrace.gui
 from cryotrace.data_model import Exposure, FoilHole, GridSquare
 from cryotrace.data_model.extract import Extractor
 from cryotrace.parsing.epu import create_atlas_and_tiles, parse_epu_dir
@@ -25,6 +27,9 @@ class App:
     def __init__(self, extractor: Extractor):
         self.app = QApplication([])
         self.window = QtFrame(extractor)
+        self.app.setStyleSheet(
+            importlib.resources.read_text(cryotrace.gui, "qt_style.css")
+        )
 
     def start(self):
         self.window.show()
