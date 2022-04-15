@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import importlib.resources
 from pathlib import Path
-from typing import List
+from typing import List, Optional, Tuple
 
-from PyQt5.QtGui import QPixmap, QTransform
+from PyQt5.QtGui import QBrush, QPainter, QPixmap, QTransform
 from PyQt5.QtWidgets import (
     QApplication,
     QComboBox,
@@ -21,6 +21,7 @@ import cryotrace.gui
 from cryotrace.data_model import Exposure, FoilHole, GridSquare
 from cryotrace.data_model.extract import Extractor
 from cryotrace.parsing.epu import create_atlas_and_tiles, parse_epu_dir
+from cryotrace.stage_model import find_point_pixel
 
 
 class App:
@@ -141,18 +142,61 @@ class MainDisplay(QWidget):
         self._update_fh_choices(self._square_combo.currentText())
 
     def _select_foil_hole(self, index: int):
-        hole_lbl = QLabel(self)
-        hole_pixmap = QPixmap(self._foil_holes[index].thumbnail)
-        hole_pixmap_flipped = hole_pixmap.transformed(QTransform().scale(1, -1))
-        hole_lbl.setPixmap(hole_pixmap_flipped)
+        hole_lbl = self._draw_foil_hole(self._foil_holes[index], flip=(1, -1))
         self.grid.addWidget(hole_lbl, 2, 2)
         self._update_exposure_choices(self._foil_hole_combo.currentText())
+
+    def _draw_foil_hole(
+        self,
+        foil_hole: FoilHole,
+        exposure: Optional[Exposure] = None,
+        flip: Tuple[int, int] = (1, 1),
+    ) -> QLabel:
+        hole_lbl = QLabel(self)
+        hole_pixmap = QPixmap(foil_hole.thumbnail)
+        foil_hole_size = hole_pixmap.size
+        if flip != (1, 1):
+            hole_pixmap = hole_pixmap.transformed(QTransform().scale(*flip))
+        if exposure:
+            painter = QPainter(hole_pixmap)
+            painter.setBrush(QBrush("green"))
+            scaled_fh_pixel_size = foil_hole.pixel_size * (
+                foil_hole.readout_area_x / foil_hole_size[0]
+            )
+            rect_centre = find_point_pixel(
+                (exposure.stage_position_x, exposure.stage_position_y),
+                (foil_hole.stage_position_x, foil_hole.stage_position_y),
+                scaled_fh_pixel_size,
+                (foil_hole.readout_area_x, foil_hole.readout_area_y),
+                xfactor=-1,
+                yfactor=-1,
+            )
+            edge_lengths = (
+                int(
+                    exposure.readout_area_x * exposure.pixel_size / scaled_fh_pixel_size
+                ),
+                int(
+                    exposure.readout_area_y * exposure.pixel_size / scaled_fh_pixel_size
+                ),
+            )
+            painter.drawRect(
+                rect_centre[0] - 0.5 * edge_lengths[0],
+                rect_centre[1] - 0.5 * edge_lengths[1],
+                edge_lengths[0],
+                edge_lengths[1],
+            )
+        hole_lbl.setPixmap(hole_pixmap)
+        return hole_lbl
 
     def _select_exposure(self, index: int):
         exposure_lbl = QLabel(self)
         exposure_pixmap = QPixmap(self._exposures[index].thumbnail)
         exposure_lbl.setPixmap(exposure_pixmap)
         self.grid.addWidget(exposure_lbl, 2, 3)
+        self._draw_foil_hole(
+            self._foil_holes[self._foil_hole_combo.currentIndex()],
+            exposure=self._exposures[index],
+        )
 
     def _update_fh_choices(self, grid_square_name: str):
         self._foil_holes = self._extractor.get_foil_holes(grid_square_name)
