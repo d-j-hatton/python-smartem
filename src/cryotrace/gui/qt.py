@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import importlib.resources
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
-from PyQt5.QtGui import QBrush, QColor, QPainter, QPixmap, QTransform
+from PyQt5 import QtCore
+from PyQt5.QtGui import QColor, QPainter, QPen, QPixmap, QTransform
 from PyQt5.QtWidgets import (
     QApplication,
     QComboBox,
@@ -152,43 +153,19 @@ class MainDisplay(QWidget):
         exposure: Optional[Exposure] = None,
         flip: Tuple[int, int] = (1, 1),
     ) -> QLabel:
-        print("drawing foil hole image")
-        hole_lbl = QLabel(self)
         hole_pixmap = QPixmap(foil_hole.thumbnail)
-        foil_hole_qtsize = hole_pixmap.size()
-        foil_hole_size = (foil_hole_qtsize.width(), foil_hole_qtsize.height())
         if flip != (1, 1):
             hole_pixmap = hole_pixmap.transformed(QTransform().scale(*flip))
         if exposure:
-            painter = QPainter(hole_pixmap)
-            painter.setBrush(QBrush(QColor("green")))
-            scaled_fh_pixel_size = foil_hole.pixel_size * (
-                foil_hole.readout_area_x / foil_hole_size[0]
+            qsize = hole_pixmap.size()
+            hole_lbl = ImageLabel(
+                foil_hole, exposure, (qsize.width(), qsize.height()), parent=self
             )
-            rect_centre = find_point_pixel(
-                (exposure.stage_position_x, exposure.stage_position_y),
-                (foil_hole.stage_position_x, foil_hole.stage_position_y),
-                scaled_fh_pixel_size,
-                (foil_hole.readout_area_x, foil_hole.readout_area_y),
-                xfactor=-1,
-                yfactor=-1,
-            )
-            edge_lengths = (
-                int(
-                    exposure.readout_area_x * exposure.pixel_size / scaled_fh_pixel_size
-                ),
-                int(
-                    exposure.readout_area_y * exposure.pixel_size / scaled_fh_pixel_size
-                ),
-            )
-            painter.drawRect(
-                rect_centre[0] - 0.5 * edge_lengths[0],
-                rect_centre[1] - 0.5 * edge_lengths[1],
-                edge_lengths[0],
-                edge_lengths[1],
-            )
-            painter.end()
-        hole_lbl.setPixmap(hole_pixmap)
+            self.grid.addWidget(hole_lbl, 2, 2)
+            hole_lbl.setPixmap(hole_pixmap)
+        else:
+            hole_lbl = QLabel(self)
+            hole_lbl.setPixmap(hole_pixmap)
         return hole_lbl
 
     def _select_exposure(self, index: int):
@@ -212,3 +189,68 @@ class MainDisplay(QWidget):
         self._exposure_combo.clear()
         for ex in self._exposures:
             self._exposure_combo.addItem(ex.exposure_name)
+
+
+class ImageLabel(QLabel):
+    def __init__(
+        self,
+        image: Union[GridSquare, FoilHole, Exposure],
+        contained_image: Optional[Union[FoilHole, Exposure]],
+        image_size: Tuple[int, int],
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._image = image
+        self._contained_image = contained_image
+        self._image_size = image_size
+
+    def paintEvent(self, e):
+        super().paintEvent(e)
+
+        if self._contained_image:
+            painter = QPainter(self)
+            pen = QPen(QColor(QtCore.Qt.red))
+            pen.setWidth(3)
+            painter.setPen(pen)
+            scaled_pixel_size = self._image.pixel_size * (
+                self._image.readout_area_x / self._image_size[0]
+            )
+            rect_centre = find_point_pixel(
+                (
+                    self._contained_image.stage_position_x,
+                    self._contained_image.stage_position_y,
+                ),
+                (self._image.stage_position_x, self._image.stage_position_y),
+                scaled_pixel_size,
+                (
+                    int(
+                        self._image.readout_area_x
+                        / (scaled_pixel_size / self._image.pixel_size)
+                    ),
+                    int(
+                        self._image.readout_area_y
+                        / (scaled_pixel_size / self._image.pixel_size)
+                    ),
+                ),
+                xfactor=-1,
+                yfactor=-1,
+            )
+            edge_lengths = (
+                int(
+                    self._contained_image.readout_area_x
+                    * self._contained_image.pixel_size
+                    / scaled_pixel_size
+                ),
+                int(
+                    self._contained_image.readout_area_y
+                    * self._contained_image.pixel_size
+                    / scaled_pixel_size
+                ),
+            )
+            painter.drawRect(
+                int(rect_centre[0] - 0.5 * edge_lengths[0]),
+                int(rect_centre[1] - 0.5 * edge_lengths[1]),
+                edge_lengths[0],
+                edge_lengths[1],
+            )
+            painter.end()
