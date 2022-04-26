@@ -4,6 +4,7 @@ import importlib.resources
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
+import mrcfile
 from PyQt5 import QtCore
 from PyQt5.QtGui import QColor, QPainter, QPen, QPixmap, QTransform
 from PyQt5.QtWidgets import (
@@ -19,7 +20,7 @@ from PyQt5.QtWidgets import (
 )
 
 import cryotrace.gui
-from cryotrace.data_model import Exposure, FoilHole, GridSquare
+from cryotrace.data_model import Atlas, Exposure, FoilHole, GridSquare, Tile
 from cryotrace.data_model.extract import Extractor
 from cryotrace.parsing.epu import create_atlas_and_tiles, parse_epu_dir
 from cryotrace.stage_model import find_point_pixel
@@ -43,19 +44,27 @@ class QtFrame(QWidget):
         super().__init__()
         self.tabs = QTabWidget()
         self.layout = QVBoxLayout(self)
-        main_display = MainDisplay(extractor)
-        proj_loader = ProjectLoader(extractor, main_display)
+        atlas_display = AtlasDisplay(extractor)
+        main_display = MainDisplay(extractor, atlas_view=atlas_display)
+        proj_loader = ProjectLoader(extractor, main_display, atlas_display)
         self.tabs.addTab(proj_loader, "Project")
         self.tabs.addTab(main_display, "Grid square view")
+        self.tabs.addTab(atlas_display, "Atlas view")
         self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)
 
 
 class ProjectLoader(QWidget):
-    def __init__(self, extractor: Extractor, main_display: MainDisplay):
+    def __init__(
+        self,
+        extractor: Extractor,
+        main_display: MainDisplay,
+        atlas_display: AtlasDisplay,
+    ):
         super().__init__()
         self._extractor = extractor
         self._main_display = main_display
+        self._atlas_display = atlas_display
         self.grid = QGridLayout()
         self.setLayout(self.grid)
         self.epu_dir = ""
@@ -100,6 +109,7 @@ class ProjectLoader(QWidget):
         atlas_found = self._extractor.set_atlas_id(self.atlas)
         if atlas_found:
             self._main_display.load()
+            self._atlas_display.load()
             return
         create_atlas_and_tiles(Path(self.atlas), self._extractor)
         atlas_found = self._extractor.set_atlas_id(self.atlas)
@@ -107,10 +117,11 @@ class ProjectLoader(QWidget):
             raise ValueError("Atlas record not found despite having just been inserted")
         parse_epu_dir(Path(self.epu_dir), self._extractor)
         self._main_display.load()
+        self._atlas_display.load()
 
 
 class MainDisplay(QWidget):
-    def __init__(self, extractor: Extractor):
+    def __init__(self, extractor: Extractor, atlas_view: Optional[AtlasDisplay] = None):
         super().__init__()
         self._extractor = extractor
         self.grid = QGridLayout()
@@ -127,6 +138,7 @@ class MainDisplay(QWidget):
         self._grid_squares: List[GridSquare] = []
         self._foil_holes: List[FoilHole] = []
         self._exposures: List[Exposure] = []
+        self._atlas_view = atlas_view
 
     def load(self):
         self._grid_squares = self._extractor.get_grid_squares()
@@ -136,16 +148,41 @@ class MainDisplay(QWidget):
         self._update_fh_choices(self._grid_squares[0].grid_square_name)
 
     def _select_square(self, index: int):
-        square_lbl = QLabel(self)
-        square_pixmap = QPixmap(self._grid_squares[index].thumbnail)
-        square_lbl.setPixmap(square_pixmap)
+        square_lbl = self._draw_grid_square(self._grid_squares[index])
         self.grid.addWidget(square_lbl, 2, 1)
         self._update_fh_choices(self._square_combo.currentText())
+        if self._atlas_view:
+            self._atlas_view.load(grid_square=self._grid_squares[index])
 
     def _select_foil_hole(self, index: int):
         hole_lbl = self._draw_foil_hole(self._foil_holes[index], flip=(-1, -1))
         self.grid.addWidget(hole_lbl, 2, 2)
         self._update_exposure_choices(self._foil_hole_combo.currentText())
+        self._draw_grid_square(
+            self._grid_squares[self._square_combo.currentIndex()],
+            foil_hole=self._foil_holes[index],
+        )
+
+    def _draw_grid_square(
+        self,
+        grid_square: GridSquare,
+        foil_hole: Optional[FoilHole] = None,
+        flip: Tuple[int, int] = (1, 1),
+    ) -> QLabel:
+        square_pixmap = QPixmap(grid_square.thumbnail)
+        if flip != (1, 1):
+            square_pixmap = square_pixmap.transformed(QTransform().scale(*flip))
+        if foil_hole:
+            qsize = square_pixmap.size()
+            square_lbl = ImageLabel(
+                grid_square, foil_hole, (qsize.width(), qsize.height()), parent=self
+            )
+            self.grid.addWidget(square_lbl, 2, 1)
+            square_lbl.setPixmap(square_pixmap)
+        else:
+            square_lbl = QLabel(self)
+            square_lbl.setPixmap(square_pixmap)
+        return square_lbl
 
     def _draw_foil_hole(
         self,
@@ -176,6 +213,7 @@ class MainDisplay(QWidget):
         self._draw_foil_hole(
             self._foil_holes[self._foil_hole_combo.currentIndex()],
             exposure=self._exposures[index],
+            flip=(-1, -1),
         )
 
     def _update_fh_choices(self, grid_square_name: str):
@@ -191,18 +229,80 @@ class MainDisplay(QWidget):
             self._exposure_combo.addItem(ex.exposure_name)
 
 
+class AtlasDisplay(QWidget):
+    def __init__(self, extractor: Extractor):
+        super().__init__()
+        self._extractor = extractor
+        self.grid = QGridLayout()
+        self.setLayout(self.grid)
+        # self._draw_atlas()
+
+    def load(self, grid_square: Optional[GridSquare] = None):
+        atlas_lbl = self._draw_atlas(grid_square=grid_square)
+        if atlas_lbl:
+            self.grid.addWidget(atlas_lbl, 1, 1)
+        if grid_square:
+            tile_lbl = self._draw_tile(grid_square)
+            self.grid.addWidget(tile_lbl, 1, 2)
+
+    def _draw_atlas(
+        self, grid_square: Optional[GridSquare] = None, flip: Tuple[int, int] = (1, 1)
+    ) -> Optional[QLabel]:
+        _atlas = self._extractor.get_atlas()
+        if _atlas:
+            atlas_pixmap = QPixmap(_atlas.thumbnail)
+            if flip != (1, 1):
+                atlas_pixmap = atlas_pixmap.transformed(QTransform().scale(*flip))
+            if grid_square:
+                qsize = atlas_pixmap.size()
+                atlas_lbl = ImageLabel(
+                    _atlas,
+                    grid_square,
+                    (qsize.width(), qsize.height()),
+                    parent=self,
+                    overwrite_readout=True,
+                )
+                self.grid.addWidget(atlas_lbl, 1, 1)
+                atlas_lbl.setPixmap(atlas_pixmap)
+            else:
+                atlas_lbl = QLabel(self)
+                atlas_lbl.setPixmap(atlas_pixmap)
+            return atlas_lbl
+        return None
+
+    def _draw_tile(
+        self, grid_square: GridSquare, flip: Tuple[int, int] = (1, 1)
+    ) -> QLabel:
+        _tile = self._extractor.get_tile(
+            (grid_square.stage_position_x, grid_square.stage_position_y)
+        )
+        if _tile:
+            tile_pixmap = QPixmap(_tile.thumbnail)
+            if flip != (1, 1):
+                tile_pixmap = tile_pixmap.transformed(QTransform().scale(*flip))
+            qsize = tile_pixmap.size()
+            tile_lbl = ImageLabel(
+                _tile, grid_square, (qsize.width(), qsize.height()), parent=self
+            )
+            self.grid.addWidget(tile_lbl, 1, 1)
+            tile_lbl.setPixmap(tile_pixmap)
+            return tile_lbl
+
+
 class ImageLabel(QLabel):
     def __init__(
         self,
-        image: Union[GridSquare, FoilHole, Exposure],
-        contained_image: Optional[Union[FoilHole, Exposure]],
+        image: Union[Atlas, Tile, GridSquare, FoilHole, Exposure],
+        contained_image: Optional[Union[GridSquare, FoilHole, Exposure]],
         image_size: Tuple[int, int],
+        overwrite_readout: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self._image = image
         self._contained_image = contained_image
         self._image_size = image_size
+        self._overwrite_readout = overwrite_readout
 
     def paintEvent(self, e):
         super().paintEvent(e)
@@ -212,8 +312,13 @@ class ImageLabel(QLabel):
             pen = QPen(QColor(QtCore.Qt.red))
             pen.setWidth(3)
             painter.setPen(pen)
+            if self._overwrite_readout:
+                with mrcfile.open(self._image.thumbnail.replace(".jpg", ".mrc")) as mrc:
+                    readout_area = mrc.data.shape
+            else:
+                readout_area = (self._image.readout_area_x, self._image.readout_area_y)
             scaled_pixel_size = self._image.pixel_size * (
-                self._image.readout_area_x / self._image_size[0]
+                readout_area[0] / self._image_size[0]
             )
             rect_centre = find_point_pixel(
                 (
@@ -223,16 +328,10 @@ class ImageLabel(QLabel):
                 (self._image.stage_position_x, self._image.stage_position_y),
                 scaled_pixel_size,
                 (
-                    int(
-                        self._image.readout_area_x
-                        / (scaled_pixel_size / self._image.pixel_size)
-                    ),
-                    int(
-                        self._image.readout_area_y
-                        / (scaled_pixel_size / self._image.pixel_size)
-                    ),
+                    int(readout_area[0] / (scaled_pixel_size / self._image.pixel_size)),
+                    int(readout_area[1] / (scaled_pixel_size / self._image.pixel_size)),
                 ),
-                xfactor=-1,
+                xfactor=1,
                 yfactor=-1,
             )
             edge_lengths = (

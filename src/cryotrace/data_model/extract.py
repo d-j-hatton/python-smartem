@@ -25,6 +25,14 @@ class Extractor:
         self.engine = create_engine(_url)
         self.session = sessionmaker(bind=self.engine)()
 
+    # @lru_cache(maxsize=1)
+    def get_atlas(self) -> Optional[Atlas]:
+        query = self.session.query(Atlas).filter(Atlas.atlas_id == self._atlas_id)
+        try:
+            return query.all()[0]
+        except IndexError:
+            return None
+
     def get_atlases(self) -> List[str]:
         query = self.session.query(Atlas).options(load_only("thumbnail"))
         return [q.thumbnail for q in query.all()]
@@ -60,7 +68,7 @@ class Extractor:
                 return True
         return False
 
-    def get_tile_id(self, stage_position: Tuple[float, float]) -> Optional[int]:
+    def get_tile(self, stage_position: Tuple[float, float]) -> Optional[Tile]:
         query = self.session.query(Tile).filter(Tile.atlas_id == self._atlas_id)
         tiles = query.all()
         for tile in tiles:
@@ -74,7 +82,13 @@ class Extractor:
             )
             if stage_position[0] > left and stage_position[0] < right:
                 if stage_position[1] < top and stage_position[1] > bottom:
-                    return tile.tile_id
+                    return tile
+        return None
+
+    def get_tile_id(self, stage_position: Tuple[float, float]) -> Optional[int]:
+        tile = self.get_tile(stage_position)
+        if tile:
+            return tile.tile_id
         return None
 
     def put_image_data(
