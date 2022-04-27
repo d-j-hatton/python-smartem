@@ -23,6 +23,7 @@ import cryotrace.gui
 from cryotrace.data_model import Atlas, Exposure, FoilHole, GridSquare, Tile
 from cryotrace.data_model.extract import Extractor
 from cryotrace.parsing.epu import create_atlas_and_tiles, parse_epu_dir
+from cryotrace.parsing.star import get_columns, open_star_file
 from cryotrace.stage_model import find_point_pixel
 
 
@@ -46,8 +47,10 @@ class QtFrame(QWidget):
         self.layout = QVBoxLayout(self)
         atlas_display = AtlasDisplay(extractor)
         main_display = MainDisplay(extractor, atlas_view=atlas_display)
-        proj_loader = ProjectLoader(extractor, main_display, atlas_display)
+        data_loader = DataLoader()
+        proj_loader = ProjectLoader(extractor, data_loader, main_display, atlas_display)
         self.tabs.addTab(proj_loader, "Project")
+        self.tabs.addTab(data_loader, "Load data")
         self.tabs.addTab(main_display, "Grid square view")
         self.tabs.addTab(atlas_display, "Atlas view")
         self.layout.addWidget(self.tabs)
@@ -58,16 +61,19 @@ class ProjectLoader(QWidget):
     def __init__(
         self,
         extractor: Extractor,
+        data_loader: DataLoader,
         main_display: MainDisplay,
         atlas_display: AtlasDisplay,
     ):
         super().__init__()
         self._extractor = extractor
+        self._data_loader = data_loader
         self._main_display = main_display
         self._atlas_display = atlas_display
         self.grid = QGridLayout()
         self.setLayout(self.grid)
         self.epu_dir = ""
+        self.project_dir = ""
         self._combo = QComboBox()
         atlases = self._extractor.get_atlases()
         for atl in atlases:
@@ -87,9 +93,15 @@ class ProjectLoader(QWidget):
         self.atlas_lbl = QLabel()
         self.atlas_lbl.setText(f"Selected: {self.atlas}")
         self.grid.addWidget(self.atlas_lbl, 3, 3)
+        project_btn = QPushButton("Select project directory")
+        project_btn.clicked.connect(self._select_project)
+        self.grid.addWidget(project_btn, 4, 1)
+        self.project_lbl = QLabel()
+        self.project_lbl.setText(f"Selected: {self.project_dir}")
+        self.grid.addWidget(self.project_lbl, 4, 3)
         load_btn = QPushButton("Load")
         load_btn.clicked.connect(self.load)
-        self.grid.addWidget(load_btn, 4, 2)
+        self.grid.addWidget(load_btn, 5, 2)
 
     def _select_epu_dir(self):
         self.epu_dir = QFileDialog.getExistingDirectory(
@@ -105,6 +117,13 @@ class ProjectLoader(QWidget):
         self.atlas = QFileDialog.getOpenFileName(self, "Select Atlas image", ".")[0]
         self.atlas_lbl.setText(f"Selected: {self.atlas}")
 
+    def _select_project(self):
+        self.project_dir = QFileDialog.getExistingDirectory(
+            self, "Select project directory", ".", QFileDialog.ShowDirsOnly
+        )
+        self.project_lbl.setText(f"Selected: {self.project_dir}")
+        self._data_loader.set_project_directory(Path(self.project_dir))
+
     def load(self):
         atlas_found = self._extractor.set_atlas_id(self.atlas)
         if atlas_found:
@@ -118,6 +137,41 @@ class ProjectLoader(QWidget):
         parse_epu_dir(Path(self.epu_dir), self._extractor)
         self._main_display.load()
         self._atlas_display.load()
+
+
+class DataLoader(QWidget):
+    def __init__(self, project_directory: Optional[Path] = None):
+        super().__init__()
+        self.grid = QGridLayout()
+        self.setLayout(self.grid)
+        self._proj_dir = project_directory
+        self._file_combo = QComboBox()
+        self._file_combo.setEditable(True)
+        self._file_combo.currentIndexChanged.connect(self._select_star_file)
+        self.grid.addWidget(self._file_combo, 1, 1)
+        self._column_combo = QComboBox()
+        self._column_combo.setEditable(True)
+        self.grid.addWidget(self._column_combo, 2, 1)
+        if self._proj_dir:
+            for sf in self._proj_dir.glob("**/*.star"):
+                self._file_combo.addItem(str(sf))
+
+    def set_project_directory(self, project_directory: Path):
+        self._proj_dir = project_directory
+        for sf in self._proj_dir.glob("**/*.star"):
+            str_sf = str(sf)
+            if (
+                all(p not in str_sf for p in ("gui", "pipeline", "Nodes"))
+                and "job" not in sf.name
+            ):
+                self._file_combo.addItem(str_sf)
+
+    def _select_star_file(self, index: int):
+        star_file_path = Path(self._file_combo.currentText())
+        star_file = open_star_file(star_file_path)
+        columns = get_columns(star_file, ignore=["pipeline"])
+        for c in columns:
+            self._column_combo.addItem(c)
 
 
 class MainDisplay(QWidget):
@@ -272,7 +326,7 @@ class AtlasDisplay(QWidget):
 
     def _draw_tile(
         self, grid_square: GridSquare, flip: Tuple[int, int] = (1, 1)
-    ) -> QLabel:
+    ) -> Optional[QLabel]:
         _tile = self._extractor.get_tile(
             (grid_square.stage_position_x, grid_square.stage_position_y)
         )
@@ -287,6 +341,7 @@ class AtlasDisplay(QWidget):
             self.grid.addWidget(tile_lbl, 1, 1)
             tile_lbl.setPixmap(tile_pixmap)
             return tile_lbl
+        return None
 
 
 class ImageLabel(QLabel):

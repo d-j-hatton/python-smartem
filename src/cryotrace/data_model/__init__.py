@@ -198,6 +198,21 @@ class ExposureInfo(Base):
     Exposure = relationship("Exposure")
 
 
+class ParticleSet(Base):
+    __tablename__ = "ParticleSet"
+
+    name = Column(
+        String,
+        primary_key=True,
+        nullable=False,
+    )
+
+    size = Column(
+        Integer,
+        nullable=False,
+    )
+
+
 _tables = [
     Atlas,
     Tile,
