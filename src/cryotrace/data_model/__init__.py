@@ -144,9 +144,7 @@ class Particle(Base):
     Exposure = relationship("Exposure")
 
 
-class ParticleInfo(Base):
-    __tablename__ = "ParticleInfo"
-
+class InfoStore:
     source = Column(
         String,
         primary_key=True,
@@ -164,6 +162,10 @@ class ParticleInfo(Base):
         primary_key=True,
         nullable=False,
     )
+
+
+class ParticleInfo(InfoStore, Base):
+    __tablename__ = "ParticleInfo"
 
     particle_id: Column = Column(
         ForeignKey("Particle.particle_id"), primary_key=True, index=True
@@ -171,26 +173,8 @@ class ParticleInfo(Base):
     Particle = relationship("Particle")
 
 
-class ExposureInfo(Base):
+class ExposureInfo(InfoStore, Base):
     __tablename__ = "ExposureInfo"
-
-    source = Column(
-        String,
-        primary_key=True,
-        nullable=False,
-    )
-
-    key = Column(
-        String,
-        primary_key=True,
-        nullable=False,
-    )
-
-    value: Column = Column(
-        Float,
-        primary_key=True,
-        nullable=False,
-    )
 
     exposure_name: Column = Column(
         ForeignKey("Exposure.exposure_name"), primary_key=True, index=True

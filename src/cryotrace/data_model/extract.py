@@ -11,6 +11,7 @@ from cryotrace.data_model import (
     ExposureInfo,
     FoilHole,
     GridSquare,
+    InfoStore,
     Particle,
     ParticleInfo,
     Tile,
@@ -101,6 +102,27 @@ class Extractor:
             return [getattr(im, return_key) for im in images]
         else:
             return None
+
+    def get_particle_id(self, exposure_name: str, x: float, y: float) -> int:
+        query = self.session.query(Exposure).filter(
+            Particle.exposure_name == exposure_name, Particle.x == x, Particle.y == y
+        )
+        _particle = query.all()
+        if not _particle:
+            raise ValueError(
+                f"No exposure found for exposure [{exposure_name}], x [{x}], y [{y}]"
+            )
+        if len(_particle) > 1:
+            raise ValueError(
+                f"More than one exposure found for exposure [{exposure_name}], x [{x}], y [{y}]"
+            )
+        particle = _particle[0]
+        return particle.particle_id
+
+    def put_info(self, info: Sequence[InfoStore]):
+        for i in info:
+            self.session.add(i)
+        self.session.commit()
 
     def get_grid_square_data(
         self, grid_square_name: str, keys: Optional[List[str]] = None

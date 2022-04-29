@@ -23,7 +23,12 @@ import cryotrace.gui
 from cryotrace.data_model import Atlas, Exposure, FoilHole, GridSquare, Tile
 from cryotrace.data_model.extract import Extractor
 from cryotrace.parsing.epu import create_atlas_and_tiles, parse_epu_dir
-from cryotrace.parsing.star import get_columns, open_star_file
+from cryotrace.parsing.star import (
+    get_column_data,
+    get_columns,
+    insert_exposure_data,
+    open_star_file,
+)
 from cryotrace.stage_model import find_point_pixel
 
 
@@ -47,7 +52,7 @@ class QtFrame(QWidget):
         self.layout = QVBoxLayout(self)
         atlas_display = AtlasDisplay(extractor)
         main_display = MainDisplay(extractor, atlas_view=atlas_display)
-        data_loader = DataLoader()
+        data_loader = DataLoader(extractor)
         proj_loader = ProjectLoader(extractor, data_loader, main_display, atlas_display)
         self.tabs.addTab(proj_loader, "Project")
         self.tabs.addTab(data_loader, "Load data")
@@ -140,10 +145,13 @@ class ProjectLoader(QWidget):
 
 
 class DataLoader(QWidget):
-    def __init__(self, project_directory: Optional[Path] = None):
+    def __init__(self, extractor: Extractor, project_directory: Optional[Path] = None):
         super().__init__()
+        self._extractor = extractor
         self.grid = QGridLayout()
         self.setLayout(self.grid)
+        self._exposure_tag = None
+        self._column = None
         self._proj_dir = project_directory
         self._file_combo = QComboBox()
         self._file_combo.setEditable(True)
@@ -151,7 +159,15 @@ class DataLoader(QWidget):
         self.grid.addWidget(self._file_combo, 1, 1)
         self._column_combo = QComboBox()
         self._column_combo.setEditable(True)
+        self._column_combo.currentIndexChanged.connect(self._select_column)
         self.grid.addWidget(self._column_combo, 2, 1)
+        self._exposure_tag_combo = QComboBox()
+        self._exposure_tag_combo.setEditable(True)
+        self._exposure_tag_combo.currentIndexChanged.connect(self._select_exposure_tag)
+        self.grid.addWidget(self._exposure_tag_combo, 3, 1)
+        load_btn = QPushButton("Load")
+        load_btn.clicked.connect(self.load)
+        self.grid.addWidget(load_btn, 4, 1)
         if self._proj_dir:
             for sf in self._proj_dir.glob("**/*.star"):
                 self._file_combo.addItem(str(sf))
@@ -172,6 +188,22 @@ class DataLoader(QWidget):
         columns = get_columns(star_file, ignore=["pipeline"])
         for c in columns:
             self._column_combo.addItem(c)
+            self._exposure_tag_combo.addItem(c)
+
+    def _select_exposure_tag(self, index: int):
+        self._exposure_tag = self._exposure_tag_combo.currentText()
+
+    def _select_column(self, index: int):
+        self._column = self._column_combo.currentText()
+
+    def load(self):
+        if self._exposure_tag and self._column:
+            star_file_path = Path(self._file_combo.currentText())
+            star_file = open_star_file(star_file_path)
+            column_data = get_column_data(star_file, [self._exposure_tag, self._column])
+            insert_exposure_data(
+                column_data, self._exposure_tag, str(star_file_path), self._extractor
+            )
 
 
 class MainDisplay(QWidget):
