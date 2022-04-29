@@ -213,6 +213,18 @@ class ParticleSet(Base):
     )
 
 
+class ParticleSetLinker(Base):
+    __tablename__ = "ParticleSetLinker"
+
+    particle_id: Column = Column(
+        ForeignKey("Particle.particle_id"), primary_key=True, index=True
+    )
+    Particle = relationship("Particle")
+
+    set_name: Column = Column(ForeignKey("ParticleSet.name"), primary_key=True)
+    ParticleSet = relationship("ParticleSet")
+
+
 _tables = [
     Atlas,
     Tile,
