@@ -26,9 +26,11 @@ def get_columns(star_file, ignore: Optional[List[str]] = None) -> List[str]:
     return cols
 
 
-def get_column_data(star_file, columns: List[str]) -> Dict[str, List[str]]:
+def get_column_data(
+    star_file, columns: List[str], block_tag: str
+) -> Dict[str, List[str]]:
     json_star = json.loads(star_file.as_json())
-    return {k: v for k, v in json_star.items() if k in columns}
+    return {k: v for k, v in json_star[block_tag].items() if k in columns}
 
 
 def insert_exposure_data(
@@ -36,18 +38,36 @@ def insert_exposure_data(
     exposure_tag: str,
     star_file_path: str,
     extractor: Extractor,
+    validate: bool = True,
 ):
+    # print("insert data", data)
+    if validate:
+        exposures = [e.exposure_name for e in extractor.get_all_exposures()]
     exposure_info: List[ExposureInfo] = []
     for k, v in data.items():
         if k != exposure_tag:
             for i, value in enumerate(v):
-                exinf = ExposureInfo(
-                    exposure_name=Path(data[exposure_tag][i]).name.replace(
-                        "_Fractions", ""
-                    ),
-                    source=star_file_path,
-                    key=k,
-                    value=value,
+                exposure_name = (
+                    Path(data[exposure_tag][i]).stem.replace("_fractions", "") + ".jpg"
                 )
-                exposure_info.append(exinf)
+                if validate:
+                    if exposure_name in exposures:
+                        exinf = ExposureInfo(
+                            exposure_name=exposure_name,
+                            source=star_file_path,
+                            key=k,
+                            value=value,
+                        )
+                        exposure_info.append(exinf)
+                    else:
+                        print(f"exposure {exposure_name} not found")
+                else:
+                    exinf = ExposureInfo(
+                        exposure_name=exposure_name,
+                        source=star_file_path,
+                        key=k,
+                        value=value,
+                    )
+                    exposure_info.append(exinf)
+
     extractor.put_info(exposure_info)

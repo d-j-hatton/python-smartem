@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import List, Optional, Sequence, Tuple, Union
 
-from sqlalchemy import create_engine
+from sqlalchemy import and_, create_engine
 from sqlalchemy.orm import Load, load_only, sessionmaker
 
 from cryotrace.data_model import (
@@ -46,6 +46,17 @@ class Extractor:
             .filter(Tile.atlas_id == self._atlas_id)
         )
         return [q[1] for q in query.all()]
+
+    def get_all_exposures(self) -> List[Exposure]:
+        query = (
+            self.session.query(Tile, GridSquare, FoilHole, Exposure)
+            .options(Load(Tile).load_only("tile_id", "atlas_id"), Load(FoilHole).load_only("grid_square_name", "foil_hole_name"), Load(Exposure).load_only("foil_hole_name", "exposure_name"))  # type: ignore
+            .join(GridSquare, GridSquare.tile_id == Tile.tile_id)
+            .join(FoilHole, FoilHole.grid_square_name == GridSquare.grid_square_name)
+            .join(Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name)
+            .filter(Tile.atlas_id == self._atlas_id)
+        )
+        return [q[-1] for q in query.all()]
 
     @lru_cache(maxsize=50)
     def get_foil_holes(self, grid_square_name: str) -> List[FoilHole]:
@@ -92,6 +103,27 @@ class Extractor:
             return tile.tile_id
         return None
 
+    def get_all_exposure_keys(self) -> List[str]:
+        query = (
+            self.session.query(Tile, GridSquare, FoilHole, Exposure, ExposureInfo)
+            .options(Load(Tile).load_only("tile_id", "atlas_id"), Load(FoilHole).load_only("grid_square_name", "foil_hole_name"), Load(Exposure).load_only("foil_hole_name", "exposure_name"), Load(ExposureInfo).load_only("key"))  # type: ignore
+            .join(GridSquare, GridSquare.tile_id == Tile.tile_id)
+            .join(FoilHole, FoilHole.grid_square_name == GridSquare.grid_square_name)
+            .join(Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name)
+            .join(ExposureInfo, ExposureInfo.exposure_name == Exposure.exposure_name)
+            .filter(Tile.atlas_id == self._atlas_id)
+            .distinct(ExposureInfo.key)
+        )
+        return [q[-1].key for q in query.all()]
+
+    def get_all_particle_keys(self) -> List[str]:
+        query = (
+            self.session.query(ParticleInfo)
+            .options(Load(ParticleInfo).load_only("key"))  # type: ignore
+            .distinct(ParticleInfo.key)
+        )
+        return [q.key for q in query.all()]
+
     def put_image_data(
         self, images: Sequence[EPUImage], return_key: Optional[str] = None
     ) -> Optional[List[Union[str, int]]]:
@@ -132,9 +164,14 @@ class Extractor:
                 self.session.query(
                     FoilHole, Exposure, Particle, ParticleInfo, ExposureInfo
                 )
-                .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
+                .join(
+                    Exposure,
+                    and_(
+                        Exposure.exposure_name == ExposureInfo.exposure_name,
+                        Exposure.exposure_name == Particle.exposure_name,
+                    ),
+                )
                 .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
-                .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
                 .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
                 .filter(FoilHole.grid_square_name == grid_square_name)
             )
@@ -143,9 +180,14 @@ class Extractor:
                 self.session.query(
                     FoilHole, Exposure, Particle, ParticleInfo, ExposureInfo
                 )
-                .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
+                .join(
+                    Exposure,
+                    and_(
+                        Exposure.exposure_name == ExposureInfo.exposure_name,
+                        Exposure.exposure_name == Particle.exposure_name,
+                    ),
+                )
                 .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
-                .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
                 .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
                 .filter(FoilHole.grid_square_name == grid_square_name)
                 .filter(ExposureInfo.key.in_(keys))
@@ -159,17 +201,27 @@ class Extractor:
         if not keys:
             query = (
                 self.session.query(Exposure, Particle, ParticleInfo, ExposureInfo)
-                .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
+                .join(
+                    Exposure,
+                    and_(
+                        Exposure.exposure_name == ExposureInfo.exposure_name,
+                        Exposure.exposure_name == Particle.exposure_name,
+                    ),
+                )
                 .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
-                .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
                 .filter(Exposure.foil_hole_name == foil_hole_name)
             )
         else:
             query = (
                 self.session.query(Exposure, Particle, ParticleInfo, ExposureInfo)
-                .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
+                .join(
+                    Exposure,
+                    and_(
+                        Exposure.exposure_name == ExposureInfo.exposure_name,
+                        Exposure.exposure_name == Particle.exposure_name,
+                    ),
+                )
                 .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
-                .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
                 .filter(Exposure.foil_hole_name == foil_hole_name)
                 .filter(ExposureInfo.key.in_(keys))
                 .filter(ParticleInfo.key.in_(keys))
@@ -182,19 +234,39 @@ class Extractor:
         if not keys:
             query = (
                 self.session.query(Exposure, Particle, ParticleInfo, ExposureInfo)
-                .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
+                .join(
+                    Exposure,
+                    and_(
+                        Exposure.exposure_name == ExposureInfo.exposure_name,
+                        Exposure.exposure_name == Particle.exposure_name,
+                    ),
+                )
                 .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
-                .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
                 .filter(Exposure.exposure_name == exposure_name)
             )
         else:
             query = (
                 self.session.query(Exposure, Particle, ParticleInfo, ExposureInfo)
-                .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
+                .join(
+                    Exposure,
+                    and_(
+                        Exposure.exposure_name == ExposureInfo.exposure_name,
+                        Exposure.exposure_name == Particle.exposure_name,
+                    ),
+                )
                 .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
-                .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
                 .filter(Exposure.exposure_name == exposure_name)
                 .filter(ExposureInfo.key.in_(keys))
                 .filter(ParticleInfo.key.in_(keys))
             )
         return query.all()
+
+    def get_foil_hole_stats(self, foil_hole_name: str, key: str) -> List[float]:
+        query = (
+            self.session.query(Exposure, ExposureInfo)
+            .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
+            .filter(ExposureInfo.key == key)
+            .filter(Exposure.foil_hole_name == foil_hole_name)
+        )
+        values = [q[-1].value for q in query.all()]
+        return values

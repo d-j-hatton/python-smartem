@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 import importlib.resources
+
+import matplotlib
+
+matplotlib.use("Qt5Agg")
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
 import mrcfile
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
 from PyQt5 import QtCore
 from PyQt5.QtGui import QColor, QPainter, QPen, QPixmap, QTransform
 from PyQt5.QtWidgets import (
@@ -174,7 +180,7 @@ class DataLoader(QWidget):
 
     def set_project_directory(self, project_directory: Path):
         self._proj_dir = project_directory
-        for sf in self._proj_dir.glob("**/*.star"):
+        for sf in self._proj_dir.glob("*/*/*.star"):
             str_sf = str(sf)
             if (
                 all(p not in str_sf for p in ("gui", "pipeline", "Nodes"))
@@ -200,7 +206,9 @@ class DataLoader(QWidget):
         if self._exposure_tag and self._column:
             star_file_path = Path(self._file_combo.currentText())
             star_file = open_star_file(star_file_path)
-            column_data = get_column_data(star_file, [self._exposure_tag, self._column])
+            column_data = get_column_data(
+                star_file, [self._exposure_tag, self._column], "micrographs"
+            )
             insert_exposure_data(
                 column_data, self._exposure_tag, str(star_file_path), self._extractor
             )
@@ -218,9 +226,15 @@ class MainDisplay(QWidget):
         self._foil_hole_combo.currentIndexChanged.connect(self._select_foil_hole)
         self._exposure_combo = QComboBox()
         self._exposure_combo.currentIndexChanged.connect(self._select_exposure)
+        self._data_combo = QComboBox()
+        fig = Figure()
+        self._foil_hole_stats_fig = fig.add_subplot(111)
+        self._foil_hole_stats = FigureCanvasQTAgg(fig)
         self.grid.addWidget(self._square_combo, 1, 1)
         self.grid.addWidget(self._foil_hole_combo, 1, 2)
         self.grid.addWidget(self._exposure_combo, 1, 3)
+        self.grid.addWidget(self._data_combo, 3, 2)
+        self.grid.addWidget(self._foil_hole_stats, 4, 2)
         self._grid_squares: List[GridSquare] = []
         self._foil_holes: List[FoilHole] = []
         self._exposures: List[Exposure] = []
@@ -232,22 +246,41 @@ class MainDisplay(QWidget):
         for gs in self._grid_squares:
             self._square_combo.addItem(gs.grid_square_name)
         self._update_fh_choices(self._grid_squares[0].grid_square_name)
+        data_keys = self._extractor.get_all_exposure_keys()
+        for k in data_keys:
+            self._data_combo.addItem(k)
 
     def _select_square(self, index: int):
-        square_lbl = self._draw_grid_square(self._grid_squares[index])
+        try:
+            square_lbl = self._draw_grid_square(self._grid_squares[index])
+        except IndexError:
+            return
         self.grid.addWidget(square_lbl, 2, 1)
         self._update_fh_choices(self._square_combo.currentText())
         if self._atlas_view:
             self._atlas_view.load(grid_square=self._grid_squares[index])
 
     def _select_foil_hole(self, index: int):
-        hole_lbl = self._draw_foil_hole(self._foil_holes[index], flip=(-1, -1))
+        try:
+            hole_lbl = self._draw_foil_hole(self._foil_holes[index], flip=(-1, -1))
+        except IndexError:
+            return
         self.grid.addWidget(hole_lbl, 2, 2)
         self._update_exposure_choices(self._foil_hole_combo.currentText())
         self._draw_grid_square(
             self._grid_squares[self._square_combo.currentIndex()],
             foil_hole=self._foil_holes[index],
         )
+        self._update_foil_hole_stats(
+            self._extractor.get_foil_hole_stats(
+                self._foil_hole_combo.currentText(), self._data_combo.currentText()
+            )
+        )
+
+    def _update_foil_hole_stats(self, stats: List[float]):
+        self._foil_hole_stats_fig.cla()
+        self._foil_hole_stats_fig.hist(stats)
+        self._foil_hole_stats.draw()
 
     def _draw_grid_square(
         self,
@@ -293,7 +326,10 @@ class MainDisplay(QWidget):
 
     def _select_exposure(self, index: int):
         exposure_lbl = QLabel(self)
-        exposure_pixmap = QPixmap(self._exposures[index].thumbnail)
+        try:
+            exposure_pixmap = QPixmap(self._exposures[index].thumbnail)
+        except IndexError:
+            return
         exposure_lbl.setPixmap(exposure_pixmap)
         self.grid.addWidget(exposure_lbl, 2, 3)
         self._draw_foil_hole(
