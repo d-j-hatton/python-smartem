@@ -282,7 +282,13 @@ class MainDisplay(QWidget):
             self._grid_squares[self._square_combo.currentIndex()],
             foil_hole=self._foil_holes[index],
         )
-        self._update_foil_hole_stats(self._data[self._foil_hole_combo.currentText()])
+        if self._data and self._foil_hole_combo.currentText():
+            try:
+                self._update_foil_hole_stats(
+                    self._data[self._foil_hole_combo.currentText()]
+                )
+            except KeyError:
+                pass
 
     def _update_grid_square_stats(self, stats: List[float]):
         self._grid_square_stats_fig.cla()
