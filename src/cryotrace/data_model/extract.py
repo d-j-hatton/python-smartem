@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 from sqlalchemy import and_, create_engine
 from sqlalchemy.orm import Load, load_only, sessionmaker
@@ -270,3 +270,12 @@ class Extractor:
         )
         values = [q[-1].value for q in query.all()]
         return values
+
+    def get_grid_square_stats(
+        self, grid_square_name: str, key: str
+    ) -> Dict[str, List[float]]:
+        stats = {}
+        foil_holes = self.get_foil_holes(grid_square_name)
+        for fh in foil_holes:
+            stats[fh.foil_hole_name] = self.get_foil_hole_stats(fh.foil_hole_name, key)
+        return stats

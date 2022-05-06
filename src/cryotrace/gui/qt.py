@@ -6,7 +6,7 @@ import matplotlib
 
 matplotlib.use("Qt5Agg")
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import mrcfile
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
@@ -218,6 +218,7 @@ class MainDisplay(QWidget):
     def __init__(self, extractor: Extractor, atlas_view: Optional[AtlasDisplay] = None):
         super().__init__()
         self._extractor = extractor
+        self._data: Dict[str, List[float]] = {}
         self.grid = QGridLayout()
         self.setLayout(self.grid)
         self._square_combo = QComboBox()
@@ -227,13 +228,17 @@ class MainDisplay(QWidget):
         self._exposure_combo = QComboBox()
         self._exposure_combo.currentIndexChanged.connect(self._select_exposure)
         self._data_combo = QComboBox()
-        fig = Figure()
-        self._foil_hole_stats_fig = fig.add_subplot(111)
-        self._foil_hole_stats = FigureCanvasQTAgg(fig)
+        fh_fig = Figure()
+        self._foil_hole_stats_fig = fh_fig.add_subplot(111)
+        self._foil_hole_stats = FigureCanvasQTAgg(fh_fig)
+        gs_fig = Figure()
+        self._grid_square_stats_fig = gs_fig.add_subplot(111)
+        self._grid_square_stats = FigureCanvasQTAgg(gs_fig)
         self.grid.addWidget(self._square_combo, 1, 1)
         self.grid.addWidget(self._foil_hole_combo, 1, 2)
         self.grid.addWidget(self._exposure_combo, 1, 3)
         self.grid.addWidget(self._data_combo, 3, 2)
+        self.grid.addWidget(self._grid_square_stats, 4, 1)
         self.grid.addWidget(self._foil_hole_stats, 4, 2)
         self._grid_squares: List[GridSquare] = []
         self._foil_holes: List[FoilHole] = []
@@ -259,6 +264,12 @@ class MainDisplay(QWidget):
         self._update_fh_choices(self._square_combo.currentText())
         if self._atlas_view:
             self._atlas_view.load(grid_square=self._grid_squares[index])
+        self._data = self._extractor.get_grid_square_stats(
+            self._square_combo.currentText(), self._data_combo.currentText()
+        )
+        self._update_grid_square_stats(
+            [elem for foil_hole in self._data.values() for elem in foil_hole]
+        )
 
     def _select_foil_hole(self, index: int):
         try:
@@ -271,11 +282,12 @@ class MainDisplay(QWidget):
             self._grid_squares[self._square_combo.currentIndex()],
             foil_hole=self._foil_holes[index],
         )
-        self._update_foil_hole_stats(
-            self._extractor.get_foil_hole_stats(
-                self._foil_hole_combo.currentText(), self._data_combo.currentText()
-            )
-        )
+        self._update_foil_hole_stats(self._data[self._foil_hole_combo.currentText()])
+
+    def _update_grid_square_stats(self, stats: List[float]):
+        self._grid_square_stats_fig.cla()
+        self._grid_square_stats_fig.hist(stats)
+        self._grid_square_stats.draw()
 
     def _update_foil_hole_stats(self, stats: List[float]):
         self._foil_hole_stats_fig.cla()
