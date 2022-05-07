@@ -333,7 +333,11 @@ class MainDisplay(QWidget):
         if exposure:
             qsize = hole_pixmap.size()
             hole_lbl = ImageLabel(
-                foil_hole, exposure, (qsize.width(), qsize.height()), parent=self
+                foil_hole,
+                exposure,
+                (qsize.width(), qsize.height()),
+                parent=self,
+                extra_images=[fh for fh in self._foil_holes if fh != foil_hole],
             )
             self.grid.addWidget(hole_lbl, 2, 2)
             hole_lbl.setPixmap(hole_pixmap)
@@ -437,20 +441,58 @@ class ImageLabel(QLabel):
         contained_image: Optional[Union[GridSquare, FoilHole, Exposure]],
         image_size: Tuple[int, int],
         overwrite_readout: bool = False,
+        extra_images: Optional[list] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self._image = image
         self._contained_image = contained_image
+        self._extra_images = extra_images or []
         self._image_size = image_size
         self._overwrite_readout = overwrite_readout
+
+    def draw_rectangle(
+        self,
+        inner_image: Union[GridSquare, FoilHole, Exposure],
+        readout_area: Tuple[int, int],
+        scaled_pixel_size: float,
+        painter: QPainter,
+    ):
+        rect_centre = find_point_pixel(
+            (
+                inner_image.stage_position_x,
+                inner_image.stage_position_y,
+            ),
+            (self._image.stage_position_x, self._image.stage_position_y),
+            scaled_pixel_size,
+            (
+                int(readout_area[0] / (scaled_pixel_size / self._image.pixel_size)),
+                int(readout_area[1] / (scaled_pixel_size / self._image.pixel_size)),
+            ),
+            xfactor=1,
+            yfactor=-1,
+        )
+        edge_lengths = (
+            int(
+                inner_image.readout_area_x * inner_image.pixel_size / scaled_pixel_size
+            ),
+            int(
+                inner_image.readout_area_y * inner_image.pixel_size / scaled_pixel_size
+            ),
+        )
+        painter.drawRect(
+            int(rect_centre[0] - 0.5 * edge_lengths[0]),
+            int(rect_centre[1] - 0.5 * edge_lengths[1]),
+            edge_lengths[0],
+            edge_lengths[1],
+        )
 
     def paintEvent(self, e):
         super().paintEvent(e)
 
         if self._contained_image:
             painter = QPainter(self)
-            pen = QPen(QColor(QtCore.Qt.red))
+            pen = QPen(QColor(QtCore.Qt.blue))
             pen.setWidth(3)
             painter.setPen(pen)
             if self._overwrite_readout:
@@ -461,36 +503,14 @@ class ImageLabel(QLabel):
             scaled_pixel_size = self._image.pixel_size * (
                 readout_area[0] / self._image_size[0]
             )
-            rect_centre = find_point_pixel(
-                (
-                    self._contained_image.stage_position_x,
-                    self._contained_image.stage_position_y,
-                ),
-                (self._image.stage_position_x, self._image.stage_position_y),
-                scaled_pixel_size,
-                (
-                    int(readout_area[0] / (scaled_pixel_size / self._image.pixel_size)),
-                    int(readout_area[1] / (scaled_pixel_size / self._image.pixel_size)),
-                ),
-                xfactor=1,
-                yfactor=-1,
-            )
-            edge_lengths = (
-                int(
-                    self._contained_image.readout_area_x
-                    * self._contained_image.pixel_size
-                    / scaled_pixel_size
-                ),
-                int(
-                    self._contained_image.readout_area_y
-                    * self._contained_image.pixel_size
-                    / scaled_pixel_size
-                ),
-            )
-            painter.drawRect(
-                int(rect_centre[0] - 0.5 * edge_lengths[0]),
-                int(rect_centre[1] - 0.5 * edge_lengths[1]),
-                edge_lengths[0],
-                edge_lengths[1],
-            )
+
+            for im in self._extra_images:
+                self.draw_rect(im, readout_area, scaled_pixel_size, painter)
+
+            pen = QPen(QColor(QtCore.Qt.red))
+            pen.setWidth(3)
+            painter.setPen(pen)
+
+            self.draw_rect(self._image, readout_area, scaled_pixel_size, painter)
+
             painter.end()
