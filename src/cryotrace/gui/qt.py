@@ -505,12 +505,14 @@ class ImageLabel(QLabel):
             )
 
             for im in self._extra_images:
-                self.draw_rect(im, readout_area, scaled_pixel_size, painter)
+                self.draw_rectangle(im, readout_area, scaled_pixel_size, painter)
 
             pen = QPen(QColor(QtCore.Qt.red))
             pen.setWidth(3)
             painter.setPen(pen)
 
-            self.draw_rect(self._image, readout_area, scaled_pixel_size, painter)
+            self.draw_rectangle(
+                self._contained_image, readout_area, scaled_pixel_size, painter
+            )
 
             painter.end()
