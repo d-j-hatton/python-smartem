@@ -176,22 +176,25 @@ class DataLoader(QWidget):
         ]
         self._radio_buttons[0].setChecked(True)
 
+        self.grid.addWidget(self._radio_buttons[0], 1, 1)
+        self.grid.addWidget(self._radio_buttons[1], 1, 2)
+
         file_combo = QComboBox()
         file_combo.setEditable(True)
         file_combo.currentIndexChanged.connect(self._select_star_file)
         self._combos = [file_combo]
-        self.grid.addWidget(self._combos[0], 1, 1)
+        self.grid.addWidget(self._combos[0], 2, 1)
         column_combo = QComboBox()
         column_combo.setEditable(True)
         column_combo.currentIndexChanged.connect(self._select_column)
         self._combos.append(column_combo)
-        self.grid.addWidget(self._combos[1], 2, 1)
+        self.grid.addWidget(self._combos[1], 3, 1)
 
         self._setup_exposure()
 
         load_btn = QPushButton("Load")
         load_btn.clicked.connect(self.load)
-        self.grid.addWidget(load_btn, 4, 1)
+        self.grid.addWidget(load_btn, 5, 1)
         if self._proj_dir:
             for sf in self._proj_dir.glob("**/*.star"):
                 self._file_combo.addItem(str(sf))
@@ -202,7 +205,7 @@ class DataLoader(QWidget):
         exposure_tag_combo.setEditable(True)
         exposure_tag_combo.currentIndexChanged.connect(self._select_exposure_tag)
         self._combos.append(exposure_tag_combo)
-        self.grid.addWidget(self._combos[2], 3, 1)
+        self.grid.addWidget(self._combos[2], 4, 1)
 
     def _setup_particles(self):
         self._combos = self._combos[:2]
@@ -210,17 +213,17 @@ class DataLoader(QWidget):
         exposure_tag_combo.setEditable(True)
         exposure_tag_combo.currentIndexChanged.connect(self._select_exposure_tag)
         self._combos.append(exposure_tag_combo)
-        self.grid.addWidget(self._combos[2], 3, 1)
+        self.grid.addWidget(self._combos[2], 4, 1)
         x_tag_combo = QComboBox()
         x_tag_combo.setEditable(True)
         x_tag_combo.currentIndexChanged.connect(self._select_x_tag)
         self._combos.append(x_tag_combo)
-        self.grid.addWidget(self._combos[3], 3, 2)
+        self.grid.addWidget(self._combos[3], 4, 2)
         y_tag_combo = QComboBox()
         y_tag_combo.setEditable(True)
         y_tag_combo.currentIndexChanged.connect(self._select_y_tag)
         self._combos.append(y_tag_combo)
-        self.grid.addWidget(self._combos[4], 3, 3)
+        self.grid.addWidget(self._combos[4], 4, 3)
 
     def set_project_directory(self, project_directory: Path):
         self._proj_dir = project_directory
