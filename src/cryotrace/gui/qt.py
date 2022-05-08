@@ -233,7 +233,7 @@ class DataLoader(QWidget):
                 self._combos[0].addItem(str_sf)
 
     def _select_star_file(self, index: int):
-        star_file_path = Path(self._file_combo.currentText())
+        star_file_path = Path(self._combos[0].currentText())
         star_file = open_star_file(star_file_path)
         columns = get_columns(star_file, ignore=["pipeline"])
         for c in columns:
