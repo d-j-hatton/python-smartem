@@ -21,6 +21,7 @@ from PyQt5.QtWidgets import (
     QGridLayout,
     QLabel,
     QPushButton,
+    QRadioButton,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -168,24 +169,58 @@ class DataLoader(QWidget):
         self._exposure_tag = None
         self._column = None
         self._proj_dir = project_directory
-        self._file_combo = QComboBox()
-        self._file_combo.setEditable(True)
-        self._file_combo.currentIndexChanged.connect(self._select_star_file)
-        self.grid.addWidget(self._file_combo, 1, 1)
-        self._column_combo = QComboBox()
-        self._column_combo.setEditable(True)
-        self._column_combo.currentIndexChanged.connect(self._select_column)
-        self.grid.addWidget(self._column_combo, 2, 1)
-        self._exposure_tag_combo = QComboBox()
-        self._exposure_tag_combo.setEditable(True)
-        self._exposure_tag_combo.currentIndexChanged.connect(self._select_exposure_tag)
-        self.grid.addWidget(self._exposure_tag_combo, 3, 1)
+
+        self._radio_buttons = [
+            QRadioButton("Per micrograph"),
+            QRadioButton("Per particle"),
+        ]
+        self._radio_buttons[0].setChecked(True)
+
+        file_combo = QComboBox()
+        file_combo.setEditable(True)
+        file_combo.currentIndexChanged.connect(self._select_star_file)
+        self._combos = [file_combo]
+        self.grid.addWidget(self._combos[0], 1, 1)
+        column_combo = QComboBox()
+        column_combo.setEditable(True)
+        column_combo.currentIndexChanged.connect(self._select_column)
+        self._combos.append(column_combo)
+        self.grid.addWidget(self._combos[1], 2, 1)
+
+        self._setup_exposure()
+
         load_btn = QPushButton("Load")
         load_btn.clicked.connect(self.load)
         self.grid.addWidget(load_btn, 4, 1)
         if self._proj_dir:
             for sf in self._proj_dir.glob("**/*.star"):
                 self._file_combo.addItem(str(sf))
+
+    def _setup_exposure(self):
+        self._combos = self._combos[:2]
+        exposure_tag_combo = QComboBox()
+        exposure_tag_combo.setEditable(True)
+        exposure_tag_combo.currentIndexChanged.connect(self._select_exposure_tag)
+        self._combos.append(exposure_tag_combo)
+        self.grid.addWidget(self._combos[2], 3, 1)
+
+    def _setup_particles(self):
+        self._combos = self._combos[:2]
+        exposure_tag_combo = QComboBox()
+        exposure_tag_combo.setEditable(True)
+        exposure_tag_combo.currentIndexChanged.connect(self._select_exposure_tag)
+        self._combos.append(exposure_tag_combo)
+        self.grid.addWidget(self._combos[2], 3, 1)
+        x_tag_combo = QComboBox()
+        x_tag_combo.setEditable(True)
+        x_tag_combo.currentIndexChanged.connect(self._select_x_tag)
+        self._combos.append(x_tag_combo)
+        self.grid.addWidget(self._combos[3], 3, 2)
+        y_tag_combo = QComboBox()
+        y_tag_combo.setEditable(True)
+        y_tag_combo.currentIndexChanged.connect(self._select_y_tag)
+        self._combos.append(y_tag_combo)
+        self.grid.addWidget(self._combos[4], 3, 3)
 
     def set_project_directory(self, project_directory: Path):
         self._proj_dir = project_directory
@@ -195,21 +230,27 @@ class DataLoader(QWidget):
                 all(p not in str_sf for p in ("gui", "pipeline", "Nodes"))
                 and "job" not in sf.name
             ):
-                self._file_combo.addItem(str_sf)
+                self._combos[0].addItem(str_sf)
 
     def _select_star_file(self, index: int):
         star_file_path = Path(self._file_combo.currentText())
         star_file = open_star_file(star_file_path)
         columns = get_columns(star_file, ignore=["pipeline"])
         for c in columns:
-            self._column_combo.addItem(c)
-            self._exposure_tag_combo.addItem(c)
+            self._combos[1].addItem(c)
+            self._combos[2].addItem(c)
 
     def _select_exposure_tag(self, index: int):
-        self._exposure_tag = self._exposure_tag_combo.currentText()
+        self._exposure_tag = self._combos[2].currentText()
+
+    def _select_x_tag(self, index: int):
+        self._x_tag = self._combos[3].currentText()
+
+    def _select_y_tag(self, index: int):
+        self._y_tag = self._combos[4].currentText()
 
     def _select_column(self, index: int):
-        self._column = self._column_combo.currentText()
+        self._column = self._combos[1].currentText()
 
     def load(self):
         if self._exposure_tag and self._column:
