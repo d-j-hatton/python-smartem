@@ -263,7 +263,10 @@ class MainDisplay(QWidget):
         self.grid.addWidget(square_lbl, 2, 1)
         self._update_fh_choices(self._square_combo.currentText())
         if self._atlas_view:
-            self._atlas_view.load(grid_square=self._grid_squares[index])
+            self._atlas_view.load(
+                grid_square=self._grid_squares[index],
+                all_grid_squares=self._grid_squares,
+            )
         self._data = self._extractor.get_grid_square_stats(
             self._square_combo.currentText(), self._data_combo.currentText()
         )
@@ -312,7 +315,11 @@ class MainDisplay(QWidget):
         if foil_hole:
             qsize = square_pixmap.size()
             square_lbl = ImageLabel(
-                grid_square, foil_hole, (qsize.width(), qsize.height()), parent=self
+                grid_square,
+                foil_hole,
+                (qsize.width(), qsize.height()),
+                parent=self,
+                extra_images=[fh for fh in self._foil_holes if fh != foil_hole],
             )
             self.grid.addWidget(square_lbl, 2, 1)
             square_lbl.setPixmap(square_pixmap)
@@ -337,7 +344,6 @@ class MainDisplay(QWidget):
                 exposure,
                 (qsize.width(), qsize.height()),
                 parent=self,
-                extra_images=[fh for fh in self._foil_holes if fh != foil_hole],
             )
             self.grid.addWidget(hole_lbl, 2, 2)
             hole_lbl.setPixmap(hole_pixmap)
@@ -381,8 +387,14 @@ class AtlasDisplay(QWidget):
         self.setLayout(self.grid)
         # self._draw_atlas()
 
-    def load(self, grid_square: Optional[GridSquare] = None):
-        atlas_lbl = self._draw_atlas(grid_square=grid_square)
+    def load(
+        self,
+        grid_square: Optional[GridSquare] = None,
+        all_grid_squares: Optional[List[GridSquare]] = None,
+    ):
+        atlas_lbl = self._draw_atlas(
+            grid_square=grid_square, all_grid_squares=all_grid_squares
+        )
         if atlas_lbl:
             self.grid.addWidget(atlas_lbl, 1, 1)
         if grid_square:
@@ -390,7 +402,10 @@ class AtlasDisplay(QWidget):
             self.grid.addWidget(tile_lbl, 1, 2)
 
     def _draw_atlas(
-        self, grid_square: Optional[GridSquare] = None, flip: Tuple[int, int] = (1, 1)
+        self,
+        grid_square: Optional[GridSquare] = None,
+        all_grid_squares: Optional[List[GridSquare]] = None,
+        flip: Tuple[int, int] = (1, 1),
     ) -> Optional[QLabel]:
         _atlas = self._extractor.get_atlas()
         if _atlas:
@@ -405,6 +420,7 @@ class AtlasDisplay(QWidget):
                     (qsize.width(), qsize.height()),
                     parent=self,
                     overwrite_readout=True,
+                    extra_images=all_grid_squares or [],
                 )
                 self.grid.addWidget(atlas_lbl, 1, 1)
                 atlas_lbl.setPixmap(atlas_pixmap)
