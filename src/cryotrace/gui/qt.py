@@ -13,10 +13,9 @@ import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt5 import QtCore
-from PyQt5.QtGui import QColor, QPainter, QPen, QPixmap, QTransform
+from PyQt5.QtGui import QBrush, QColor, QPainter, QPen, QPixmap, QTransform
 from PyQt5.QtWidgets import (
     QApplication,
-    QBrush,
     QComboBox,
     QFileDialog,
     QGridLayout,
@@ -324,13 +323,21 @@ class MainDisplay(QWidget):
             square_pixmap = square_pixmap.transformed(QTransform().scale(*flip))
         if foil_hole:
             qsize = square_pixmap.size()
+            imvs: Optional[list] = None
+            if self._data:
+                imvs = [
+                    np.mean(self._data.get(fh.foil_hole_name, []))
+                    for fh in self._foil_holes
+                    if fh != foil_hole
+                ]
+                imvs = list(np.nan_to_num(imvs))
             square_lbl = ImageLabel(
                 grid_square,
                 foil_hole,
                 (qsize.width(), qsize.height()),
                 parent=self,
                 extra_images=[fh for fh in self._foil_holes if fh != foil_hole],
-                image_values=self._data[grid_square.grid_square_name],
+                image_values=imvs,
             )
             self.grid.addWidget(square_lbl, 2, 1)
             square_lbl.setPixmap(square_pixmap)
@@ -489,7 +496,8 @@ class ImageLabel(QLabel):
         normalised_value: Optional[float] = None,
     ):
         if normalised_value:
-            c = QColor(matplotlib.colors.to_rgb(colour_gradient(normalised_value)))
+            c = QColor()
+            c.setRgb(*matplotlib.colors.to_rgb(colour_gradient(normalised_value)))
             c.setAlpha(0.5)
             brush = QBrush()
             brush.setColor(c)
@@ -545,12 +553,14 @@ class ImageLabel(QLabel):
 
             for i, im in enumerate(self._extra_images):
                 if self._image_values:
+                    maxv = max(self._image_values)
+                    v = self._image_values[i] / max(self._image_values) if maxv else 0
                     self.draw_rectangle(
                         im,
                         readout_area,
                         scaled_pixel_size,
                         painter,
-                        value=self._image_values[i] / max(self._image_values),
+                        normalised_value=v,
                     )
                 else:
                     self.draw_rectangle(im, readout_area, scaled_pixel_size, painter)
