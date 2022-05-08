@@ -495,12 +495,14 @@ class ImageLabel(QLabel):
         painter: QPainter,
         normalised_value: Optional[float] = None,
     ):
-        if normalised_value:
+        if normalised_value is not None:
             c = QColor()
-            c.setRgb(*matplotlib.colors.to_rgb(colour_gradient(normalised_value)))
-            c.setAlpha(0.5)
-            brush = QBrush()
-            brush.setColor(c)
+            rgb = (
+                255 * x
+                for x in matplotlib.colors.to_rgb(colour_gradient(normalised_value))
+            )
+            c.setRgb(*rgb)
+            brush = QBrush(c, QtCore.Qt.SolidPattern)
             painter.setBrush(brush)
         else:
             brush = QBrush()
@@ -551,16 +553,21 @@ class ImageLabel(QLabel):
                 readout_area[0] / self._image_size[0]
             )
 
+            if self._image_values:
+                shifted = [iv - min(self._image_values) for iv in self._image_values]
+                maxv = max(self._image_values)
+                if maxv:
+                    normalised = [s / maxv for s in shifted]
+                else:
+                    normalised = shifted
             for i, im in enumerate(self._extra_images):
                 if self._image_values:
-                    maxv = max(self._image_values)
-                    v = self._image_values[i] / max(self._image_values) if maxv else 0
                     self.draw_rectangle(
                         im,
                         readout_area,
                         scaled_pixel_size,
                         painter,
-                        normalised_value=v,
+                        normalised_value=normalised[i],
                     )
                 else:
                     self.draw_rectangle(im, readout_area, scaled_pixel_size, painter)
