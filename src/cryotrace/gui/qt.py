@@ -175,6 +175,8 @@ class DataLoader(QWidget):
             QRadioButton("Per particle"),
         ]
         self._radio_buttons[0].setChecked(True)
+        self._radio_buttons[0].toggled.connect(self._setup_exposure)
+        self._radio_buttons[0].toggled.connect(self._setup_particles)
 
         self.grid.addWidget(self._radio_buttons[0], 1, 1)
         self.grid.addWidget(self._radio_buttons[1], 1, 2)
