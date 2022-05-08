@@ -9,12 +9,14 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
 import mrcfile
+import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt5 import QtCore
 from PyQt5.QtGui import QColor, QPainter, QPen, QPixmap, QTransform
 from PyQt5.QtWidgets import (
     QApplication,
+    QBrush,
     QComboBox,
     QFileDialog,
     QGridLayout,
@@ -36,6 +38,14 @@ from cryotrace.parsing.star import (
     open_star_file,
 )
 from cryotrace.stage_model import find_point_pixel
+
+
+def colour_gradient(value: float) -> str:
+    low = "#2E5EAA"
+    high = "#F26419"
+    low_rgb = np.array(matplotlib.colors.to_rgb(low))
+    high_rgb = np.array(matplotlib.colors.to_rgb(high))
+    return matplotlib.colors.to_hex((1 - value) * low_rgb + value * high_rgb)
 
 
 class App:
@@ -320,6 +330,7 @@ class MainDisplay(QWidget):
                 (qsize.width(), qsize.height()),
                 parent=self,
                 extra_images=[fh for fh in self._foil_holes if fh != foil_hole],
+                image_values=self._data[grid_square.grid_square_name],
             )
             self.grid.addWidget(square_lbl, 2, 1)
             square_lbl.setPixmap(square_pixmap)
@@ -458,6 +469,7 @@ class ImageLabel(QLabel):
         image_size: Tuple[int, int],
         overwrite_readout: bool = False,
         extra_images: Optional[list] = None,
+        image_values: Optional[List[float]] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -466,6 +478,7 @@ class ImageLabel(QLabel):
         self._extra_images = extra_images or []
         self._image_size = image_size
         self._overwrite_readout = overwrite_readout
+        self._image_values = image_values or []
 
     def draw_rectangle(
         self,
@@ -473,7 +486,17 @@ class ImageLabel(QLabel):
         readout_area: Tuple[int, int],
         scaled_pixel_size: float,
         painter: QPainter,
+        normalised_value: Optional[float] = None,
     ):
+        if normalised_value:
+            c = QColor(matplotlib.colors.to_rgb(colour_gradient(normalised_value)))
+            c.setAlpha(0.5)
+            brush = QBrush()
+            brush.setColor(c)
+            painter.setBrush(brush)
+        else:
+            brush = QBrush()
+            painter.setBrush(brush)
         rect_centre = find_point_pixel(
             (
                 inner_image.stage_position_x,
@@ -520,8 +543,17 @@ class ImageLabel(QLabel):
                 readout_area[0] / self._image_size[0]
             )
 
-            for im in self._extra_images:
-                self.draw_rectangle(im, readout_area, scaled_pixel_size, painter)
+            for i, im in enumerate(self._extra_images):
+                if self._image_values:
+                    self.draw_rectangle(
+                        im,
+                        readout_area,
+                        scaled_pixel_size,
+                        painter,
+                        value=self._image_values[i] / max(self._image_values),
+                    )
+                else:
+                    self.draw_rectangle(im, readout_area, scaled_pixel_size, painter)
 
             pen = QPen(QColor(QtCore.Qt.red))
             pen.setWidth(3)
