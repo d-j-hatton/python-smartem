@@ -35,3 +35,7 @@ QComboBox {
 QComboBox:hover{
     background-color: #36f1cd;
 }
+
+QRadioButton {
+  background-color: #36f1cd;
+}

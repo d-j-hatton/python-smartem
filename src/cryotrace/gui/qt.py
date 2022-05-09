@@ -321,6 +321,7 @@ class MainDisplay(QWidget):
             self._atlas_view.load(
                 grid_square=self._grid_squares[index],
                 all_grid_squares=self._grid_squares,
+                data_key=self._data_combo.currentText() or None,
             )
         self._data = self._extractor.get_grid_square_stats(
             self._square_combo.currentText(), self._data_combo.currentText()
@@ -449,13 +450,24 @@ class AtlasDisplay(QWidget):
         self._extractor = extractor
         self.grid = QGridLayout()
         self.setLayout(self.grid)
+        # self._atlas_lbl = self._draw_atlas(grid_square=grid_square, all_grid_squares=all_grid_squares)
+        # self.grid.addWidget(self._atlas_lbl, 1, 1)
+        atlas_fig = Figure()
+        self._atlas_stats_fig = atlas_fig.add_subplot(111)
+        self._atlas_stats = FigureCanvasQTAgg(atlas_fig)
+        self.grid.addWidget(self._atlas_stats, 2, 1)
+        self._data: Dict[str, List[float]] = {}
         # self._draw_atlas()
 
     def load(
         self,
         grid_square: Optional[GridSquare] = None,
         all_grid_squares: Optional[List[GridSquare]] = None,
+        data_key: Optional[str] = None,
     ):
+        if data_key:
+            self._data = self._extractor.get_atlas_stats(data_key)
+            self._update_atlas_stats()
         atlas_lbl = self._draw_atlas(
             grid_square=grid_square, all_grid_squares=all_grid_squares
         )
@@ -464,6 +476,14 @@ class AtlasDisplay(QWidget):
         if grid_square:
             tile_lbl = self._draw_tile(grid_square)
             self.grid.addWidget(tile_lbl, 1, 2)
+
+    def _update_atlas_stats(self):
+        stats = []
+        for d in self._data.values():
+            stats.extend(d)
+        self._atlas_stats_fig.cla()
+        self._atlas_stats_fig.hist(stats)
+        self._atlas_stats.draw()
 
     def _draw_atlas(
         self,
@@ -477,6 +497,14 @@ class AtlasDisplay(QWidget):
             if flip != (1, 1):
                 atlas_pixmap = atlas_pixmap.transformed(QTransform().scale(*flip))
             if grid_square:
+                imvs: Optional[list] = None
+                if self._data and grid_square and all_grid_squares:
+                    imvs = [
+                        np.mean(self._data.get(gs.grid_square_name, []))
+                        for gs in all_grid_squares
+                        if gs != grid_square
+                    ]
+                    imvs = list(np.nan_to_num(imvs))
                 qsize = atlas_pixmap.size()
                 atlas_lbl = ImageLabel(
                     _atlas,
@@ -484,7 +512,10 @@ class AtlasDisplay(QWidget):
                     (qsize.width(), qsize.height()),
                     parent=self,
                     overwrite_readout=True,
-                    extra_images=all_grid_squares or [],
+                    extra_images=[gs for gs in all_grid_squares if gs != grid_square]
+                    if all_grid_squares
+                    else [],
+                    image_values=imvs,
                 )
                 self.grid.addWidget(atlas_lbl, 1, 1)
                 atlas_lbl.setPixmap(atlas_pixmap)

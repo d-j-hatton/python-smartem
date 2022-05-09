@@ -279,3 +279,13 @@ class Extractor:
         for fh in foil_holes:
             stats[fh.foil_hole_name] = self.get_foil_hole_stats(fh.foil_hole_name, key)
         return stats
+
+    def get_atlas_stats(self, key: str) -> Dict[str, List[float]]:
+        stats: Dict[str, List[float]] = {}
+        grid_squares = self.get_grid_squares()
+        for gs in grid_squares:
+            gs_data = self.get_grid_square_stats(gs.grid_square_name, key)
+            stats[gs.grid_square_name] = []
+            for d in gs_data.values():
+                stats[gs.grid_square_name].extend(d)
+        return stats
