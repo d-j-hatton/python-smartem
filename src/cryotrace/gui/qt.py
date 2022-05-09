@@ -259,7 +259,7 @@ class DataLoader(QWidget):
 
     def load(self):
         if self._exposure_tag and self._column:
-            star_file_path = Path(self._file_combo.currentText())
+            star_file_path = Path(self._combos[0].currentText())
             star_file = open_star_file(star_file_path)
             column_data = get_column_data(
                 star_file, [self._exposure_tag, self._column], "micrographs"
