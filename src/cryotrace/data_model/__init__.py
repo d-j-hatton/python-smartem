@@ -197,6 +197,15 @@ class ParticleSet(Base):
     )
 
 
+class ParticleSetInfo(InfoStore, Base):
+    __tablename__ = "ParticleSetInfo"
+
+    set_name: Column = Column(
+        ForeignKey("ParticleSet.name"), primary_key=True, index=True
+    )
+    ParticleSet = relationship("ParticleSet")
+
+
 class ParticleSetLinker(Base):
     __tablename__ = "ParticleSetLinker"
 
