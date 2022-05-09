@@ -21,28 +21,28 @@ from PyQt5.QtWidgets import (
     QGridLayout,
     QLabel,
     QPushButton,
-    QRadioButton,
     QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 import cryotrace.gui
-from cryotrace.data_model import Atlas, Exposure, FoilHole, GridSquare, Tile
+from cryotrace.data_model import Atlas, Exposure, FoilHole, GridSquare, Particle, Tile
 from cryotrace.data_model.extract import Extractor
 from cryotrace.parsing.epu import create_atlas_and_tiles, parse_epu_dir
 from cryotrace.parsing.star import (
     get_column_data,
     get_columns,
     insert_exposure_data,
+    insert_particle_data,
     open_star_file,
 )
 from cryotrace.stage_model import find_point_pixel
 
 
 def colour_gradient(value: float) -> str:
-    low = "#2E5EAA"
-    high = "#F26419"
+    low = "#EF3054"
+    high = "#47682C"
     low_rgb = np.array(matplotlib.colors.to_rgb(low))
     high_rgb = np.array(matplotlib.colors.to_rgb(high))
     return matplotlib.colors.to_hex((1 - value) * low_rgb + value * high_rgb)
@@ -69,9 +69,13 @@ class QtFrame(QWidget):
         atlas_display = AtlasDisplay(extractor)
         main_display = MainDisplay(extractor, atlas_view=atlas_display)
         data_loader = DataLoader(extractor)
-        proj_loader = ProjectLoader(extractor, data_loader, main_display, atlas_display)
+        particle_loader = ParticleLoader(extractor)
+        proj_loader = ProjectLoader(
+            extractor, data_loader, particle_loader, main_display, atlas_display
+        )
         self.tabs.addTab(proj_loader, "Project")
-        self.tabs.addTab(data_loader, "Load data")
+        self.tabs.addTab(data_loader, "Load mic data")
+        self.tabs.addTab(particle_loader, "Load particle data")
         self.tabs.addTab(main_display, "Grid square view")
         self.tabs.addTab(atlas_display, "Atlas view")
         self.layout.addWidget(self.tabs)
@@ -83,12 +87,14 @@ class ProjectLoader(QWidget):
         self,
         extractor: Extractor,
         data_loader: DataLoader,
+        particle_loader: ParticleLoader,
         main_display: MainDisplay,
         atlas_display: AtlasDisplay,
     ):
         super().__init__()
         self._extractor = extractor
         self._data_loader = data_loader
+        self._particle_loader = particle_loader
         self._main_display = main_display
         self._atlas_display = atlas_display
         self.grid = QGridLayout()
@@ -144,6 +150,7 @@ class ProjectLoader(QWidget):
         )
         self.project_lbl.setText(f"Selected: {self.project_dir}")
         self._data_loader.set_project_directory(Path(self.project_dir))
+        self._particle_loader.set_project_directory(Path(self.project_dir))
 
     def load(self):
         atlas_found = self._extractor.set_atlas_id(self.atlas)
@@ -170,16 +177,92 @@ class DataLoader(QWidget):
         self._column = None
         self._proj_dir = project_directory
 
-        self._radio_buttons = [
-            QRadioButton("Per micrograph"),
-            QRadioButton("Per particle"),
-        ]
-        self._radio_buttons[0].setChecked(True)
-        self._radio_buttons[0].toggled.connect(self._setup_exposure)
-        self._radio_buttons[0].toggled.connect(self._setup_particles)
+        star_lbl = QLabel()
+        star_lbl.setText("Star file:")
+        self.grid.addWidget(star_lbl, 2, 1)
+        column_lbl = QLabel()
+        column_lbl.setText("Data column:")
+        self.grid.addWidget(column_lbl, 3, 1)
 
-        self.grid.addWidget(self._radio_buttons[0], 1, 1)
-        self.grid.addWidget(self._radio_buttons[1], 1, 2)
+        file_combo = QComboBox()
+        file_combo.setEditable(True)
+        file_combo.currentIndexChanged.connect(self._select_star_file)
+        self._combos = [file_combo]
+        self.grid.addWidget(self._combos[0], 2, 2)
+        column_combo = QComboBox()
+        column_combo.setEditable(True)
+        column_combo.currentIndexChanged.connect(self._select_column)
+        self._combos.append(column_combo)
+        self.grid.addWidget(self._combos[1], 3, 2)
+
+        self._setup_exposure()
+
+        load_btn = QPushButton("Load")
+        load_btn.clicked.connect(self.load)
+        self.grid.addWidget(load_btn, 5, 2)
+        if self._proj_dir:
+            for sf in self._proj_dir.glob("**/*.star"):
+                self._file_combo.addItem(str(sf))
+
+    def _setup_exposure(self):
+        exposure_lbl = QLabel()
+        exposure_lbl.setText("Micrograph identifier:")
+        self.grid.addWidget(exposure_lbl, 4, 1)
+
+        self._combos = self._combos[:2]
+        exposure_tag_combo = QComboBox()
+        exposure_tag_combo.setEditable(True)
+        exposure_tag_combo.currentIndexChanged.connect(self._select_exposure_tag)
+        self._combos.append(exposure_tag_combo)
+        self.grid.addWidget(self._combos[2], 4, 2)
+
+    def set_project_directory(self, project_directory: Path):
+        self._proj_dir = project_directory
+        for sf in self._proj_dir.glob("*/*/*.star"):
+            str_sf = str(sf)
+            if (
+                all(p not in str_sf for p in ("gui", "pipeline", "Nodes"))
+                and "job" not in sf.name
+            ):
+                self._combos[0].addItem(str_sf)
+
+    def _select_star_file(self, index: int):
+        star_file_path = Path(self._combos[0].currentText())
+        star_file = open_star_file(star_file_path)
+        columns = get_columns(star_file, ignore=["pipeline"])
+        for combo in self._combos[1:]:
+            combo.clear()
+        for c in columns:
+            for combo in self._combos[1:]:
+                combo.addItem(c)
+
+    def _select_exposure_tag(self, index: int):
+        self._exposure_tag = self._combos[2].currentText()
+
+    def _select_column(self, index: int):
+        self._column = self._combos[1].currentText()
+
+    def load(self):
+        if self._exposure_tag and self._column:
+            star_file_path = Path(self._combos[0].currentText())
+            star_file = open_star_file(star_file_path)
+            column_data = get_column_data(
+                star_file, [self._exposure_tag, self._column], "micrographs"
+            )
+            insert_exposure_data(
+                column_data, self._exposure_tag, str(star_file_path), self._extractor
+            )
+
+
+class ParticleLoader(QWidget):
+    def __init__(self, extractor: Extractor, project_directory: Optional[Path] = None):
+        super().__init__()
+        self._extractor = extractor
+        self.grid = QGridLayout()
+        self.setLayout(self.grid)
+        self._exposure_tag = None
+        self._column = None
+        self._proj_dir = project_directory
 
         file_combo = QComboBox()
         file_combo.setEditable(True)
@@ -192,7 +275,7 @@ class DataLoader(QWidget):
         self._combos.append(column_combo)
         self.grid.addWidget(self._combos[1], 3, 1)
 
-        self._setup_exposure()
+        self._setup_particles()
 
         load_btn = QPushButton("Load")
         load_btn.clicked.connect(self.load)
@@ -200,14 +283,6 @@ class DataLoader(QWidget):
         if self._proj_dir:
             for sf in self._proj_dir.glob("**/*.star"):
                 self._file_combo.addItem(str(sf))
-
-    def _setup_exposure(self):
-        self._combos = self._combos[:2]
-        exposure_tag_combo = QComboBox()
-        exposure_tag_combo.setEditable(True)
-        exposure_tag_combo.currentIndexChanged.connect(self._select_exposure_tag)
-        self._combos.append(exposure_tag_combo)
-        self.grid.addWidget(self._combos[2], 4, 1)
 
     def _setup_particles(self):
         self._combos = self._combos[:2]
@@ -241,9 +316,12 @@ class DataLoader(QWidget):
         star_file_path = Path(self._combos[0].currentText())
         star_file = open_star_file(star_file_path)
         columns = get_columns(star_file, ignore=["pipeline"])
+        for combo in self._combos[1:]:
+            combo.clear()
+        self._combos[1].addItem("")
         for c in columns:
-            self._combos[1].addItem(c)
-            self._combos[2].addItem(c)
+            for combo in self._combos[1:]:
+                combo.addItem(c)
 
     def _select_exposure_tag(self, index: int):
         self._exposure_tag = self._combos[2].currentText()
@@ -258,14 +336,36 @@ class DataLoader(QWidget):
         self._column = self._combos[1].currentText()
 
     def load(self):
-        if self._exposure_tag and self._column:
+        if self._exposure_tag and self._x_tag and self._y_tag and self._column:
             star_file_path = Path(self._combos[0].currentText())
             star_file = open_star_file(star_file_path)
             column_data = get_column_data(
-                star_file, [self._exposure_tag, self._column], "micrographs"
+                star_file,
+                [self._exposure_tag, self._x_tag, self._y_tag, self._column],
+                "particles",
             )
-            insert_exposure_data(
-                column_data, self._exposure_tag, str(star_file_path), self._extractor
+            insert_particle_data(
+                column_data,
+                self._exposure_tag,
+                self._x_tag,
+                self._y_tag,
+                str(star_file_path),
+                self._extractor,
+            )
+        elif self._exposure_tag and self._x_tag and self._y_tag:
+            star_file_path = Path(self._combos[0].currentText())
+            star_file = open_star_file(star_file_path)
+            column_data = get_column_data(
+                star_file, [self._exposure_tag, self._x_tag, self._y_tag], "particles"
+            )
+            insert_particle_data(
+                column_data,
+                self._exposure_tag,
+                self._x_tag,
+                self._y_tag,
+                str(star_file_path),
+                self._extractor,
+                just_particles=True,
             )
 
 
@@ -289,9 +389,9 @@ class MainDisplay(QWidget):
         gs_fig = Figure()
         self._grid_square_stats_fig = gs_fig.add_subplot(111)
         self._grid_square_stats = FigureCanvasQTAgg(gs_fig)
-        self.grid.addWidget(self._square_combo, 1, 1)
-        self.grid.addWidget(self._foil_hole_combo, 1, 2)
-        self.grid.addWidget(self._exposure_combo, 1, 3)
+        self.grid.addWidget(self._square_combo, 2, 1)
+        self.grid.addWidget(self._foil_hole_combo, 2, 2)
+        self.grid.addWidget(self._exposure_combo, 2, 3)
         self.grid.addWidget(self._data_combo, 3, 2)
         self.grid.addWidget(self._grid_square_stats, 4, 1)
         self.grid.addWidget(self._foil_hole_stats, 4, 2)
@@ -315,7 +415,7 @@ class MainDisplay(QWidget):
             square_lbl = self._draw_grid_square(self._grid_squares[index])
         except IndexError:
             return
-        self.grid.addWidget(square_lbl, 2, 1)
+        self.grid.addWidget(square_lbl, 1, 1)
         self._update_fh_choices(self._square_combo.currentText())
         if self._atlas_view:
             self._atlas_view.load(
@@ -335,7 +435,7 @@ class MainDisplay(QWidget):
             hole_lbl = self._draw_foil_hole(self._foil_holes[index], flip=(-1, -1))
         except IndexError:
             return
-        self.grid.addWidget(hole_lbl, 2, 2)
+        self.grid.addWidget(hole_lbl, 1, 2)
         self._update_exposure_choices(self._foil_hole_combo.currentText())
         self._draw_grid_square(
             self._grid_squares[self._square_combo.currentIndex()],
@@ -383,10 +483,11 @@ class MainDisplay(QWidget):
                 foil_hole,
                 (qsize.width(), qsize.height()),
                 parent=self,
+                value=np.mean(self._data.get(foil_hole.foil_hole_name, [0])),
                 extra_images=[fh for fh in self._foil_holes if fh != foil_hole],
                 image_values=imvs,
             )
-            self.grid.addWidget(square_lbl, 2, 1)
+            self.grid.addWidget(square_lbl, 1, 1)
             square_lbl.setPixmap(square_pixmap)
         else:
             square_lbl = QLabel(self)
@@ -410,7 +511,7 @@ class MainDisplay(QWidget):
                 (qsize.width(), qsize.height()),
                 parent=self,
             )
-            self.grid.addWidget(hole_lbl, 2, 2)
+            self.grid.addWidget(hole_lbl, 1, 2)
             hole_lbl.setPixmap(hole_pixmap)
         else:
             hole_lbl = QLabel(self)
@@ -420,16 +521,30 @@ class MainDisplay(QWidget):
     def _select_exposure(self, index: int):
         exposure_lbl = QLabel(self)
         try:
-            exposure_pixmap = QPixmap(self._exposures[index].thumbnail)
+            exposure_lbl = self._draw_exposure(self._exposures[index], flip=(1, -1))
         except IndexError:
             return
-        exposure_lbl.setPixmap(exposure_pixmap)
-        self.grid.addWidget(exposure_lbl, 2, 3)
+        self.grid.addWidget(exposure_lbl, 1, 3)
         self._draw_foil_hole(
             self._foil_holes[self._foil_hole_combo.currentIndex()],
             exposure=self._exposures[index],
             flip=(-1, -1),
         )
+
+    def _draw_exposure(
+        self, exposure: Exposure, flip: Tuple[int, int] = (1, 1)
+    ) -> QLabel:
+        exposure_pixmap = QPixmap(exposure.thumbnail)
+        if flip != (1, 1):
+            exposure_pixmap = exposure_pixmap.transformed(QTransform().scale(*flip))
+        qsize = exposure_pixmap.size()
+        particles = self._extractor.get_particles(exposure.exposure_name)
+        exposure_lbl = ParticleImageLabel(
+            exposure, particles, (qsize.width(), qsize.height())
+        )
+        self.grid.addWidget(exposure_lbl, 1, 3)
+        exposure_lbl.setPixmap(exposure_pixmap)
+        return exposure_lbl
 
     def _update_fh_choices(self, grid_square_name: str):
         self._foil_holes = self._extractor.get_foil_holes(grid_square_name)
@@ -450,14 +565,11 @@ class AtlasDisplay(QWidget):
         self._extractor = extractor
         self.grid = QGridLayout()
         self.setLayout(self.grid)
-        # self._atlas_lbl = self._draw_atlas(grid_square=grid_square, all_grid_squares=all_grid_squares)
-        # self.grid.addWidget(self._atlas_lbl, 1, 1)
         atlas_fig = Figure()
         self._atlas_stats_fig = atlas_fig.add_subplot(111)
         self._atlas_stats = FigureCanvasQTAgg(atlas_fig)
         self.grid.addWidget(self._atlas_stats, 2, 1)
         self._data: Dict[str, List[float]] = {}
-        # self._draw_atlas()
 
     def load(
         self,
@@ -512,6 +624,7 @@ class AtlasDisplay(QWidget):
                     (qsize.width(), qsize.height()),
                     parent=self,
                     overwrite_readout=True,
+                    value=np.mean(self._data.get(grid_square.grid_square_name, [0])),
                     extra_images=[gs for gs in all_grid_squares if gs != grid_square]
                     if all_grid_squares
                     else [],
@@ -545,6 +658,46 @@ class AtlasDisplay(QWidget):
         return None
 
 
+class ParticleImageLabel(QLabel):
+    def __init__(
+        self,
+        image: Exposure,
+        particles: List[Particle],
+        image_size: Tuple[int, int],
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._image = image
+        self._image_size = image_size
+        self._particles = particles
+
+    def draw_circle(
+        self, coordinates: Tuple[float, float], diameter: int, painter: QPainter
+    ):
+        x = (
+            coordinates[0] * 0.5 * (self._image_size[0] / self._image.readout_area_x)
+            - diameter / 2
+        )
+        y = (
+            coordinates[1] * 0.5 * (self._image_size[1] / self._image.readout_area_y)
+            - diameter / 2
+        )
+        painter.drawEllipse(x, y, diameter, diameter)
+
+    def paintEvent(self, e):
+        super().paintEvent(e)
+
+        painter = QPainter(self)
+        pen = QPen(QColor(QtCore.Qt.blue))
+        pen.setWidth(3)
+        painter.setPen(pen)
+
+        for particle in self._particles:
+            self.draw_circle((particle.x, particle.y), 30, painter)
+
+        painter.end()
+
+
 class ImageLabel(QLabel):
     def __init__(
         self,
@@ -552,6 +705,7 @@ class ImageLabel(QLabel):
         contained_image: Optional[Union[GridSquare, FoilHole, Exposure]],
         image_size: Tuple[int, int],
         overwrite_readout: bool = False,
+        value: Optional[float] = None,
         extra_images: Optional[list] = None,
         image_values: Optional[List[float]] = None,
         **kwargs,
@@ -562,6 +716,7 @@ class ImageLabel(QLabel):
         self._extra_images = extra_images or []
         self._image_size = image_size
         self._overwrite_readout = overwrite_readout
+        self._value = value
         self._image_values = image_values or []
 
     def draw_rectangle(
@@ -575,10 +730,10 @@ class ImageLabel(QLabel):
         if normalised_value is not None:
             c = QColor()
             rgb = (
-                255 * x
+                int(255 * x)
                 for x in matplotlib.colors.to_rgb(colour_gradient(normalised_value))
             )
-            c.setRgb(*rgb)
+            c.setRgb(*rgb, alpha=150)
             brush = QBrush(c, QtCore.Qt.SolidPattern)
             painter.setBrush(brush)
         else:
@@ -631,8 +786,11 @@ class ImageLabel(QLabel):
             )
 
             if self._image_values:
-                shifted = [iv - min(self._image_values) for iv in self._image_values]
-                maxv = max(self._image_values)
+                shifted = [
+                    iv - min(self._image_values + [self._value])
+                    for iv in self._image_values
+                ]
+                maxv = max(self._image_values + [self._value])
                 if maxv:
                     normalised = [s / maxv for s in shifted]
                 else:
@@ -653,8 +811,26 @@ class ImageLabel(QLabel):
             pen.setWidth(3)
             painter.setPen(pen)
 
-            self.draw_rectangle(
-                self._contained_image, readout_area, scaled_pixel_size, painter
-            )
+            if self._value:
+                norm_value = (
+                    self._value - min(self._image_values + [self._value])
+                ) / max(self._image_values + [self._value])
+            else:
+                norm_value = 0
+
+            norm_value = np.nan_to_num(norm_value)
+
+            if self._value is not None:
+                self.draw_rectangle(
+                    self._contained_image,
+                    readout_area,
+                    scaled_pixel_size,
+                    painter,
+                    normalised_value=norm_value,
+                )
+            else:
+                self.draw_rectangle(
+                    self._contained_image, readout_area, scaled_pixel_size, painter
+                )
 
             painter.end()

@@ -39,3 +39,7 @@ QComboBox:hover{
 QRadioButton {
   background-color: #36f1cd;
 }
+
+QLabel {
+  font-size: 12pt;
+}

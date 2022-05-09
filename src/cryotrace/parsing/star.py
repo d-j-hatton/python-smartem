@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 
 from gemmi import cif
 
-from cryotrace.data_model import ExposureInfo
+from cryotrace.data_model import ExposureInfo, ParticleInfo
 from cryotrace.data_model.extract import Extractor
 
 
@@ -40,7 +40,6 @@ def insert_exposure_data(
     extractor: Extractor,
     validate: bool = True,
 ):
-    # print("insert data", data)
     if validate:
         exposures = [e.exposure_name for e in extractor.get_all_exposures()]
     exposure_info: List[ExposureInfo] = []
@@ -71,3 +70,61 @@ def insert_exposure_data(
                     exposure_info.append(exinf)
 
     extractor.put_info(exposure_info)
+
+
+def insert_particle_data(
+    data: Dict[str, List[str]],
+    exposure_tag: str,
+    x_tag: str,
+    y_tag: str,
+    star_file_path: str,
+    extractor: Extractor,
+    validate: bool = True,
+    just_particles: bool = False,
+):
+    if validate:
+        exposures = [e.exposure_name for e in extractor.get_all_exposures()]
+    particle_info: List[ParticleInfo] = []
+    for k, v in data.items():
+        if just_particles:
+            for i, value in enumerate(v):
+                exposure_name = (
+                    Path(data[exposure_tag][i]).stem.replace("_fractions", "") + ".jpg"
+                )
+                x = float(data[x_tag][i])
+                y = float(data[y_tag][i])
+                particle_id = extractor.get_particle_id(exposure_name, x, y)
+                if particle_id is None:
+                    if validate:
+                        if exposure_name in exposures:
+                            particle_id = extractor.put_particle(exposure_name, x, y)
+                    else:
+                        particle_id = extractor.put_particle(exposure_name, x, y)
+        else:
+            if k not in (exposure_tag, x_tag, y_tag):
+                for i, value in enumerate(v):
+                    exposure_name = (
+                        Path(data[exposure_tag][i]).stem.replace("_fractions", "")
+                        + ".jpg"
+                    )
+                    x = float(data[x_tag][i])
+                    y = float(data[y_tag][i])
+                    particle_id = extractor.get_particle_id(exposure_name, x, y)
+                    if particle_id is None:
+                        if validate:
+                            if exposure_name in exposures:
+                                particle_id = extractor.put_particle(
+                                    exposure_name, x, y
+                                )
+                        else:
+                            particle_id = extractor.put_particle(exposure_name, x, y)
+                    if particle_id:
+                        partinfo = ParticleInfo(
+                            particle_id=particle_id,
+                            source=star_file_path,
+                            key=k,
+                            value=value,
+                        )
+                        particle_info.append(partinfo)
+    if not just_particles:
+        extractor.put_info(particle_info)

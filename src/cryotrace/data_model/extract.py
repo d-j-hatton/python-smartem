@@ -135,20 +135,30 @@ class Extractor:
         else:
             return None
 
-    def get_particle_id(self, exposure_name: str, x: float, y: float) -> int:
-        query = self.session.query(Exposure).filter(
+    def get_particles(self, exposure_name: str) -> List[Particle]:
+        query = self.session.query(Particle).filter(
+            Particle.exposure_name == exposure_name
+        )
+        return query.all()
+
+    def get_particle_id(self, exposure_name: str, x: float, y: float) -> Optional[int]:
+        query = self.session.query(Particle).filter(
             Particle.exposure_name == exposure_name, Particle.x == x, Particle.y == y
         )
         _particle = query.all()
         if not _particle:
-            raise ValueError(
-                f"No exposure found for exposure [{exposure_name}], x [{x}], y [{y}]"
-            )
+            return None
         if len(_particle) > 1:
             raise ValueError(
-                f"More than one exposure found for exposure [{exposure_name}], x [{x}], y [{y}]"
+                f"More than one particle found for exposure [{exposure_name}], x [{x}], y [{y}]"
             )
         particle = _particle[0]
+        return particle.particle_id
+
+    def put_particle(self, exposure_name: str, x: float, y: float) -> int:
+        particle = Particle(exposure_name=exposure_name, x=x, y=y)
+        self.session.add(particle)
+        self.session.commit()
         return particle.particle_id
 
     def put_info(self, info: Sequence[InfoStore]):
