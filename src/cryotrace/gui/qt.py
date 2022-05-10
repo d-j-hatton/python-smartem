@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (
     QFileDialog,
     QGridLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QTabWidget,
     QVBoxLayout,
@@ -35,6 +36,7 @@ from cryotrace.parsing.star import (
     get_columns,
     insert_exposure_data,
     insert_particle_data,
+    insert_particle_set,
     open_star_file,
 )
 from cryotrace.stage_model import find_point_pixel
@@ -70,12 +72,19 @@ class QtFrame(QWidget):
         main_display = MainDisplay(extractor, atlas_view=atlas_display)
         data_loader = DataLoader(extractor)
         particle_loader = ParticleLoader(extractor)
+        particle_set_loader = ParticleSetLoader(extractor)
         proj_loader = ProjectLoader(
-            extractor, data_loader, particle_loader, main_display, atlas_display
+            extractor,
+            data_loader,
+            particle_loader,
+            particle_set_loader,
+            main_display,
+            atlas_display,
         )
         self.tabs.addTab(proj_loader, "Project")
         self.tabs.addTab(data_loader, "Load mic data")
         self.tabs.addTab(particle_loader, "Load particle data")
+        self.tabs.addTab(particle_set_loader, "Load particle set data")
         self.tabs.addTab(main_display, "Grid square view")
         self.tabs.addTab(atlas_display, "Atlas view")
         self.layout.addWidget(self.tabs)
@@ -88,6 +97,7 @@ class ProjectLoader(QWidget):
         extractor: Extractor,
         data_loader: DataLoader,
         particle_loader: ParticleLoader,
+        particle_set_loader: ParticleSetLoader,
         main_display: MainDisplay,
         atlas_display: AtlasDisplay,
     ):
@@ -95,6 +105,7 @@ class ProjectLoader(QWidget):
         self._extractor = extractor
         self._data_loader = data_loader
         self._particle_loader = particle_loader
+        self._particle_set_loader = particle_set_loader
         self._main_display = main_display
         self._atlas_display = atlas_display
         self.grid = QGridLayout()
@@ -151,6 +162,7 @@ class ProjectLoader(QWidget):
         self.project_lbl.setText(f"Selected: {self.project_dir}")
         self._data_loader.set_project_directory(Path(self.project_dir))
         self._particle_loader.set_project_directory(Path(self.project_dir))
+        self._particle_set_loader.set_project_directory(Path(self.project_dir))
 
     def load(self):
         atlas_found = self._extractor.set_atlas_id(self.atlas)
@@ -366,6 +378,133 @@ class ParticleLoader(QWidget):
                 str(star_file_path),
                 self._extractor,
                 just_particles=True,
+            )
+
+
+class ParticleSetLoader(QWidget):
+    def __init__(self, extractor: Extractor, project_directory: Optional[Path] = None):
+        super().__init__()
+        self._extractor = extractor
+        self.grid = QGridLayout()
+        self.setLayout(self.grid)
+        self._exposure_tag = None
+        self._column = None
+        self._set_id_tag = None
+        self._proj_dir = project_directory
+
+        file_combo = QComboBox()
+        file_combo.setEditable(True)
+        file_combo.currentIndexChanged.connect(self._select_star_file)
+        self._combos = [file_combo]
+        self.grid.addWidget(self._combos[0], 2, 1)
+        column_combo = QComboBox()
+        column_combo.setEditable(True)
+        column_combo.currentIndexChanged.connect(self._select_column)
+        self._combos.append(column_combo)
+        self.grid.addWidget(self._combos[1], 3, 1)
+
+        self._setup_particle_set()
+
+        self._group_name_box = QLineEdit()
+        self.grid.addWidget(self._group_name_box, 5, 2)
+
+        load_btn = QPushButton("Load")
+        load_btn.clicked.connect(self.load)
+        self.grid.addWidget(load_btn, 5, 1)
+        if self._proj_dir:
+            for sf in self._proj_dir.glob("**/*.star"):
+                self._file_combo.addItem(str(sf))
+
+    def _setup_particle_set(self):
+        self._combos = self._combos[:2]
+        exposure_tag_combo = QComboBox()
+        exposure_tag_combo.setEditable(True)
+        exposure_tag_combo.currentIndexChanged.connect(self._select_exposure_tag)
+        self._combos.append(exposure_tag_combo)
+        self.grid.addWidget(self._combos[2], 4, 1)
+        x_tag_combo = QComboBox()
+        x_tag_combo.setEditable(True)
+        x_tag_combo.currentIndexChanged.connect(self._select_x_tag)
+        self._combos.append(x_tag_combo)
+        self.grid.addWidget(self._combos[3], 4, 2)
+        y_tag_combo = QComboBox()
+        y_tag_combo.setEditable(True)
+        y_tag_combo.currentIndexChanged.connect(self._select_y_tag)
+        self._combos.append(y_tag_combo)
+        self.grid.addWidget(self._combos[4], 4, 3)
+        set_id_combo = QComboBox()
+        set_id_combo.setEditable(True)
+        set_id_combo.currentIndexChanged.connect(self._select_set_id_tag)
+        self._combos.append(set_id_combo)
+        self.grid.addWidget(self._combos[5], 4, 4)
+
+    def set_project_directory(self, project_directory: Path):
+        self._proj_dir = project_directory
+        for sf in self._proj_dir.glob("*/*/*.star"):
+            str_sf = str(sf)
+            if (
+                all(p not in str_sf for p in ("gui", "pipeline", "Nodes"))
+                and "job" not in sf.name
+            ):
+                self._combos[0].addItem(str_sf)
+
+    def _select_star_file(self, index: int):
+        star_file_path = Path(self._combos[0].currentText())
+        star_file = open_star_file(star_file_path)
+        columns = get_columns(star_file, ignore=["pipeline"])
+        for combo in self._combos[1:]:
+            combo.clear()
+        self._combos[1].addItem("")
+        for c in columns:
+            for combo in self._combos[1:]:
+                combo.addItem(c)
+
+    def _select_exposure_tag(self, index: int):
+        self._exposure_tag = self._combos[2].currentText()
+
+    def _select_x_tag(self, index: int):
+        self._x_tag = self._combos[3].currentText()
+
+    def _select_y_tag(self, index: int):
+        self._y_tag = self._combos[4].currentText()
+
+    def _select_column(self, index: int):
+        self._column = self._combos[1].currentText()
+
+    def _select_set_id_tag(self, index: int):
+        self._set_id_tag = self._combos[5].currentText()
+
+    def load(self):
+        if (
+            self._exposure_tag
+            and self._x_tag
+            and self._y_tag
+            and self._column
+            and self._set_id_tag
+            and self._group_name_box.text()
+        ):
+            star_file_path = Path(self._combos[0].currentText())
+            star_file = open_star_file(star_file_path)
+            column_data = get_column_data(
+                star_file,
+                [
+                    self._exposure_tag,
+                    self._x_tag,
+                    self._y_tag,
+                    self._column,
+                    self._set_id_tag,
+                ],
+                "particles",
+            )
+            insert_particle_set(
+                column_data,
+                self._group_name_box.text(),
+                self._set_id_tag,
+                self._exposure_tag,
+                self._x_tag,
+                self._y_tag,
+                str(star_file_path),
+                self._extractor,
             )
 
 
