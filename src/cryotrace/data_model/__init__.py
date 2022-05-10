@@ -5,7 +5,7 @@ from typing import Any, Optional, Type, Union, cast
 import yaml
 from sqlalchemy import Column
 from sqlalchemy import Float as Float_org
-from sqlalchemy import ForeignKey, Integer, String, create_engine
+from sqlalchemy import ForeignKey, Integer, String, create_engine, inspect
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.type_api import TypeEngine
@@ -185,14 +185,14 @@ class ExposureInfo(InfoStore, Base):
 class ParticleSet(Base):
     __tablename__ = "ParticleSet"
 
-    name = Column(
+    group_name = Column(
         String,
-        primary_key=True,
         nullable=False,
     )
 
-    size = Column(
-        Integer,
+    identifier = Column(
+        String,
+        primary_key=True,
         nullable=False,
     )
 
@@ -201,7 +201,7 @@ class ParticleSetInfo(InfoStore, Base):
     __tablename__ = "ParticleSetInfo"
 
     set_name: Column = Column(
-        ForeignKey("ParticleSet.name"), primary_key=True, index=True
+        ForeignKey("ParticleSet.identifier"), primary_key=True, index=True
     )
     ParticleSet = relationship("ParticleSet")
 
@@ -214,7 +214,7 @@ class ParticleSetLinker(Base):
     )
     Particle = relationship("Particle")
 
-    set_name: Column = Column(ForeignKey("ParticleSet.name"), primary_key=True)
+    set_name: Column = Column(ForeignKey("ParticleSet.identifier"), primary_key=True)
     ParticleSet = relationship("ParticleSet")
 
 
@@ -226,6 +226,9 @@ _tables = [
     Exposure,
     Particle,
     ParticleInfo,
+    ParticleSet,
+    ParticleSetInfo,
+    ParticleSetLinker,
     ExposureInfo,
 ]
 
@@ -248,7 +251,8 @@ def url(credentials_file: Optional[Union[str, Path]] = None) -> str:
 def setup():
     engine = create_engine(url())
     for tab in _tables:
-        tab.__table__.create(engine)
+        if not inspect(engine).has_table(tab.__tablename__):
+            tab.__table__.create(engine)
 
 
 def teardown():

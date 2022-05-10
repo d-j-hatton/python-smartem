@@ -6,6 +6,7 @@ from sqlalchemy.orm import Load, load_only, sessionmaker
 
 from cryotrace.data_model import (
     Atlas,
+    Base,
     EPUImage,
     Exposure,
     ExposureInfo,
@@ -169,6 +170,11 @@ class Extractor:
     def put_info(self, info: Sequence[InfoStore]):
         for i in info:
             self.session.add(i)
+        self.session.commit()
+
+    def put(self, entries: Sequence[Base]):
+        for entry in entries:
+            self.session.add(entry)
         self.session.commit()
 
     def get_grid_square_data(
