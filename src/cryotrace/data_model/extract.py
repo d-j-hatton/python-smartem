@@ -161,6 +161,11 @@ class Extractor:
         self.session.commit()
         return particle.particle_id
 
+    def put_particles(self, particles: List[Particle]):
+        for p in particles:
+            self.session.add(p)
+        self.session.commit()
+
     def put_info(self, info: Sequence[InfoStore]):
         for i in info:
             self.session.add(i)
