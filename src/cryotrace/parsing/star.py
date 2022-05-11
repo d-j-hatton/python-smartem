@@ -192,17 +192,21 @@ def insert_particle_set(
     )
     set_instances: Dict[str, Dict[str, float]] = {}
     linkers = []
+
+    if extra_keys:
+        for si in set_ids:
+            for i, s in enumerate(data[set_id_tag]):
+                if s == si:
+                    set_instances[si] = {
+                        k: float(v[i]) for k, v in data.items() if k in extra_keys
+                    }
+                    break
+
     for exposure in exposures:
         if structured_data.get(exposure):
             particles = extractor.get_particles(exposure)
             particle_coords = {(p.x, p.y): p.particle_id for p in particles}
             for i, particle in enumerate(structured_data[exposure]["coordinates"]):
-                if extra_keys and not set_instances.get(
-                    data[set_id_tag][structured_data[exposure]["indices"][i]]
-                ):
-                    set_instances[
-                        data[set_id_tag][structured_data[exposure]["indices"][i]]
-                    ] = {k: float(v[i]) for k, v in data.items()}
                 if particle_coords.get(particle):
                     linkers.append(
                         ParticleSetLinker(
