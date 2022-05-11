@@ -196,6 +196,9 @@ class ParticleSet(Base):
         nullable=False,
     )
 
+    atlas_id: Column = Column(ForeignKey("Atlas.atlas_id"), nullable=False)
+    Atlas = relationship("Atlas")
+
 
 class ParticleSetInfo(InfoStore, Base):
     __tablename__ = "ParticleSetInfo"

@@ -15,6 +15,8 @@ from cryotrace.data_model import (
     InfoStore,
     Particle,
     ParticleInfo,
+    ParticleSet,
+    ParticleSetInfo,
     Tile,
     url,
 )
@@ -119,11 +121,29 @@ class Extractor:
 
     def get_all_particle_keys(self) -> List[str]:
         query = (
-            self.session.query(ParticleInfo)
-            .options(Load(ParticleInfo).load_only("key"))  # type: ignore
+            self.session.query(
+                Tile, GridSquare, FoilHole, Exposure, Particle, ParticleInfo
+            )
+            .options(Load(Tile).load_only("tile_id", "atlas_id"), Load(FoilHole).load_only("grid_square_name", "foil_hole_name"), Load(Exposure).load_only("foil_hole_name", "exposure_name"), Load(Particle).load_only("exposure_name", "particle_id"), Load(ParticleInfo).load_only("key"))  # type: ignore
+            .join(GridSquare, GridSquare.tile_id == Tile.tile_id)
+            .join(FoilHole, FoilHole.grid_square_name == GridSquare.grid_square_name)
+            .join(Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name)
+            .join(Particle, Particle.exposure_name == Exposure.exposure_name)
+            .join(ParticleInfo, ParticleInfo.particle_id == Particle.particle_id)
+            .filter(Tile.atlas_id == self._atlas_id)
             .distinct(ParticleInfo.key)
         )
-        return [q.key for q in query.all()]
+        return [q[-1].key for q in query.all()]
+
+    def get_all_particle_set_keys(self) -> List[str]:
+        query = (
+            self.session.query(ParticleSet, ParticleSetInfo)
+            .options(Load(ParticleSet).load_only("atlas_id", "identifier"), Load(ParticleSetInfo).load_only("key"))  # type: ignore
+            .join(ParticleSet, ParticleSet.identifier == ParticleSetInfo.set_name)
+            .filter(ParticleSet.atlas_id == self._atlas_id)
+            .distinct(ParticleSetInfo.key)
+        )
+        return [q[-1].key for q in query.all()]
 
     def put_image_data(
         self, images: Sequence[EPUImage], return_key: Optional[str] = None
@@ -287,6 +307,19 @@ class Extractor:
             self.session.query(Exposure, ExposureInfo)
             .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
             .filter(ExposureInfo.key == key)
+            .filter(Exposure.foil_hole_name == foil_hole_name)
+        )
+        values = [q[-1].value for q in query.all()]
+        return values
+
+    def get_foil_hole_stats_particle(
+        self, foil_hole_name: str, key: str
+    ) -> List[float]:
+        query = (
+            self.session.query(Exposure, Particle, ParticleInfo)
+            .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
+            .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
+            .filter(ParticleInfo.key == key)
             .filter(Exposure.foil_hole_name == foil_hole_name)
         )
         values = [q[-1].value for q in query.all()]

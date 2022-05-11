@@ -522,6 +522,7 @@ class MainDisplay(QWidget):
         self._exposure_combo = QComboBox()
         self._exposure_combo.currentIndexChanged.connect(self._select_exposure)
         self._data_combo = QComboBox()
+        self._particle_data_combo = QComboBox()
         fh_fig = Figure()
         self._foil_hole_stats_fig = fh_fig.add_subplot(111)
         self._foil_hole_stats = FigureCanvasQTAgg(fh_fig)
@@ -532,6 +533,7 @@ class MainDisplay(QWidget):
         self.grid.addWidget(self._foil_hole_combo, 2, 2)
         self.grid.addWidget(self._exposure_combo, 2, 3)
         self.grid.addWidget(self._data_combo, 3, 2)
+        self.grid.addWidget(self._particle_data_combo, 3, 3)
         self.grid.addWidget(self._grid_square_stats, 4, 1)
         self.grid.addWidget(self._foil_hole_stats, 4, 2)
         self._grid_squares: List[GridSquare] = []
@@ -545,9 +547,15 @@ class MainDisplay(QWidget):
         for gs in self._grid_squares:
             self._square_combo.addItem(gs.grid_square_name)
         self._update_fh_choices(self._grid_squares[0].grid_square_name)
+        self._data_combo.clear()
+        self._particle_data_combo.clear()
         data_keys = self._extractor.get_all_exposure_keys()
         for k in data_keys:
             self._data_combo.addItem(k)
+        p_data_keys = self._extractor.get_all_particle_keys()
+        p_data_keys.extend(self._extractor.get_all_particle_set_keys())
+        for k in p_data_keys:
+            self._particle_data_combo.addItem(k)
 
     def _select_square(self, index: int):
         try:

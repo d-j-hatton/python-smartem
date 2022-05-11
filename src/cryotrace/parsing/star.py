@@ -183,7 +183,10 @@ def insert_particle_set(
     ]
     set_ids = set(data[set_id_tag])
     particle_sets = [
-        ParticleSet(group_name=set_name, identifier=set_id) for set_id in set_ids
+        ParticleSet(
+            group_name=set_name, identifier=set_id, atlas_id=extractor._atlas_id
+        )
+        for set_id in set_ids
     ]
     extractor.put(particle_sets)
     exposures = [e.exposure_name for e in extractor.get_all_exposures()]
