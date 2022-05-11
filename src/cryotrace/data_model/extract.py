@@ -17,6 +17,7 @@ from cryotrace.data_model import (
     ParticleInfo,
     ParticleSet,
     ParticleSetInfo,
+    ParticleSetLinker,
     Tile,
     url,
 )
@@ -302,6 +303,31 @@ class Extractor:
             )
         return query.all()
 
+    def get_exposure_stats(self, exposure_name: str, key: str) -> List[float]:
+        query = (
+            self.session.query(Particle, ParticleInfo)
+            .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
+            .filter(ParticleInfo.key == key)
+            .filter(Particle.exposure_name == exposure_name)
+        )
+        values = [q[-1].value for q in query.all()]
+        return values
+
+    def get_exposure_stats_particle_set(
+        self, exposure_name: str, key: str
+    ) -> List[float]:
+        query = (
+            self.session.query(Particle, ParticleSetLinker, ParticleSetInfo)
+            .join(Particle, Particle.particle_id == ParticleSetLinker.particle_id)
+            .join(
+                ParticleSetInfo, ParticleSetInfo.set_name == ParticleSetLinker.set_name
+            )
+            .filter(ParticleSetInfo.key == key)
+            .filter(Particle.exposure_name == exposure_name)
+        )
+        values = [q[-1].value for q in query.all()]
+        return values
+
     def get_foil_hole_stats(self, foil_hole_name: str, key: str) -> List[float]:
         query = (
             self.session.query(Exposure, ExposureInfo)
@@ -325,6 +351,24 @@ class Extractor:
         values = [q[-1].value for q in query.all()]
         return values
 
+    def get_foil_hole_stats_particle_set(
+        self, foil_hole_name: str, key: str
+    ) -> List[float]:
+        query = (
+            self.session.query(Exposure, Particle, ParticleSetLinker, ParticleSetInfo)
+            .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
+            .join(
+                ParticleSetLinker, ParticleSetLinker.particle_id == Particle.particle_id
+            )
+            .join(
+                ParticleSetInfo, ParticleSetInfo.set_name == ParticleSetLinker.set_name
+            )
+            .filter(ParticleSetInfo.key == key)
+            .filter(Exposure.foil_hole_name == foil_hole_name)
+        )
+        values = [q[-1].value for q in query.all()]
+        return values
+
     def get_grid_square_stats(
         self, grid_square_name: str, key: str
     ) -> Dict[str, List[float]]:
@@ -332,6 +376,28 @@ class Extractor:
         foil_holes = self.get_foil_holes(grid_square_name)
         for fh in foil_holes:
             stats[fh.foil_hole_name] = self.get_foil_hole_stats(fh.foil_hole_name, key)
+        return stats
+
+    def get_grid_square_stats_particle(
+        self, grid_square_name: str, key: str
+    ) -> Dict[str, List[float]]:
+        stats = {}
+        foil_holes = self.get_foil_holes(grid_square_name)
+        for fh in foil_holes:
+            stats[fh.foil_hole_name] = self.get_foil_hole_stats_particle(
+                fh.foil_hole_name, key
+            )
+        return stats
+
+    def get_grid_square_stats_particle_set(
+        self, grid_square_name: str, key: str
+    ) -> Dict[str, List[float]]:
+        stats = {}
+        foil_holes = self.get_foil_holes(grid_square_name)
+        for fh in foil_holes:
+            stats[fh.foil_hole_name] = self.get_foil_hole_stats_particle_set(
+                fh.foil_hole_name, key
+            )
         return stats
 
     def get_atlas_stats(self, key: str) -> Dict[str, List[float]]:
