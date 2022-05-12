@@ -344,7 +344,7 @@ class Extractor:
         query = (
             self.session.query(Exposure, Particle, ParticleInfo)
             .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
-            .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
+            .join(ParticleInfo, ParticleInfo.particle_id == Particle.particle_id)
             .filter(ParticleInfo.key == key)
             .filter(Exposure.foil_hole_name == foil_hole_name)
         )
@@ -405,6 +405,26 @@ class Extractor:
         grid_squares = self.get_grid_squares()
         for gs in grid_squares:
             gs_data = self.get_grid_square_stats(gs.grid_square_name, key)
+            stats[gs.grid_square_name] = []
+            for d in gs_data.values():
+                stats[gs.grid_square_name].extend(d)
+        return stats
+
+    def get_atlas_stats_particle(self, key: str) -> Dict[str, List[float]]:
+        stats: Dict[str, List[float]] = {}
+        grid_squares = self.get_grid_squares()
+        for gs in grid_squares:
+            gs_data = self.get_grid_square_stats_particle(gs.grid_square_name, key)
+            stats[gs.grid_square_name] = []
+            for d in gs_data.values():
+                stats[gs.grid_square_name].extend(d)
+        return stats
+
+    def get_atlas_stats_particle_set(self, key: str) -> Dict[str, List[float]]:
+        stats: Dict[str, List[float]] = {}
+        grid_squares = self.get_grid_squares()
+        for gs in grid_squares:
+            gs_data = self.get_grid_square_stats_particle_set(gs.grid_square_name, key)
             stats[gs.grid_square_name] = []
             for d in gs_data.values():
                 stats[gs.grid_square_name].extend(d)

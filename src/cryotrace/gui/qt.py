@@ -577,11 +577,19 @@ class MainDisplay(QWidget):
             return
         self.grid.addWidget(square_lbl, 1, 1)
         self._update_fh_choices(self._square_combo.currentText())
+        p_keys = self._extractor.get_all_particle_keys()
+        ps_keys = self._extractor.get_all_particle_set_keys()
         if self._atlas_view:
             self._atlas_view.load(
                 grid_square=self._grid_squares[index],
                 all_grid_squares=self._grid_squares,
                 data_key=self._data_combo.currentText() or None,
+                particle_data_key=self._particle_data_combo.currentText()
+                if self._particle_data_combo.currentText() in p_keys
+                else None,
+                particle_set_data_key=self._particle_data_combo.currentText()
+                if self._particle_data_combo.currentText() in ps_keys
+                else None,
             )
         self._data = self._extractor.get_grid_square_stats(
             self._square_combo.currentText(), self._data_combo.currentText()
@@ -589,8 +597,6 @@ class MainDisplay(QWidget):
         self._update_grid_square_stats(
             [elem for foil_hole in self._data.values() for elem in foil_hole]
         )
-        p_keys = self._extractor.get_all_particle_keys()
-        ps_keys = self._extractor.get_all_particle_set_keys()
         if self._particle_data_combo.currentText() in p_keys:
             self._particle_data = self._extractor.get_grid_square_stats_particle(
                 self._square_combo.currentText(),
@@ -779,18 +785,35 @@ class AtlasDisplay(QWidget):
         atlas_fig = Figure()
         self._atlas_stats_fig = atlas_fig.add_subplot(111)
         self._atlas_stats = FigureCanvasQTAgg(atlas_fig)
+        atlas_particle_fig = Figure()
+        self._atlas_stats_particle_fig = atlas_particle_fig.add_subplot(111)
+        self._atlas_stats_particle = FigureCanvasQTAgg(atlas_particle_fig)
         self.grid.addWidget(self._atlas_stats, 2, 1)
+        self.grid.addWidget(self._atlas_stats_particle, 3, 1)
         self._data: Dict[str, List[float]] = {}
+        self._particle_data: Dict[str, List[float]] = {}
 
     def load(
         self,
         grid_square: Optional[GridSquare] = None,
         all_grid_squares: Optional[List[GridSquare]] = None,
         data_key: Optional[str] = None,
+        particle_data_key: Optional[str] = None,
+        particle_set_data_key: Optional[str] = None,
     ):
         if data_key:
             self._data = self._extractor.get_atlas_stats(data_key)
             self._update_atlas_stats()
+        if particle_data_key:
+            self._particle_data = self._extractor.get_atlas_stats_particle(
+                particle_data_key
+            )
+            self._update_atlas_stats_particle()
+        if particle_set_data_key:
+            self._particle_data = self._extractor.get_atlas_stats_particle_set(
+                particle_set_data_key
+            )
+            self._update_atlas_stats_particle()
         atlas_lbl = self._draw_atlas(
             grid_square=grid_square, all_grid_squares=all_grid_squares
         )
@@ -807,6 +830,14 @@ class AtlasDisplay(QWidget):
         self._atlas_stats_fig.cla()
         self._atlas_stats_fig.hist(stats)
         self._atlas_stats.draw()
+
+    def _update_atlas_stats_particle(self):
+        stats = []
+        for d in self._particle_data.values():
+            stats.extend(d)
+        self._atlas_stats_particle_fig.cla()
+        self._atlas_stats_particle_fig.hist(stats)
+        self._atlas_stats_particle.draw()
 
     def _draw_atlas(
         self,
