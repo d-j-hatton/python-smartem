@@ -55,7 +55,7 @@ class App:
         self.app = QApplication([])
         self.window = QtFrame(extractor)
         self.app.setStyleSheet(
-            importlib.resources.read_text(cryotrace.gui, "qt_style.css")
+            importlib.resources.read_text(cryotrace.gui.qt, "qt_style.css")
         )
 
     def start(self):
