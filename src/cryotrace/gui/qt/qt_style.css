@@ -36,6 +36,18 @@ QComboBox:hover{
     background-color: #36f1cd;
 }
 
+QListWidget {
+  background-color: #13c4a3;
+  font-family: system-ui,-apple-system,system-ui,"Helvetica Neue",Helvetica,Arial,sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+QListWidget:hover{
+  background-color: #36f1cd;
+}
+
+
 QRadioButton {
   background-color: #36f1cd;
 }

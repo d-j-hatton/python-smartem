@@ -1,7 +1,8 @@
 from functools import lru_cache
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
-from sqlalchemy import and_, create_engine
+import numpy as np
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Load, load_only, sessionmaker
 
 from cryotrace.data_model import (
@@ -75,6 +76,13 @@ class Extractor:
             Exposure.foil_hole_name == foil_hole_name
         )
         return query.all()
+
+    @lru_cache(maxsize=50)
+    def get_exposure_names(self, foil_hole_name: str) -> List[str]:
+        query = self.session.query(Exposure).filter(
+            Exposure.foil_hole_name == foil_hole_name
+        )
+        return [q.exposure_name for q in query.all()]
 
     def set_atlas_id(self, atlas_path: str) -> bool:
         query = self.session.query(Atlas).options(load_only("thumbnail", "atlas_id"))
@@ -198,111 +206,6 @@ class Extractor:
             self.session.add(entry)
         self.session.commit()
 
-    def get_grid_square_data(
-        self, grid_square_name: str, keys: Optional[List[str]] = None
-    ) -> list:
-        if not keys:
-            query = (
-                self.session.query(
-                    FoilHole, Exposure, Particle, ParticleInfo, ExposureInfo
-                )
-                .join(
-                    Exposure,
-                    and_(
-                        Exposure.exposure_name == ExposureInfo.exposure_name,
-                        Exposure.exposure_name == Particle.exposure_name,
-                    ),
-                )
-                .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
-                .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
-                .filter(FoilHole.grid_square_name == grid_square_name)
-            )
-        else:
-            query = (
-                self.session.query(
-                    FoilHole, Exposure, Particle, ParticleInfo, ExposureInfo
-                )
-                .join(
-                    Exposure,
-                    and_(
-                        Exposure.exposure_name == ExposureInfo.exposure_name,
-                        Exposure.exposure_name == Particle.exposure_name,
-                    ),
-                )
-                .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
-                .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
-                .filter(FoilHole.grid_square_name == grid_square_name)
-                .filter(ExposureInfo.key.in_(keys))
-                .filter(ParticleInfo.key.in_(keys))
-            )
-        return query.all()
-
-    def get_foil_hole_data(
-        self, foil_hole_name: str, keys: Optional[List[str]] = None
-    ) -> list:
-        if not keys:
-            query = (
-                self.session.query(Exposure, Particle, ParticleInfo, ExposureInfo)
-                .join(
-                    Exposure,
-                    and_(
-                        Exposure.exposure_name == ExposureInfo.exposure_name,
-                        Exposure.exposure_name == Particle.exposure_name,
-                    ),
-                )
-                .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
-                .filter(Exposure.foil_hole_name == foil_hole_name)
-            )
-        else:
-            query = (
-                self.session.query(Exposure, Particle, ParticleInfo, ExposureInfo)
-                .join(
-                    Exposure,
-                    and_(
-                        Exposure.exposure_name == ExposureInfo.exposure_name,
-                        Exposure.exposure_name == Particle.exposure_name,
-                    ),
-                )
-                .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
-                .filter(Exposure.foil_hole_name == foil_hole_name)
-                .filter(ExposureInfo.key.in_(keys))
-                .filter(ParticleInfo.key.in_(keys))
-            )
-        return query.all()
-
-    def get_exposure_data(
-        self, exposure_name: str, keys: Optional[List[str]] = None
-    ) -> list:
-        if not keys:
-            query = (
-                self.session.query(Exposure, Particle, ParticleInfo, ExposureInfo)
-                .join(
-                    Exposure,
-                    and_(
-                        Exposure.exposure_name == ExposureInfo.exposure_name,
-                        Exposure.exposure_name == Particle.exposure_name,
-                    ),
-                )
-                .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
-                .filter(Exposure.exposure_name == exposure_name)
-            )
-        else:
-            query = (
-                self.session.query(Exposure, Particle, ParticleInfo, ExposureInfo)
-                .join(
-                    Exposure,
-                    and_(
-                        Exposure.exposure_name == ExposureInfo.exposure_name,
-                        Exposure.exposure_name == Particle.exposure_name,
-                    ),
-                )
-                .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
-                .filter(Exposure.exposure_name == exposure_name)
-                .filter(ExposureInfo.key.in_(keys))
-                .filter(ParticleInfo.key.in_(keys))
-            )
-        return query.all()
-
     def get_exposure_stats(self, exposure_name: str, key: str) -> List[float]:
         query = (
             self.session.query(Particle, ParticleInfo)
@@ -312,6 +215,23 @@ class Extractor:
         )
         values = [q[-1].value for q in query.all()]
         return values
+
+    def get_exposure_stats_multi(
+        self, exposure_name: str, keys: List[str]
+    ) -> Dict[str, List[float]]:
+        stats: Dict[str, List[float]] = {}
+        if not keys:
+            return stats
+        query = (
+            self.session.query(Particle, ParticleInfo)
+            .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
+            .filter(ParticleInfo.key.in_(keys))
+            .filter(Particle.exposure_name == exposure_name)
+        )
+        info = [q[-1] for q in query.all()]
+        for key in keys:
+            stats[key] = [q.value for q in info if q.key == key]
+        return stats
 
     def get_exposure_stats_particle_set(
         self, exposure_name: str, key: str
@@ -328,6 +248,26 @@ class Extractor:
         values = [q[-1].value for q in query.all()]
         return values
 
+    def get_exposure_stats_particle_set_multi(
+        self, exposure_name: str, keys: List[str]
+    ) -> Dict[str, List[float]]:
+        stats: Dict[str, List[float]] = {}
+        if not keys:
+            return stats
+        query = (
+            self.session.query(Particle, ParticleSetLinker, ParticleSetInfo)
+            .join(Particle, Particle.particle_id == ParticleSetLinker.particle_id)
+            .join(
+                ParticleSetInfo, ParticleSetInfo.set_name == ParticleSetLinker.set_name
+            )
+            .filter(ParticleSetInfo.key.in_(keys))
+            .filter(Particle.exposure_name == exposure_name)
+        )
+        info = [q[-1] for q in query.all()]
+        for key in keys:
+            stats[key] = [q.value for q in info if q.key == key]
+        return stats
+
     def get_foil_hole_stats(self, foil_hole_name: str, key: str) -> List[float]:
         query = (
             self.session.query(Exposure, ExposureInfo)
@@ -338,23 +278,32 @@ class Extractor:
         values = [q[-1].value for q in query.all()]
         return values
 
-    def get_foil_hole_stats_particle(
-        self, foil_hole_name: str, key: str
-    ) -> List[float]:
-        query = (
+    def get_foil_hole_stats_all(
+        self,
+        foil_hole_name: str,
+        exposure_keys: List[str],
+        particle_keys: List[str],
+        particle_set_keys: List[str],
+        avg_particles: bool = False,
+    ) -> Dict[str, List[float]]:
+        stats: Dict[str, List[float]] = {}
+        if not any((exposure_keys, particle_keys, particle_set_keys)):
+            return stats
+        exposures = self.get_exposure_names(foil_hole_name)
+        exposure_query = (
+            self.session.query(Exposure, ExposureInfo)
+            .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
+            .filter(ExposureInfo.key.in_(exposure_keys))
+            .filter(Exposure.foil_hole_name == foil_hole_name)
+        )
+        particle_query = (
             self.session.query(Exposure, Particle, ParticleInfo)
             .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
             .join(ParticleInfo, ParticleInfo.particle_id == Particle.particle_id)
-            .filter(ParticleInfo.key == key)
+            .filter(ParticleInfo.key.in_(particle_keys))
             .filter(Exposure.foil_hole_name == foil_hole_name)
         )
-        values = [q[-1].value for q in query.all()]
-        return values
-
-    def get_foil_hole_stats_particle_set(
-        self, foil_hole_name: str, key: str
-    ) -> List[float]:
-        query = (
+        particle_set_query = (
             self.session.query(Exposure, Particle, ParticleSetLinker, ParticleSetInfo)
             .join(Exposure, Exposure.exposure_name == Particle.exposure_name)
             .join(
@@ -363,11 +312,59 @@ class Extractor:
             .join(
                 ParticleSetInfo, ParticleSetInfo.set_name == ParticleSetLinker.set_name
             )
-            .filter(ParticleSetInfo.key == key)
+            .filter(ParticleSetInfo.key.in_(particle_set_keys))
             .filter(Exposure.foil_hole_name == foil_hole_name)
         )
-        values = [q[-1].value for q in query.all()]
-        return values
+        exposure_results = exposure_query.all()
+        particle_results = particle_query.all()
+        particle_set_results = particle_set_query.all()
+        for k in exposure_keys:
+            stats[k] = []
+            for exp in exposures:
+                stats[k].extend(
+                    er[-1].value
+                    for er in exposure_results
+                    if er[-1].key == k and er[0].exposure_name == exp
+                )
+        for k in particle_keys:
+            stats[k] = []
+            for exp in exposures:
+                if avg_particles:
+                    stats[k].append(
+                        np.mean(
+                            [
+                                er[-1].value
+                                for er in particle_results
+                                if er[-1].key == k and er[0].exposure_name == exp
+                            ]
+                        )
+                    )
+                else:
+                    stats[k].extend(
+                        er[-1].value
+                        for er in particle_results
+                        if er[-1].key == k and er[0].exposure_name == exp
+                    )
+        for k in particle_set_keys:
+            stats[k] = []
+            for exp in exposures:
+                if avg_particles:
+                    stats[k].append(
+                        np.mean(
+                            [
+                                er[-1].value
+                                for er in particle_set_results
+                                if er[-1].key == k and er[0].exposure_name == exp
+                            ]
+                        )
+                    )
+                else:
+                    stats[k].extend(
+                        er[-1].value
+                        for er in particle_set_results
+                        if er[-1].key == k and er[0].exposure_name == exp
+                    )
+        return stats
 
     def get_grid_square_stats(
         self, grid_square_name: str, key: str
@@ -378,26 +375,31 @@ class Extractor:
             stats[fh.foil_hole_name] = self.get_foil_hole_stats(fh.foil_hole_name, key)
         return stats
 
-    def get_grid_square_stats_particle(
-        self, grid_square_name: str, key: str
-    ) -> Dict[str, List[float]]:
-        stats = {}
+    def get_grid_square_stats_all(
+        self,
+        grid_square_name: str,
+        exposure_keys: List[str],
+        particle_keys: List[str],
+        particle_set_keys: List[str],
+        avg_particles: bool = False,
+    ) -> Dict[str, Dict[str, List[float]]]:
+        stats: Dict[str, Dict[str, List[float]]] = {}
+        if not any((exposure_keys, particle_keys, particle_set_keys)):
+            return stats
         foil_holes = self.get_foil_holes(grid_square_name)
         for fh in foil_holes:
-            stats[fh.foil_hole_name] = self.get_foil_hole_stats_particle(
-                fh.foil_hole_name, key
+            fh_stats = self.get_foil_hole_stats_all(
+                fh.foil_hole_name,
+                exposure_keys,
+                particle_keys,
+                particle_set_keys,
+                avg_particles=avg_particles,
             )
-        return stats
-
-    def get_grid_square_stats_particle_set(
-        self, grid_square_name: str, key: str
-    ) -> Dict[str, List[float]]:
-        stats = {}
-        foil_holes = self.get_foil_holes(grid_square_name)
-        for fh in foil_holes:
-            stats[fh.foil_hole_name] = self.get_foil_hole_stats_particle_set(
-                fh.foil_hole_name, key
-            )
+            for k, v in fh_stats.items():
+                try:
+                    stats[k].update({fh.foil_hole_name: v})
+                except KeyError:
+                    stats[k] = {fh.foil_hole_name: v}
         return stats
 
     def get_atlas_stats(self, key: str) -> Dict[str, List[float]]:
@@ -405,26 +407,6 @@ class Extractor:
         grid_squares = self.get_grid_squares()
         for gs in grid_squares:
             gs_data = self.get_grid_square_stats(gs.grid_square_name, key)
-            stats[gs.grid_square_name] = []
-            for d in gs_data.values():
-                stats[gs.grid_square_name].extend(d)
-        return stats
-
-    def get_atlas_stats_particle(self, key: str) -> Dict[str, List[float]]:
-        stats: Dict[str, List[float]] = {}
-        grid_squares = self.get_grid_squares()
-        for gs in grid_squares:
-            gs_data = self.get_grid_square_stats_particle(gs.grid_square_name, key)
-            stats[gs.grid_square_name] = []
-            for d in gs_data.values():
-                stats[gs.grid_square_name].extend(d)
-        return stats
-
-    def get_atlas_stats_particle_set(self, key: str) -> Dict[str, List[float]]:
-        stats: Dict[str, List[float]] = {}
-        grid_squares = self.get_grid_squares()
-        for gs in grid_squares:
-            gs_data = self.get_grid_square_stats_particle_set(gs.grid_square_name, key)
             stats[gs.grid_square_name] = []
             for d in gs_data.values():
                 stats[gs.grid_square_name].extend(d)
