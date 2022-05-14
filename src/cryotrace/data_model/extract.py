@@ -268,16 +268,6 @@ class Extractor:
             stats[key] = [q.value for q in info if q.key == key]
         return stats
 
-    def get_foil_hole_stats(self, foil_hole_name: str, key: str) -> List[float]:
-        query = (
-            self.session.query(Exposure, ExposureInfo)
-            .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
-            .filter(ExposureInfo.key == key)
-            .filter(Exposure.foil_hole_name == foil_hole_name)
-        )
-        values = [q[-1].value for q in query.all()]
-        return values
-
     def get_foil_hole_stats_all(
         self,
         foil_hole_name: str,
@@ -366,15 +356,6 @@ class Extractor:
                     )
         return stats
 
-    def get_grid_square_stats(
-        self, grid_square_name: str, key: str
-    ) -> Dict[str, List[float]]:
-        stats = {}
-        foil_holes = self.get_foil_holes(grid_square_name)
-        for fh in foil_holes:
-            stats[fh.foil_hole_name] = self.get_foil_hole_stats(fh.foil_hole_name, key)
-        return stats
-
     def get_grid_square_stats_all(
         self,
         grid_square_name: str,
@@ -402,12 +383,28 @@ class Extractor:
                     stats[k] = {fh.foil_hole_name: v}
         return stats
 
-    def get_atlas_stats(self, key: str) -> Dict[str, List[float]]:
-        stats: Dict[str, List[float]] = {}
+    def get_atlas_stats(
+        self,
+        exposure_keys: List[str],
+        particle_keys: List[str],
+        particle_set_keys: List[str],
+        avg_particles: bool = False,
+    ) -> Dict[str, Dict[str, List[float]]]:
+        stats: Dict[str, Dict[str, List[float]]] = {}
         grid_squares = self.get_grid_squares()
+        for k in exposure_keys + particle_keys + particle_set_keys:
+            stats[k] = {}
         for gs in grid_squares:
-            gs_data = self.get_grid_square_stats(gs.grid_square_name, key)
-            stats[gs.grid_square_name] = []
-            for d in gs_data.values():
-                stats[gs.grid_square_name].extend(d)
+            foil_holes = self.get_foil_holes(gs.grid_square_name)
+            gs_data = self.get_grid_square_stats_all(
+                gs.grid_square_name,
+                exposure_keys,
+                particle_keys,
+                particle_set_keys,
+                avg_particles=avg_particles,
+            )
+            for k in gs_data.keys():
+                stats[k][gs.grid_square_name] = []
+                for fh in foil_holes:
+                    stats[k][gs.grid_square_name].extend(gs_data[k][fh.foil_hole_name])
         return stats

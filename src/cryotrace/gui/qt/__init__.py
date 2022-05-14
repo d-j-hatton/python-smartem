@@ -258,9 +258,9 @@ class MainDisplay(QWidget):
             self._atlas_view.load(
                 grid_square=self._grid_squares[index],
                 all_grid_squares=self._grid_squares,
-                data_key=self._data_list.selectedItems()[0].text()
-                if self._data_list.selectedItems()
-                else None,
+                exposure_keys=_exposure_keys,
+                particle_keys=_particle_keys,
+                particle_set_keys=_particle_set_keys,
             )
 
         for_correlation = {}
@@ -302,7 +302,6 @@ class MainDisplay(QWidget):
         if len(stats.keys()) == 1:
             self._grid_square_stats_fig.hist(list(stats.values())[0])
         if len(stats.keys()) == 2:
-            print([len(v) for v in stats.values()])
             self._grid_square_stats_fig.scatter(*(v for v in stats.values()))
         if len(stats.keys()) > 2:
             corr = np.corrcoef(list(stats.values()))
@@ -485,17 +484,26 @@ class AtlasDisplay(QWidget):
         self._atlas_stats_particle = FigureCanvasQTAgg(atlas_particle_fig)
         self.grid.addWidget(self._atlas_stats, 2, 1)
         self.grid.addWidget(self._atlas_stats_particle, 3, 1)
-        self._data: Dict[str, List[float]] = {}
+        self._data: Dict[str, Dict[str, List[float]]] = {}
         self._particle_data: Dict[str, List[float]] = {}
+        self._colour_bar = None
 
     def load(
         self,
         grid_square: Optional[GridSquare] = None,
         all_grid_squares: Optional[List[GridSquare]] = None,
-        data_key: Optional[str] = None,
+        exposure_keys: Optional[List[str]] = None,
+        particle_keys: Optional[List[str]] = None,
+        particle_set_keys: Optional[List[str]] = None,
     ):
-        if data_key:
-            self._data = self._extractor.get_atlas_stats(data_key)
+        if any((exposure_keys, particle_keys, particle_set_keys)):
+            self._data = self._extractor.get_atlas_stats(
+                exposure_keys or [],
+                particle_keys or [],
+                particle_set_keys or [],
+                avg_particles=bool(exposure_keys)
+                and (bool(particle_keys) or bool(particle_set_keys)),
+            )
             self._update_atlas_stats()
         atlas_lbl = self._draw_atlas(
             grid_square=grid_square, all_grid_squares=all_grid_squares
@@ -507,11 +515,20 @@ class AtlasDisplay(QWidget):
             self.grid.addWidget(tile_lbl, 1, 2)
 
     def _update_atlas_stats(self):
-        stats = []
-        for d in self._data.values():
-            stats.extend(d)
         self._atlas_stats_fig.cla()
-        self._atlas_stats_fig.hist(stats)
+        try:
+            if self._colour_bar:
+                self._colour_bar.remove()
+        except (AttributeError, ValueError):
+            pass
+        if len(self._data.keys()) == 1:
+            self._atlas_stats_fig.hist(list(self._data.values())[0])
+        if len(self._data.keys()) == 2:
+            self._atlas_stats_fig.scatter(*(v for v in self._data.values()))
+        if len(self._data.keys()) > 2:
+            corr = np.corrcoef(list(self._data.values()))
+            mat = self._atlas_stats_fig.matshow(corr)
+            self._colour_bar = self._atlas_stats_fig.figure.colorbar(mat)
         self._atlas_stats.draw()
 
     def _update_atlas_stats_particle(self):
