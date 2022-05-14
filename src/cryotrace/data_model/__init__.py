@@ -54,6 +54,26 @@ class EPUImage:
     )
 
 
+class Project(Base):
+    __tablename__ = "Project"
+
+    project_name = Column(
+        String,
+        primary_key=True,
+        nullable=False,
+    )
+
+    acquisition_directory = Column(
+        String,
+        nullable=False,
+    )
+
+    processing_directory = Column(String)
+
+    atlas_id: Column = Column(ForeignKey("Atlas.atlas_id"), index=True)
+    Atlas = relationship("Atlas")
+
+
 class Atlas(EPUImage, Base):
     __tablename__ = "Atlas"
 
