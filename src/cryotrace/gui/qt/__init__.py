@@ -253,7 +253,6 @@ class MainDisplay(QWidget):
         self._data_list.setSelectionMode(QListWidget.MultiSelection)
         self._pick_list = QListWidget()
         self._pick_list.setSelectionMode(QListWidget.MultiSelection)
-        self._particle_data_combo = QComboBox()
         fh_fig = Figure()
         self._foil_hole_stats_fig = fh_fig.add_subplot(111)
         self._foil_hole_stats = FigureCanvasQTAgg(fh_fig)
@@ -295,7 +294,6 @@ class MainDisplay(QWidget):
             self._square_combo.addItem(gs.grid_square_name)
         self._update_fh_choices(self._grid_squares[0].grid_square_name)
         self._data_list.clear()
-        self._particle_data_combo.clear()
 
         self._data_keys["micrograph"] = self._extractor.get_all_exposure_keys()
         self._data_keys["particle"] = self._extractor.get_all_particle_keys()
