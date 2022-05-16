@@ -200,11 +200,21 @@ class Extractor:
         else:
             return None
 
-    def get_particles(self, exposure_name: str) -> List[Particle]:
-        query = self.session.query(Particle).filter(
-            Particle.exposure_name == exposure_name
+    def get_particles(
+        self, exposure_name: str, source: Optional[str] = None
+    ) -> List[Particle]:
+        if not source:
+            query = self.session.query(Particle).filter(
+                Particle.exposure_name == exposure_name
+            )
+            return query.all()
+        query = (
+            self.session.query(Particle, ParticleInfo)
+            .join(Particle, Particle.particle_id == ParticleInfo.particle_id)
+            .filter(ParticleInfo.source == source)
+            .filter(Particle.exposure_name == exposure_name)
         )
-        return query.all()
+        return [q[0] for q in query.all()]
 
     def get_particle_id(self, exposure_name: str, x: float, y: float) -> Optional[int]:
         query = self.session.query(Particle).filter(
