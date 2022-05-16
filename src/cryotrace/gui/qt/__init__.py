@@ -590,11 +590,24 @@ class AtlasDisplay(QWidget):
         except (AttributeError, ValueError):
             pass
         if len(self._data.keys()) == 1:
-            self._atlas_stats_fig.hist(list(self._data.values())[0])
+            stats = []
+            for gs in list(self._data.values())[0].values():
+                stats.extend(gs)
+            self._atlas_stats_fig.hist(stats)
         if len(self._data.keys()) == 2:
-            self._atlas_stats_fig.scatter(*(v for v in self._data.values()))
+            stats = {}
+            for k, v in self._data.items():
+                stats[k] = []
+                for d in v.values():
+                    stats[k].extend(d)
+            self._atlas_stats_fig.scatter(*(v for v in stats.values()))
         if len(self._data.keys()) > 2:
-            corr = np.corrcoef(list(self._data.values()))
+            stats = {}
+            for k, v in self._data.items():
+                stats[k] = []
+                for d in v.values():
+                    stats[k].extend(d)
+            corr = np.corrcoef(list(stats.values()))
             mat = self._atlas_stats_fig.matshow(corr)
             self._colour_bar = self._atlas_stats_fig.figure.colorbar(mat)
         self._atlas_stats.draw()
@@ -620,9 +633,16 @@ class AtlasDisplay(QWidget):
                 atlas_pixmap = atlas_pixmap.transformed(QTransform().scale(*flip))
             if grid_square:
                 imvs: Optional[list] = None
-                if self._data and grid_square and all_grid_squares:
+                _key = None
+                if (
+                    self._data
+                    and grid_square
+                    and all_grid_squares
+                    and len(self._data.keys()) == 1
+                ):
+                    _key = list(self._data.keys())[0]
                     imvs = [
-                        np.mean(self._data.get(gs.grid_square_name, []))
+                        np.mean(self._data[_key].get(gs.grid_square_name, []))
                         for gs in all_grid_squares
                         if gs != grid_square
                     ]
@@ -634,7 +654,11 @@ class AtlasDisplay(QWidget):
                     (qsize.width(), qsize.height()),
                     parent=self,
                     overwrite_readout=True,
-                    value=np.mean(self._data.get(grid_square.grid_square_name, [0])),
+                    value=np.mean(
+                        self._data[_key].get(grid_square.grid_square_name, [0])
+                    )
+                    if _key
+                    else None,
                     extra_images=[gs for gs in all_grid_squares if gs != grid_square]
                     if all_grid_squares
                     else [],
