@@ -126,6 +126,30 @@ class Extractor:
             return tile.tile_id
         return None
 
+    def get_particle_set_group_names(self) -> List[str]:
+        query = (
+            self.session.query(ParticleSet)
+            .filter(ParticleSet.atlas_id == self._atlas_id)
+            .distinct(ParticleSet.group_name)
+        )
+        return [q.group_name for q in query.all()]
+
+    def get_particle_info_sources(self) -> List[str]:
+        query = (
+            self.session.query(
+                Tile, GridSquare, FoilHole, Exposure, Particle, ParticleInfo
+            )
+            .options(Load(Tile).load_only("tile_id", "atlas_id"), Load(FoilHole).load_only("grid_square_name", "foil_hole_name"), Load(Exposure).load_only("foil_hole_name", "exposure_name"), Load(Particle).load_only("exposure_name", "particle_id"), Load(ParticleInfo).load_only("source"))  # type: ignore
+            .join(GridSquare, GridSquare.tile_id == Tile.tile_id)
+            .join(FoilHole, FoilHole.grid_square_name == GridSquare.grid_square_name)
+            .join(Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name)
+            .join(Particle, Particle.exposure_name == Exposure.exposure_name)
+            .join(ParticleInfo, ParticleInfo.particle_id == Particle.particle_id)
+            .filter(Tile.atlas_id == self._atlas_id)
+            .distinct(ParticleInfo.source)
+        )
+        return [q[-1].source for q in query.all()]
+
     def get_all_exposure_keys(self) -> List[str]:
         query = (
             self.session.query(Tile, GridSquare, FoilHole, Exposure, ExposureInfo)

@@ -207,6 +207,7 @@ class ParticleSet(Base):
 
     group_name = Column(
         String,
+        primary_key=True,
         nullable=False,
     )
 
