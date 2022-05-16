@@ -19,6 +19,7 @@ from cryotrace.data_model import (
     ParticleSet,
     ParticleSetInfo,
     ParticleSetLinker,
+    Project,
     Tile,
     url,
 )
@@ -42,6 +43,16 @@ class Extractor:
     def get_atlases(self) -> List[str]:
         query = self.session.query(Atlas).options(load_only("thumbnail"))
         return [q.thumbnail for q in query.all()]
+
+    def get_projects(self) -> List[str]:
+        query = self.session.query(Project).options(load_only("project_name"))
+        return [q.project_name for q in query.all()]
+
+    def get_project(self, project_name: str) -> Tuple[Project, Atlas]:
+        query = self.session.query(Project).filter(Project.project_name == project_name)
+        proj = query.one()
+        query = self.session.query(Atlas).filter(Atlas.atlas_id == proj.atlas_id)
+        return proj, query.one()
 
     def get_grid_squares(self) -> List[GridSquare]:
         query = (

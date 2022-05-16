@@ -17,7 +17,9 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QFileDialog,
     QGridLayout,
+    QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QPushButton,
     QTabWidget,
@@ -26,7 +28,7 @@ from PyQt5.QtWidgets import (
 )
 
 import cryotrace.gui
-from cryotrace.data_model import Exposure, FoilHole, GridSquare
+from cryotrace.data_model import Exposure, FoilHole, GridSquare, Project
 from cryotrace.data_model.extract import Extractor
 from cryotrace.gui.qt.image_utils import ImageLabel, ParticleImageLabel
 from cryotrace.gui.qt.loader import (
@@ -100,49 +102,96 @@ class ProjectLoader(QWidget):
         self.epu_dir = ""
         self.project_dir = ""
         self._combo = QComboBox()
-        atlases = self._extractor.get_atlases()
-        for atl in atlases:
-            self._combo.addItem(atl)
-        self._combo.currentIndexChanged.connect(self._select_atlas_combo)
-        self.grid.addWidget(self._combo, 1, 1)
-        self.atlas = self._combo.currentText()
+        projects = self._extractor.get_projects()
+        self._combo.addItem(None)
+        for proj in projects:
+            self._combo.addItem(proj)
+        self._combo.currentIndexChanged.connect(self._select_project)
+        self._project_name = self._combo.currentText()
+        self._name_input = QLineEdit()
+        self._name_input.returnPressed.connect(self._button_check)
+        hbox = QHBoxLayout()
+        hbox.addWidget(self._combo, 1)
+        hbox.addWidget(self._name_input, 1)
+        self.grid.addLayout(hbox, 1, 1, 1, 2)
+        epu_hbox = QHBoxLayout()
         epu_btn = QPushButton("Select EPU directory")
         epu_btn.clicked.connect(self._select_epu_dir)
-        self.grid.addWidget(epu_btn, 2, 1)
         self.epu_lbl = QLabel()
         self.epu_lbl.setText(f"Selected: {self.epu_dir}")
-        self.grid.addWidget(self.epu_lbl, 2, 3)
+        epu_hbox.addWidget(epu_btn, 1)
+        epu_hbox.addWidget(self.epu_lbl, 1)
+        self.grid.addLayout(epu_hbox, 2, 1, 1, 2)
+        self.atlas = None
+        atlas_hbox = QHBoxLayout()
         atlas_btn = QPushButton("Select Atlas")
         atlas_btn.clicked.connect(self._select_atlas)
-        self.grid.addWidget(atlas_btn, 3, 1)
         self.atlas_lbl = QLabel()
         self.atlas_lbl.setText(f"Selected: {self.atlas}")
-        self.grid.addWidget(self.atlas_lbl, 3, 3)
+        atlas_hbox.addWidget(atlas_btn, 1)
+        atlas_hbox.addWidget(self.atlas_lbl, 1)
+        self.grid.addLayout(atlas_hbox, 3, 1, 1, 2)
+        project_hbox = QHBoxLayout()
         project_btn = QPushButton("Select project directory")
-        project_btn.clicked.connect(self._select_project)
-        self.grid.addWidget(project_btn, 4, 1)
+        project_btn.clicked.connect(self._select_processing_project)
         self.project_lbl = QLabel()
         self.project_lbl.setText(f"Selected: {self.project_dir}")
-        self.grid.addWidget(self.project_lbl, 4, 3)
-        load_btn = QPushButton("Load")
-        load_btn.clicked.connect(self.load)
-        self.grid.addWidget(load_btn, 5, 2)
+        project_hbox.addWidget(project_btn)
+        project_hbox.addWidget(self.project_lbl)
+        self.grid.addLayout(project_hbox, 4, 1, 1, 2)
+        self._load_btn = QPushButton("Load")
+        self._load_btn.clicked.connect(self.load)
+        self.grid.addWidget(self._load_btn, 5, 1)
+        self._create_btn = QPushButton("Create")
+        self._create_btn.clicked.connect(self._create_project)
+        self.grid.addWidget(self._create_btn, 5, 2)
+        self._button_check()
+
+    def _button_check(self):
+        if self._combo.currentText():
+            self._load_btn.setEnabled(True)
+            self._create_btn.setEnabled(False)
+        elif self._name_input.text() and self.atlas and self.epu_dir:
+            self._load_btn.setEnabled(False)
+            self._create_btn.setEnabled(True)
+        else:
+            self._load_btn.setEnabled(False)
+            self._create_btn.setEnabled(False)
+
+    def _select_project(self):
+        if self._combo.currentText():
+            self._project_name = self._combo.currentText()
+            self._name_input.setEnabled(False)
+            project, atlas = self._extractor.get_project(self._project_name)
+            self.epu_dir = project.acquisition_directory
+            self.epu_lbl.setText(f"Selected: {self.epu_dir}")
+            self.project_dir = project.processing_directory
+            self.project_lbl.setText(f"Selected: {self.project_dir}")
+            self.atlas = atlas.thumbnail
+            self.atlas_lbl.setText(f"Selected: {self.atlas}")
+        else:
+            self._name_input.setEnabled(False)
+            self._project_name = self._name_input.text()
+        self._button_check()
 
     def _select_epu_dir(self):
         self.epu_dir = QFileDialog.getExistingDirectory(
             self, "Select EPU directory", ".", QFileDialog.ShowDirsOnly
         )
         self.epu_lbl.setText(f"Selected: {self.epu_dir}")
+        self._button_check()
 
     def _select_atlas_combo(self, index: int):
         self.atlas = self._combo.currentText()
         self.atlas_lbl.setText(f"Selected: {self.atlas}")
+        self._button_check()
 
     def _select_atlas(self):
         self.atlas = QFileDialog.getOpenFileName(self, "Select Atlas image", ".")[0]
         self.atlas_lbl.setText(f"Selected: {self.atlas}")
+        self._button_check()
 
-    def _select_project(self):
+    def _select_processing_project(self):
         self.project_dir = QFileDialog.getExistingDirectory(
             self, "Select project directory", ".", QFileDialog.ShowDirsOnly
         )
@@ -150,6 +199,25 @@ class ProjectLoader(QWidget):
         self._data_loader._set_project_directory(Path(self.project_dir))
         self._particle_loader._set_project_directory(Path(self.project_dir))
         self._particle_set_loader._set_project_directory(Path(self.project_dir))
+        self._button_check()
+
+    def _create_project(self):
+        self._extractor.set_atlas_id(self.atlas)
+        if self._extractor._atlas_id is not None:
+            if self.project_dir:
+                proj = Project(
+                    atlas_id=self._extractor._atlas_id,
+                    acquisition_directory=self.epu_dir,
+                    processing_directory=self.project_dir,
+                    project_name=self._name_input.text(),
+                )
+            else:
+                proj = Project(
+                    atlas_id=self._extractor._atlas_id,
+                    acquisition_directory=self.epu_dir,
+                    project_name=self.project_name,
+                )
+            self._extractor.put([proj])
 
     def load(self):
         atlas_found = self._extractor.set_atlas_id(self.atlas)

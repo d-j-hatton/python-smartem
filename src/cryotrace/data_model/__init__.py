@@ -252,6 +252,7 @@ _tables = [
     ParticleSet,
     ParticleSetInfo,
     ParticleSetLinker,
+    Project,
     ExposureInfo,
 ]
 
