@@ -20,16 +20,6 @@ def colour_gradient(value: float) -> str:
     return matplotlib.colors.to_hex((1 - value) * low_rgb + value * high_rgb)
 
 
-colour_cycle = cycle(
-    [
-        QColor(QtCore.Qt.red),
-        QColor(QtCore.Qt.green),
-        QColor(QtCore.Qt.cyan),
-        QColor(QtCore.Qt.blue),
-    ]
-)
-
-
 class ParticleImageLabel(QLabel):
     def __init__(
         self,
@@ -64,15 +54,24 @@ class ParticleImageLabel(QLabel):
         pen.setWidth(3)
         painter.setPen(pen)
 
+        colour_cycle = cycle(
+            [
+                QColor(QtCore.Qt.red),
+                QColor(QtCore.Qt.green),
+                QColor(QtCore.Qt.cyan),
+                QColor(QtCore.Qt.blue),
+            ]
+        )
+
         if self._particles and isinstance(self._particles[0], Particle):
             for particle in self._particles:
                 self.draw_circle((particle.x, particle.y), 30, painter)
         elif self._particles:
             for particle_group in self._particles:
+                pen = QPen(next(colour_cycle))
+                pen.setWidth(3)
+                painter.setPen(pen)
                 for particle in particle_group:
-                    pen = QPen(next(colour_cycle))
-                    pen.setWidth(3)
-                    painter.setPen(pen)
                     self.draw_circle((particle.x, particle.y), 30, painter)
 
         painter.end()

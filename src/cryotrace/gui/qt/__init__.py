@@ -196,10 +196,12 @@ class ProjectLoader(QWidget):
             self, "Select project directory", ".", QFileDialog.ShowDirsOnly
         )
         self.project_lbl.setText(f"Selected: {self.project_dir}")
+        self._button_check()
+
+    def _update_loaders(self):
         self._data_loader._set_project_directory(Path(self.project_dir))
         self._particle_loader._set_project_directory(Path(self.project_dir))
         self._particle_set_loader._set_project_directory(Path(self.project_dir))
-        self._button_check()
 
     def _create_project(self):
         self._extractor.set_atlas_id(self.atlas)
@@ -218,12 +220,14 @@ class ProjectLoader(QWidget):
                     project_name=self.project_name,
                 )
             self._extractor.put([proj])
+            self._update_loaders()
 
     def load(self):
         atlas_found = self._extractor.set_atlas_id(self.atlas)
         if atlas_found:
             self._main_display.load()
             self._atlas_display.load()
+            self._update_loaders()
             return
         create_atlas_and_tiles(Path(self.atlas), self._extractor)
         atlas_found = self._extractor.set_atlas_id(self.atlas)
@@ -232,6 +236,7 @@ class ProjectLoader(QWidget):
         parse_epu_dir(Path(self.epu_dir), self._extractor)
         self._main_display.load()
         self._atlas_display.load()
+        self._update_loaders()
 
 
 class MainDisplay(QWidget):
