@@ -528,7 +528,23 @@ class MainDisplay(QWidget):
         if flip != (1, 1):
             exposure_pixmap = exposure_pixmap.transformed(QTransform().scale(*flip))
         qsize = exposure_pixmap.size()
-        particles = self._extractor.get_particles(exposure.exposure_name)
+        particles = []
+        if self._pick_list.selectedItems():
+            for p in self._pick_list.selectedItems():
+                if p.text() in self._pick_keys["source"]:
+                    particles.append(
+                        self._extractor.get_particles(
+                            exposure.exposure_name, source=p.text()
+                        )
+                    )
+                else:
+                    particles.append(
+                        self._extractor.get_particles(
+                            exposure.exposure_name, group_name=p.text()
+                        )
+                    )
+        else:
+            particles = [self._extractor.get_particles(exposure.exposure_name)]
         exposure_lbl = ParticleImageLabel(
             exposure, particles, (qsize.width(), qsize.height())
         )
