@@ -204,39 +204,37 @@ class ProjectLoader(QWidget):
         self._particle_set_loader._set_project_directory(Path(self.project_dir))
 
     def _create_project(self):
-        self._extractor.set_atlas_id(self.atlas)
-        if self._extractor._atlas_id is not None:
-            if self.project_dir:
-                proj = Project(
-                    atlas_id=self._extractor._atlas_id,
-                    acquisition_directory=self.epu_dir,
-                    processing_directory=self.project_dir,
-                    project_name=self._name_input.text(),
-                )
-            else:
-                proj = Project(
-                    atlas_id=self._extractor._atlas_id,
-                    acquisition_directory=self.epu_dir,
-                    project_name=self.project_name,
-                )
-            self._extractor.put([proj])
-            self._update_loaders()
-
-    def load(self):
-        atlas_found = self._extractor.set_atlas_id(self.atlas)
-        if atlas_found:
-            self._main_display.load()
-            self._atlas_display.load()
-            self._update_loaders()
-            return
-        create_atlas_and_tiles(Path(self.atlas), self._extractor)
+        found = self._extractor.set_atlas_id(self.atlas)
+        if not found:
+            create_atlas_and_tiles(Path(self.atlas), self._extractor)
         atlas_found = self._extractor.set_atlas_id(self.atlas)
         if not atlas_found:
             raise ValueError("Atlas record not found despite having just been inserted")
+        if self.project_dir:
+            proj = Project(
+                atlas_id=self._extractor._atlas_id,
+                acquisition_directory=self.epu_dir,
+                processing_directory=self.project_dir,
+                project_name=self._name_input.text(),
+            )
+        else:
+            proj = Project(
+                atlas_id=self._extractor._atlas_id,
+                acquisition_directory=self.epu_dir,
+                project_name=self.project_name,
+            )
+        self._extractor.put([proj])
         parse_epu_dir(Path(self.epu_dir), self._extractor)
+        self._update_loaders()
+
+    def load(self):
+        atlas_found = self._extractor.set_atlas_id(self.atlas)
+        if not atlas_found:
+            raise ValueError("Atlas record not found")
         self._main_display.load()
         self._atlas_display.load()
         self._update_loaders()
+        return
 
 
 class MainDisplay(QWidget):

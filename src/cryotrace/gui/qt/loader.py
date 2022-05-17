@@ -1,12 +1,14 @@
 from pathlib import Path
-from typing import List, Optional
+from typing import Generator, List, Optional
 
 from PyQt5.QtWidgets import (
     QComboBox,
     QGridLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -21,6 +23,21 @@ from cryotrace.parsing.star import (
 )
 
 
+def _string_to_glob(glob_string: str) -> Generator[Path, None, None]:
+    split_string = glob_string.split("/")
+    if "*" in split_string[0]:
+        return Path("/").glob("/".join(split_string)[1:])
+    root_path = Path("/")
+    end_index = 0
+    for i, s in enumerate(split_string):
+        if "*" not in s:
+            root_path = root_path / s
+        else:
+            end_index = i
+            break
+    return root_path.glob("/".join(split_string[end_index:])[1:])
+
+
 class StarDataLoader(QWidget):
     def __init__(self, extractor: Extractor, project_directory: Optional[Path] = None):
         super().__init__()
@@ -33,23 +50,34 @@ class StarDataLoader(QWidget):
 
         star_lbl = QLabel()
         star_lbl.setText("Star file:")
-        self.grid.addWidget(star_lbl, 2, 1)
         column_lbl = QLabel()
         column_lbl.setText("Data column:")
-        self.grid.addWidget(column_lbl, 3, 1)
 
         self._file_combo = QComboBox()
         self._file_combo.setEditable(True)
         self._file_combo.currentIndexChanged.connect(self._select_star_file)
-        self.grid.addWidget(self._file_combo, 2, 2)
+
+        star_hbox = QHBoxLayout()
+        star_hbox.addWidget(star_lbl, 1)
+        star_hbox.addWidget(self._file_combo, 1)
+
+        self._file_vbox = QVBoxLayout()
+        self._file_vbox.addLayout(star_hbox, 1)
+
+        self.grid.addLayout(self._file_vbox, 2, 1, 1, 2)
         self._column_combo = QComboBox()
         self._column_combo.setEditable(True)
         self._column_combo.currentIndexChanged.connect(self._select_column)
-        self.grid.addWidget(self._column_combo, 3, 2)
+
+        column_hbox = QHBoxLayout()
+        column_hbox.addWidget(column_lbl, 1)
+        column_hbox.addWidget(self._column_combo, 1)
+
+        self.grid.addLayout(column_hbox, 3, 1, 1, 2)
 
         load_btn = QPushButton("Load")
         load_btn.clicked.connect(self.load)
-        self.grid.addWidget(load_btn, 5, 2)
+        self.grid.addWidget(load_btn, 5, 1)
 
     def _set_project_directory(self, project_directory: Path):
         self._proj_dir = project_directory
@@ -64,10 +92,14 @@ class StarDataLoader(QWidget):
     def _select_star_file(
         self, index: int, column_combos: Optional[List[QComboBox]] = None
     ):
-        star_file_path = Path(self._file_combo.currentText())
+        if "*" in self._file_combo.currentText():
+            star_file_path = next(_string_to_glob(self._file_combo.currentText()))
+        else:
+            star_file_path = Path(self._file_combo.currentText())
         try:
             star_file = open_star_file(star_file_path)
         except (OSError, ValueError):
+            print(f"Could not open star file {star_file_path}")
             return
         if not column_combos:
             column_combos = [self._column_combo]
@@ -90,12 +122,20 @@ class ExposureDataLoader(StarDataLoader):
         super().__init__(extractor, project_directory)
         exposure_lbl = QLabel()
         exposure_lbl.setText("Micrograph identifier:")
-        self.grid.addWidget(exposure_lbl, 4, 1)
 
         self._exposure_tag_combo = QComboBox()
         self._exposure_tag_combo.setEditable(True)
         self._exposure_tag_combo.currentIndexChanged.connect(self._select_exposure_tag)
-        self.grid.addWidget(self._exposure_tag_combo, 4, 2)
+
+        self._identifier_box = QVBoxLayout()
+
+        hbox = QHBoxLayout()
+        hbox.addWidget(exposure_lbl, 1)
+        hbox.addWidget(self._exposure_tag_combo, 1)
+
+        self._identifier_box.addLayout(hbox, 1)
+
+        self.grid.addLayout(self._identifier_box, 4, 1, 1, 2)
 
         self._exposure_tag = self._exposure_tag_combo.currentText()
 
@@ -111,9 +151,8 @@ class ExposureDataLoader(StarDataLoader):
             or [self._column_combo, self._exposure_tag_combo],
         )
 
-    def load(self):
-        if self._exposure_tag and self._column:
-            star_file_path = Path(self._file_combo.currentText())
+    def _insert_from_star_file(self, star_file_path: Path):
+        if self._exposure_tag:
             star_file = open_star_file(star_file_path)
             column_data = get_column_data(
                 star_file, [self._exposure_tag, self._column], "micrographs"
@@ -122,6 +161,14 @@ class ExposureDataLoader(StarDataLoader):
                 column_data, self._exposure_tag, str(star_file_path), self._extractor
             )
 
+    def load(self):
+        if self._exposure_tag and self._column:
+            if "*" in self._file_combo.currentText():
+                for sfp in _string_to_glob(self._file_combo.currentText()):
+                    self._insert_from_star_file(Path(sfp))
+            else:
+                self._insert_from_star_file(Path(self._file_combo.currentText()))
+
 
 class ParticleDataLoader(ExposureDataLoader):
     def __init__(self, extractor: Extractor, project_directory: Optional[Path] = None):
@@ -129,21 +176,29 @@ class ParticleDataLoader(ExposureDataLoader):
 
         x_lbl = QLabel()
         x_lbl.setText("x coordinate identifier:")
-        self.grid.addWidget(x_lbl, 4, 3)
 
         self._x_tag_combo = QComboBox()
         self._x_tag_combo.setEditable(True)
         self._x_tag_combo.currentIndexChanged.connect(self._select_x_tag)
-        self.grid.addWidget(self._x_tag_combo, 4, 4)
+
+        x_hbox = QHBoxLayout()
+        x_hbox.addWidget(x_lbl, 1)
+        x_hbox.addWidget(self._x_tag_combo, 1)
+
+        self._identifier_box.addLayout(x_hbox, 1)
 
         y_lbl = QLabel()
         y_lbl.setText("y coordinate identifier:")
-        self.grid.addWidget(y_lbl, 4, 5)
 
         self._y_tag_combo = QComboBox()
         self._y_tag_combo.setEditable(True)
         self._y_tag_combo.currentIndexChanged.connect(self._select_y_tag)
-        self.grid.addWidget(self._y_tag_combo, 4, 6)
+
+        y_hbox = QHBoxLayout()
+        y_hbox.addWidget(y_lbl, 1)
+        y_hbox.addWidget(self._y_tag_combo, 1)
+
+        self._identifier_box.addLayout(y_hbox, 1)
 
     def _select_x_tag(self, index: int):
         self._x_tag = self._x_tag_combo.currentText()
@@ -165,38 +220,56 @@ class ParticleDataLoader(ExposureDataLoader):
             ],
         )
 
+    def _insert_from_star_file(
+        self, star_file_path: Path, just_particles: bool = False
+    ):
+        star_file = open_star_file(star_file_path)
+        if self._exposure_tag:
+            if just_particles:
+                column_data = get_column_data(
+                    star_file,
+                    [self._exposure_tag, self._x_tag, self._y_tag],
+                    "particles",
+                )
+                insert_particle_data(
+                    column_data,
+                    self._exposure_tag,
+                    self._x_tag,
+                    self._y_tag,
+                    str(star_file_path),
+                    self._extractor,
+                )
+            else:
+                column_data = get_column_data(
+                    star_file,
+                    [self._exposure_tag, self._x_tag, self._y_tag, self._column],
+                    "particles",
+                )
+                insert_particle_data(
+                    column_data,
+                    self._exposure_tag,
+                    self._x_tag,
+                    self._y_tag,
+                    str(star_file_path),
+                    self._extractor,
+                    just_particles=True,
+                )
+
     def load(self):
         if self._exposure_tag and self._x_tag and self._y_tag and self._column:
-            star_file_path = Path(self._file_combo.currentText())
-            star_file = open_star_file(star_file_path)
-            column_data = get_column_data(
-                star_file,
-                [self._exposure_tag, self._x_tag, self._y_tag, self._column],
-                "particles",
-            )
-            insert_particle_data(
-                column_data,
-                self._exposure_tag,
-                self._x_tag,
-                self._y_tag,
-                str(star_file_path),
-                self._extractor,
-            )
+            if "*" in self._file_combo.currentText():
+                for sfp in _string_to_glob(self._file_combo.currentText()):
+                    self._insert_from_star_file(Path(sfp))
+            else:
+                self._insert_from_star_file(Path(self._file_combo.currentText()))
         elif self._exposure_tag and self._x_tag and self._y_tag:
-            star_file_path = Path(self._file_combo.currentText())
-            star_file = open_star_file(star_file_path)
-            column_data = get_column_data(
-                star_file, [self._exposure_tag, self._x_tag, self._y_tag], "particles"
-            )
-            insert_particle_data(
-                column_data,
-                self._exposure_tag,
-                self._x_tag,
-                self._y_tag,
-                str(star_file_path),
-                self._extractor,
-                just_particles=True,
-            )
+            if "*" in self._file_combo.currentText():
+                for sfp in _string_to_glob(self._file_combo.currentText()):
+                    self._insert_from_star_file(Path(sfp), just_particles=True)
+            else:
+                self._insert_from_star_file(
+                    Path(self._file_combo.currentText()), just_particles=True
+                )
 
 
 class ParticleSetDataLoader(ParticleDataLoader):
@@ -208,12 +281,75 @@ class ParticleSetDataLoader(ParticleDataLoader):
 
         set_id_lbl = QLabel()
         set_id_lbl.setText("Particle set identifier:")
-        self.grid.addWidget(set_id_lbl, 4, 7)
 
         self._set_id_combo = QComboBox()
         self._set_id_combo.setEditable(True)
         self._set_id_combo.currentIndexChanged.connect(self._select_set_id_tag)
-        self.grid.addWidget(self._set_id_combo, 4, 8)
+
+        set_id_hbox = QHBoxLayout()
+        set_id_hbox.addWidget(set_id_lbl, 1)
+        set_id_hbox.addWidget(self._set_id_combo, 1)
+
+        self._identifier_box.addLayout(set_id_hbox, 1)
+
+        cross_ref_lbl = QLabel()
+        cross_ref_lbl.setText("Cross reference column:")
+
+        self._cross_ref_combo = QComboBox()
+        self._cross_ref_combo.setEditable(True)
+        self._cross_ref_combo.setEnabled(False)
+
+        cross_ref_hbox = QHBoxLayout()
+        cross_ref_hbox.addWidget(cross_ref_lbl, 1)
+        cross_ref_hbox.addWidget(self._cross_ref_combo, 1)
+
+        self._identifier_box.addLayout(cross_ref_hbox, 1)
+
+        cross_ref_file_hbox = QHBoxLayout()
+
+        cross_ref_file_lbl = QLabel()
+        cross_ref_file_lbl.setText("Star file for cross reference:")
+        cross_ref_file_hbox.addWidget(cross_ref_file_lbl, 1)
+
+        self._cross_ref_file_combo = QComboBox()
+        self._cross_ref_file_combo.setEditable(True)
+        self._cross_ref_file_combo.currentIndexChanged.connect(
+            self._select_cross_ref_file
+        )
+
+        cross_ref_file_hbox.addWidget(self._cross_ref_file_combo, 1)
+
+        self._file_vbox.addLayout(cross_ref_file_hbox, 1)
+
+    def _set_project_directory(self, project_directory: Path):
+        self._proj_dir = project_directory
+        self._file_combo.clear()
+        self._cross_ref_file_combo.clear()
+        self._cross_ref_file_combo.addItem("")
+        for sf in self._proj_dir.glob("*/*/*.star"):
+            str_sf = str(sf)
+            if (
+                all(p not in str_sf for p in ("gui", "pipeline", "Nodes", "NODES"))
+                and "job" not in sf.name
+            ):
+                self._file_combo.addItem(str_sf)
+                self._cross_ref_file_combo.addItem(str_sf)
+
+    def _select_cross_ref_file(self):
+        if self._cross_ref_file_combo.currentText():
+            self._cross_ref_combo.setEnabled(True)
+            star_file_path = Path(self._cross_ref_file_combo.currentText())
+            try:
+                star_file = open_star_file(star_file_path)
+            except (OSError, ValueError):
+                print(f"Could not open star file {star_file_path}")
+                return
+            columns = get_columns(star_file, ignore=["pipeline"])
+            self._cross_ref_combo.clear()
+            self._set_id_combo.clear()
+            for c in columns:
+                self._cross_ref_combo.addItem(c)
+                self._set_id_combo.addItem(c)
 
     def _select_set_id_tag(self, index: int):
         self._set_id_tag = self._set_id_combo.currentText()
@@ -221,28 +357,34 @@ class ParticleSetDataLoader(ParticleDataLoader):
     def _select_star_file(
         self, index: int, column_combos: Optional[List[QComboBox]] = None
     ):
-        super()._select_star_file(
-            index,
-            column_combos=column_combos
-            or [
-                self._column_combo,
-                self._exposure_tag_combo,
-                self._x_tag_combo,
-                self._y_tag_combo,
-                self._set_id_combo,
-            ],
-        )
+        if self._cross_ref_file_combo.currentText():
+            super()._select_star_file(
+                index,
+                column_combos=column_combos
+                or [
+                    self._column_combo,
+                    self._exposure_tag_combo,
+                    self._x_tag_combo,
+                    self._y_tag_combo,
+                ],
+            )
+        else:
+            super()._select_star_file(
+                index,
+                column_combos=column_combos
+                or [
+                    self._column_combo,
+                    self._exposure_tag_combo,
+                    self._x_tag_combo,
+                    self._y_tag_combo,
+                    self._set_id_combo,
+                ],
+            )
 
-    def load(self):
-        if (
-            self._exposure_tag
-            and self._x_tag
-            and self._y_tag
-            and self._column
-            and self._set_id_tag
-            and self._group_name_box.text()
-        ):
-            star_file_path = Path(self._file_combo.currentText())
+    def _insert_from_star_file(
+        self, star_file_path: Path, just_particles: bool = False
+    ):
+        if self._exposure_tag and self._column:
             star_file = open_star_file(star_file_path)
             column_data = get_column_data(
                 star_file,
@@ -265,3 +407,18 @@ class ParticleSetDataLoader(ParticleDataLoader):
                 str(star_file_path),
                 self._extractor,
             )
+
+    def load(self):
+        if (
+            self._exposure_tag
+            and self._x_tag
+            and self._y_tag
+            and self._column
+            and self._set_id_tag
+            and self._group_name_box.text()
+        ):
+            if "*" in self._file_combo.currentText():
+                for sfp in _string_to_glob(self._file_combo.currentText()):
+                    self._insert_from_star_file(Path(sfp))
+            else:
+                self._insert_from_star_file(Path(self._file_combo.currentText()))

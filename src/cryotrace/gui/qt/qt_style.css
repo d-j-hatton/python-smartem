@@ -40,6 +40,10 @@ QComboBox:hover{
     background-color: #36f1cd;
 }
 
+QComboBox:disabled{
+  background-color: darkgray;
+}
+
 QListWidget {
   background-color: #13c4a3;
   font-family: system-ui,-apple-system,system-ui,"Helvetica Neue",Helvetica,Arial,sans-serif;
