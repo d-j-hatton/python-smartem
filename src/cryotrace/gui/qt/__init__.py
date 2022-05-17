@@ -266,7 +266,7 @@ class MainDisplay(QWidget):
         self.grid.addWidget(self._foil_hole_combo, 2, 2)
         self.grid.addWidget(self._exposure_combo, 2, 3)
         self.grid.addWidget(self._data_list, 3, 2)
-        self.grid.addWidget(self._pick_keys, 3, 3)
+        self.grid.addWidget(self._pick_list, 3, 3)
         self.grid.addWidget(self._grid_square_stats, 4, 1)
         self.grid.addWidget(self._foil_hole_stats, 4, 2)
         self.grid.addWidget(self._exposure_stats, 4, 3)
