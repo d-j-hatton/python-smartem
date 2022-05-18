@@ -410,6 +410,13 @@ class MainDisplay(QWidget):
                 self._fh_colour_bar = self._foil_hole_stats_fig.figure.colorbar(mat)
         self._foil_hole_stats.draw()
 
+    def _update_foil_hole_stats_picks(self, stats: Dict[str, List[int]]):
+        if len(stats.keys()) == 2:
+            size_lists = list(stats.values())
+            diffs = [p2 - p1 for p1, p2 in zip(size_lists[0], size_lists[1])]
+            self._foil_hole_stats_fig.hist(diffs)
+            self._foil_hole_stats.draw()
+
     def _update_exposure_stats(self, stats: Dict[str, List[float]]):
         self._exposure_stats_fig.cla()
         try:
@@ -535,17 +542,15 @@ class MainDisplay(QWidget):
         if self._pick_list.selectedItems():
             for p in self._pick_list.selectedItems():
                 if p.text() in self._pick_keys["source"]:
-                    particles.append(
-                        self._extractor.get_particles(
-                            exposure.exposure_name, source=p.text()
-                        )
+                    exp_parts = self._extractor.get_particles(
+                        exposure.exposure_name, source=p.text()
                     )
+                    particles.append(exp_parts)
                 else:
-                    particles.append(
-                        self._extractor.get_particles(
-                            exposure.exposure_name, group_name=p.text()
-                        )
+                    exp_parts = self._extractor.get_particles(
+                        exposure.exposure_name, group_name=p.text()
                     )
+                    particles.append(exp_parts)
         else:
             particles = [self._extractor.get_particles(exposure.exposure_name)]
         exposure_lbl = ParticleImageLabel(
