@@ -257,13 +257,19 @@ class MainDisplay(QWidget):
         self._pick_list = QListWidget()
         self._pick_list.setSelectionMode(QListWidget.MultiSelection)
         fh_fig = Figure()
+        fh_fig.set_facecolor("gray")
         self._foil_hole_stats_fig = fh_fig.add_subplot(111)
+        self._foil_hole_stats_fig.set_facecolor("silver")
         self._foil_hole_stats = FigureCanvasQTAgg(fh_fig)
         gs_fig = Figure()
+        gs_fig.set_facecolor("gray")
         self._grid_square_stats_fig = gs_fig.add_subplot(111)
+        self._grid_square_stats_fig.set_facecolor("silver")
         self._grid_square_stats = FigureCanvasQTAgg(gs_fig)
         ex_fig = Figure()
+        ex_fig.set_facecolor("gray")
         self._exposure_stats_fig = ex_fig.add_subplot(111)
+        self._exposure_stats_fig.set_facecolor("silver")
         self._exposure_stats = FigureCanvasQTAgg(ex_fig)
         self.grid.addWidget(self._square_combo, 2, 1)
         self.grid.addWidget(self._foil_hole_combo, 2, 2)
@@ -382,9 +388,13 @@ class MainDisplay(QWidget):
         except (AttributeError, ValueError):
             pass
         if len(stats.keys()) == 1:
-            self._grid_square_stats_fig.hist(list(stats.values())[0])
+            self._grid_square_stats_fig.hist(
+                list(stats.values())[0], color="darkturquoise"
+            )
         if len(stats.keys()) == 2:
-            self._grid_square_stats_fig.scatter(*(v for v in stats.values()))
+            self._grid_square_stats_fig.scatter(
+                *(v for v in stats.values()), color="darkturquoise"
+            )
         if len(stats.keys()) > 2:
             corr = np.corrcoef(list(stats.values()))
             mat = self._grid_square_stats_fig.matshow(corr)
@@ -399,10 +409,14 @@ class MainDisplay(QWidget):
         except (AttributeError, ValueError):
             pass
         if len(stats.keys()) == 1:
-            self._foil_hole_stats_fig.hist(list(stats.values())[0])
+            self._foil_hole_stats_fig.hist(
+                list(stats.values())[0], color="darkturquoise"
+            )
         if len(stats.keys()) == 2:
             if all(stats.values()):
-                self._foil_hole_stats_fig.scatter(*(v for v in stats.values()))
+                self._foil_hole_stats_fig.scatter(
+                    *(v for v in stats.values()), color="darkturquoise"
+                )
         if len(stats.keys()) > 2:
             if all(stats.values()):
                 corr = np.corrcoef(list(stats.values()))
@@ -425,9 +439,13 @@ class MainDisplay(QWidget):
         except (AttributeError, ValueError):
             pass
         if len(stats.keys()) == 1:
-            self._exposure_stats_fig.hist(list(stats.values())[0])
+            self._exposure_stats_fig.hist(
+                list(stats.values())[0], color="darkturquoise"
+            )
         if len(stats.keys()) == 2:
-            self._exposure_stats_fig.scatter(*(v for v in stats.values()))
+            self._exposure_stats_fig.scatter(
+                *(v for v in stats.values()), color="darkturquoise"
+            )
         if len(stats.keys()) > 2:
             corr = np.corrcoef(list(stats.values()))
             mat = self._exposure_stats_fig.matshow(corr)
