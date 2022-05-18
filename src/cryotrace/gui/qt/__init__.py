@@ -392,8 +392,15 @@ class MainDisplay(QWidget):
                 list(stats.values())[0], color="darkturquoise"
             )
         if len(stats.keys()) == 2:
+            _labels, _data = stats.items()
+            labels = list(_labels)
+            data = list(_data)
             self._grid_square_stats_fig.scatter(
-                *(v for v in stats.values()), color="darkturquoise"
+                data[0],
+                data[1],
+                xlabel=labels[0],
+                ylabel=labels[1],
+                color="darkturquoise",
             )
         if len(stats.keys()) > 2:
             corr = np.corrcoef(list(stats.values()))
