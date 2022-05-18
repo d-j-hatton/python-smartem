@@ -111,7 +111,7 @@ def insert_particle_data(
     y_tag: str,
     star_file_path: str,
     extractor: Extractor,
-):
+) -> List[Particle]:
     exposures = [e.exposure_name for e in extractor.get_all_exposures()]
     particle_info: List[ParticleInfo] = []
     extra_keys = [k for k in data.keys() if k and k not in (exposure_tag, x_tag, y_tag)]
@@ -120,11 +120,13 @@ def insert_particle_data(
         data, exposures, exposure_tag, x_tag, y_tag
     )
 
+    all_particles = []
     new_particles = []
     particle_info = []
     new_particle_indices: List[int] = []
     for exposure in exposures:
         existing_particles = extractor.get_particles(exposure)
+        all_particles.extend(existing_particles)
         existing_particle_coords = {
             (ep.x, ep.y): ep.particle_id for ep in existing_particles
         }
@@ -150,6 +152,7 @@ def insert_particle_data(
                     )
                     new_particle_indices.append(structured_data[exposure]["indices"][i])
     extractor.put_particles(new_particles)
+    all_particles.extend(new_particles)
     for k in extra_keys:
         for p, pind in zip(new_particles, new_particle_indices):
             particle_info.append(
@@ -162,6 +165,7 @@ def insert_particle_data(
             )
     if particle_info:
         extractor.put_info(particle_info)
+    return all_particles
 
 
 def insert_particle_set(
@@ -173,6 +177,7 @@ def insert_particle_set(
     y_tag: str,
     star_file_path: str,
     extractor: Extractor,
+    add_source_to_id: bool = False,
 ):
     extra_keys = [
         k
@@ -180,12 +185,24 @@ def insert_particle_set(
         if k and k not in (exposure_tag, x_tag, y_tag, set_id_tag)
     ]
     set_ids = set(data[set_id_tag])
-    particle_sets = [
-        ParticleSet(
-            group_name=set_name, identifier=set_id, atlas_id=extractor._atlas_id
-        )
-        for set_id in set_ids
-    ]
+    if add_source_to_id:
+        particle_sets = [
+            ParticleSet(
+                group_name=set_name,
+                identifier=star_file_path + ":" + str(set_id),
+                atlas_id=extractor._atlas_id,
+            )
+            for set_id in set_ids
+        ]
+    else:
+        particle_sets = [
+            ParticleSet(
+                group_name=set_name,
+                identifier=str(set_id),
+                atlas_id=extractor._atlas_id,
+            )
+            for set_id in set_ids
+        ]
     extractor.put(particle_sets)
     exposures = [e.exposure_name for e in extractor.get_all_exposures()]
     structured_data = _structure_particle_data(
@@ -209,27 +226,51 @@ def insert_particle_set(
             particle_coords = {(p.x, p.y): p.particle_id for p in particles}
             for i, particle in enumerate(structured_data[exposure]["coordinates"]):
                 if particle_coords.get(particle):
-                    linkers.append(
-                        ParticleSetLinker(
-                            set_name=data[set_id_tag][
-                                structured_data[exposure]["indices"][i]
-                            ],
-                            particle_id=particle_coords[particle],
+                    if add_source_to_id:
+                        linkers.append(
+                            ParticleSetLinker(
+                                set_name=star_file_path
+                                + ":"
+                                + str(
+                                    data[set_id_tag][
+                                        structured_data[exposure]["indices"][i]
+                                    ]
+                                ),
+                                particle_id=particle_coords[particle],
+                            )
                         )
-                    )
+                    else:
+                        linkers.append(
+                            ParticleSetLinker(
+                                set_name=data[set_id_tag][
+                                    structured_data[exposure]["indices"][i]
+                                ],
+                                particle_id=particle_coords[particle],
+                            )
+                        )
     if linkers:
         extractor.put(linkers)
 
     particle_set_info = []
     for k in extra_keys:
         for si in set_ids:
-            particle_set_info.append(
-                ParticleSetInfo(
-                    set_name=si,
-                    source=star_file_path,
-                    key=k,
-                    value=set_instances[si][k],
+            if add_source_to_id:
+                particle_set_info.append(
+                    ParticleSetInfo(
+                        set_name=star_file_path + ":" + str(si),
+                        source=star_file_path,
+                        key=k,
+                        value=set_instances[si][k],
+                    )
                 )
-            )
+            else:
+                particle_set_info.append(
+                    ParticleSetInfo(
+                        set_name=si,
+                        source=star_file_path,
+                        key=k,
+                        value=set_instances[si][k],
+                    )
+                )
     if particle_set_info:
         extractor.put(particle_set_info)

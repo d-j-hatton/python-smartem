@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from cryotrace.data_model import ParticleSet, ParticleSetLinker
 from cryotrace.data_model.extract import Extractor
 from cryotrace.parsing.star import (
     get_column_data,
@@ -35,7 +36,8 @@ def _string_to_glob(glob_string: str) -> Generator[Path, None, None]:
         else:
             end_index = i
             break
-    return root_path.glob("/".join(split_string[end_index:])[1:])
+    print(root_path, "/".join(split_string[end_index:]))
+    return root_path.glob("/".join(split_string[end_index:]))
 
 
 class StarDataLoader(QWidget):
@@ -106,6 +108,7 @@ class StarDataLoader(QWidget):
         columns = get_columns(star_file, ignore=["pipeline"])
         for combo in column_combos:
             combo.clear()
+            combo.addItem("")
         for c in columns:
             for combo in column_combos:
                 combo.addItem(c)
@@ -231,7 +234,7 @@ class ParticleDataLoader(ExposureDataLoader):
                     [self._exposure_tag, self._x_tag, self._y_tag],
                     "particles",
                 )
-                insert_particle_data(
+                particles = insert_particle_data(
                     column_data,
                     self._exposure_tag,
                     self._x_tag,
@@ -239,6 +242,20 @@ class ParticleDataLoader(ExposureDataLoader):
                     str(star_file_path),
                     self._extractor,
                 )
+                source_set = ParticleSet(
+                    group_name=str(star_file_path),
+                    identifier=str(star_file_path),
+                    atlas_id=self._extractor._atlas_id,
+                )
+                self._extractor.put([source_set])
+                linkers = [
+                    ParticleSetLinker(
+                        set_name=str(star_file_path), particle_id=p.particle_id
+                    )
+                    for p in particles
+                ]
+                self._extractor.put(linkers)
+
             else:
                 column_data = get_column_data(
                     star_file,
@@ -382,31 +399,78 @@ class ParticleSetDataLoader(ParticleDataLoader):
             )
 
     def _insert_from_star_file(
-        self, star_file_path: Path, just_particles: bool = False
+        self,
+        star_file_path: Path,
+        just_particles: bool = False,
+        cross_ref_file_path: Optional[Path] = None,
     ):
         if self._exposure_tag and self._column:
-            star_file = open_star_file(star_file_path)
-            column_data = get_column_data(
-                star_file,
-                [
+            if cross_ref_file_path:
+                star_file = open_star_file(star_file_path)
+                column_data = get_column_data(
+                    star_file,
+                    [
+                        self._exposure_tag,
+                        self._x_tag,
+                        self._y_tag,
+                        self._column,
+                        self._cross_ref_combo.currentText(),
+                    ],
+                    "particles",
+                )
+                cross_ref_file = open_star_file(cross_ref_file_path)
+                cross_ref_column_data = get_column_data(
+                    cross_ref_file,
+                    [self._cross_ref_combo.currentText(), self._set_id_tag],
+                    "model_classes",
+                )
+                cross_ref_dict = {
+                    k: v
+                    for k, v in zip(
+                        cross_ref_column_data[self._cross_ref_combo.currentText()],
+                        cross_ref_column_data[self._set_id_tag],
+                    )
+                }
+                column_data[self._set_id_tag] = [
+                    cross_ref_dict[crf]
+                    for crf in column_data[self._cross_ref_combo.currentText()]
+                ]
+                column_data.pop(self._cross_ref_combo.currentText())
+                insert_particle_set(
+                    column_data,
+                    self._group_name_box.text(),
+                    self._set_id_tag,
                     self._exposure_tag,
                     self._x_tag,
                     self._y_tag,
-                    self._column,
+                    str(star_file_path),
+                    self._extractor,
+                    add_source_to_id=True,
+                )
+            else:
+                star_file = open_star_file(star_file_path)
+                column_data = get_column_data(
+                    star_file,
+                    [
+                        self._exposure_tag,
+                        self._x_tag,
+                        self._y_tag,
+                        self._column,
+                        self._set_id_tag,
+                    ],
+                    "particles",
+                )
+                insert_particle_set(
+                    column_data,
+                    self._group_name_box.text(),
                     self._set_id_tag,
-                ],
-                "particles",
-            )
-            insert_particle_set(
-                column_data,
-                self._group_name_box.text(),
-                self._set_id_tag,
-                self._exposure_tag,
-                self._x_tag,
-                self._y_tag,
-                str(star_file_path),
-                self._extractor,
-            )
+                    self._exposure_tag,
+                    self._x_tag,
+                    self._y_tag,
+                    str(star_file_path),
+                    self._extractor,
+                    add_source_to_id=True,
+                )
 
     def load(self):
         if (
@@ -418,7 +482,32 @@ class ParticleSetDataLoader(ParticleDataLoader):
             and self._group_name_box.text()
         ):
             if "*" in self._file_combo.currentText():
-                for sfp in _string_to_glob(self._file_combo.currentText()):
-                    self._insert_from_star_file(Path(sfp))
+                if "*" in self._cross_ref_file_combo.currentText():
+                    split_file_name = self._file_combo.currentText().split("*")
+                    for sfp in _string_to_glob(self._file_combo.currentText()):
+                        wildcard = (
+                            str(sfp)
+                            .replace(split_file_name[0], "")
+                            .replace(split_file_name[-1], "")
+                        )
+                        self._insert_from_star_file(
+                            sfp,
+                            cross_ref_file_path=Path(
+                                self._cross_ref_file_combo.currentText().replace(
+                                    "*", wildcard
+                                )
+                            ),
+                        )
+                elif self._cross_ref_file_combo.currentText():
+                    for sfp in _string_to_glob(self._file_combo.currentText()):
+                        self._insert_from_star_file(
+                            Path(sfp),
+                            cross_ref_file_path=Path(
+                                self._cross_ref_file_combo.currentText()
+                            ),
+                        )
+                else:
+                    for sfp in _string_to_glob(self._file_combo.currentText()):
+                        self._insert_from_star_file(Path(sfp))
             else:
                 self._insert_from_star_file(Path(self._file_combo.currentText()))
