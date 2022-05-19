@@ -381,7 +381,12 @@ class MainDisplay(QWidget):
                 pass
 
     def _update_grid_square_stats(self, stats: Dict[str, List[float]]):
-        self._grid_square_stats_fig.cla()
+        gs_fig = Figure(tight_layout=True)
+        gs_fig.set_facecolor("gray")
+        self._grid_square_stats_fig = gs_fig.add_subplot(111)
+        self._grid_square_stats_fig.set_facecolor("silver")
+        self._grid_square_stats = FigureCanvasQTAgg(gs_fig)
+        self.grid.addWidget(self._grid_square_stats, 4, 1)
         try:
             if self._colour_bar:
                 self._colour_bar.remove()
@@ -411,7 +416,12 @@ class MainDisplay(QWidget):
         self._grid_square_stats.draw()
 
     def _update_foil_hole_stats(self, stats: Dict[str, List[float]]):
-        self._foil_hole_stats_fig.cla()
+        fh_fig = Figure(tight_layout=True)
+        fh_fig.set_facecolor("gray")
+        self._foil_hole_stats_fig = fh_fig.add_subplot(111)
+        self._foil_hole_stats_fig.set_facecolor("silver")
+        self._foil_hole_stats = FigureCanvasQTAgg(fh_fig)
+        self.grid.addWidget(self._foil_hole_stats, 4, 2)
         try:
             if self._fh_colour_bar:
                 self._fh_colour_bar.remove()
@@ -448,7 +458,12 @@ class MainDisplay(QWidget):
             self._foil_hole_stats.draw()
 
     def _update_exposure_stats(self, stats: Dict[str, List[float]]):
-        self._exposure_stats_fig.cla()
+        ex_fig = Figure(tight_layout=True)
+        ex_fig.set_facecolor("gray")
+        self._exposure_stats_fig = ex_fig.add_subplot(111)
+        self._exposure_stats_fig.set_facecolor("silver")
+        self._exposure_stats = FigureCanvasQTAgg(ex_fig)
+        self.grid.addWidget(self._exposure_stats, 4, 3)
         try:
             if self._exp_colour_bar:
                 self._exp_colour_bar.remove()
