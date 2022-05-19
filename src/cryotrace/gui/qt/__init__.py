@@ -337,6 +337,13 @@ class MainDisplay(QWidget):
             _particle_set_keys or [],
             avg_particles=avg_particles,
         )
+        self._select_square(self._square_combo.currentIndex())
+        self._select_foil_hole(self._foil_hole_combo.currentIndex())
+        self._select_exposure(self._exposure_combo.currentIndex())
+        if self._atlas_view:
+            self._atlas_view.load(
+                stats=self._data,
+            )
 
     def _select_square(self, index: int):
         try:
@@ -346,24 +353,26 @@ class MainDisplay(QWidget):
         self.grid.addWidget(square_lbl, 1, 1)
         self._update_fh_choices(self._square_combo.currentText())
 
-        # if self._atlas_view:
-        #    self._atlas_view.load(
-        #        grid_square=self._grid_squares[index],
-        #        all_grid_squares=self._grid_squares,
-        #        exposure_keys=_exposure_keys,
-        #        particle_keys=_particle_keys,
-        #        particle_set_keys=_particle_set_keys,
-        #    )
+        if self._atlas_view:
+            self._atlas_view.load(
+                grid_square=self._grid_squares[index],
+                all_grid_squares=self._grid_squares,
+            )
         if self._data:
-            for_correlation = {}
+            for_correlation: Dict[str, List[Optional[float]]] = {}
+            _foil_holes: Dict[str, List[str]] = {}
             for k, v in self._data.items():
-                for_correlation[k] = [
-                    elem
-                    for foil_hole in v[
-                        self._grid_squares[index].grid_square_name
-                    ].values()
-                    for elem in foil_hole
-                ]
+                if not v.get(self._grid_squares[index].grid_square_name):
+                    continue
+                if not _foil_holes.get(self._grid_squares[index].grid_square_name):
+                    _foil_holes[self._grid_squares[index].grid_square_name] = list(
+                        v[self._grid_squares[index].grid_square_name].keys()
+                    )
+                for_correlation[k] = []
+                for fh in _foil_holes[self._grid_squares[index].grid_square_name]:
+                    for_correlation[k].extend(
+                        v[self._grid_squares[index].grid_square_name][fh]
+                    )
             self._update_grid_square_stats(for_correlation)
 
     def _select_foil_hole(self, index: int):
@@ -392,7 +401,7 @@ class MainDisplay(QWidget):
             except KeyError:
                 pass
 
-    def _update_grid_square_stats(self, stats: Dict[str, List[float]]):
+    def _update_grid_square_stats(self, stats: Dict[str, List[Optional[float]]]):
         gs_fig = Figure(tight_layout=True)
         gs_fig.set_facecolor("gray")
         self._grid_square_stats_fig = gs_fig.add_subplot(111)
@@ -661,12 +670,8 @@ class AtlasDisplay(QWidget):
         atlas_fig = Figure()
         self._atlas_stats_fig = atlas_fig.add_subplot(111)
         self._atlas_stats = FigureCanvasQTAgg(atlas_fig)
-        atlas_particle_fig = Figure()
-        self._atlas_stats_particle_fig = atlas_particle_fig.add_subplot(111)
-        self._atlas_stats_particle = FigureCanvasQTAgg(atlas_particle_fig)
         self.grid.addWidget(self._atlas_stats, 2, 1)
-        self.grid.addWidget(self._atlas_stats_particle, 3, 1)
-        self._data: Dict[str, Dict[str, List[Optional[float]]]] = {}
+        self._data: Dict[str, Dict[str, Dict[str, List[Optional[float]]]]] = {}
         self._particle_data: Dict[str, List[float]] = {}
         self._colour_bar = None
 
@@ -674,25 +679,17 @@ class AtlasDisplay(QWidget):
         self,
         grid_square: Optional[GridSquare] = None,
         all_grid_squares: Optional[List[GridSquare]] = None,
-        exposure_keys: Optional[List[str]] = None,
-        particle_keys: Optional[List[str]] = None,
-        particle_set_keys: Optional[List[str]] = None,
+        stats: Optional[Dict[str, Dict[str, Dict[str, List[Optional[float]]]]]] = None,
     ):
-        if any((exposure_keys, particle_keys, particle_set_keys)):
-            self._data = self._extractor.get_atlas_stats(
-                exposure_keys or [],
-                particle_keys or [],
-                particle_set_keys or [],
-                avg_particles=bool(exposure_keys)
-                and (bool(particle_keys) or bool(particle_set_keys)),
-            )
+        if stats:
+            self._data = stats
             self._update_atlas_stats()
-        atlas_lbl = self._draw_atlas(
-            grid_square=grid_square, all_grid_squares=all_grid_squares
-        )
-        if atlas_lbl:
-            self.grid.addWidget(atlas_lbl, 1, 1)
         if grid_square:
+            atlas_lbl = self._draw_atlas(
+                grid_square=grid_square, all_grid_squares=all_grid_squares
+            )
+            if atlas_lbl:
+                self.grid.addWidget(atlas_lbl, 1, 1)
             tile_lbl = self._draw_tile(grid_square)
             self.grid.addWidget(tile_lbl, 1, 2)
 
@@ -706,33 +703,34 @@ class AtlasDisplay(QWidget):
         if len(self._data.keys()) == 1:
             stats = []
             for gs in list(self._data.values())[0].values():
-                stats.extend(gs)
+                for fh in gs.values():
+                    stats.extend(fh)
             self._atlas_stats_fig.hist(stats)
         if len(self._data.keys()) == 2:
             stats = {}
+            _foil_holes = {}
             for k, v in self._data.items():
                 stats[k] = []
-                for d in v.values():
-                    stats[k].extend(d)
+                for gs, d in v.items():
+                    if not _foil_holes.get(gs):
+                        _foil_holes[gs] = list(d.keys())
+                    for f in d[_foil_holes[gs]]:
+                        stats[k].extend(d[f])
             self._atlas_stats_fig.scatter(*(v for v in stats.values()))
         if len(self._data.keys()) > 2:
             stats = {}
             for k, v in self._data.items():
                 stats[k] = []
-                for d in v.values():
-                    stats[k].extend(d)
+                _foil_holes = {}
+                for gs, d in v.items():
+                    if not _foil_holes.get(gs):
+                        _foil_holes[gs] = list(d.keys())
+                    for f in d[_foil_holes[gs]]:
+                        stats[k].extend(d[f])
             corr = np.corrcoef(list(stats.values()))
             mat = self._atlas_stats_fig.matshow(corr)
             self._colour_bar = self._atlas_stats_fig.figure.colorbar(mat)
         self._atlas_stats.draw()
-
-    def _update_atlas_stats_particle(self):
-        stats = []
-        for d in self._particle_data.values():
-            stats.extend(d)
-        self._atlas_stats_particle_fig.cla()
-        self._atlas_stats_particle_fig.hist(stats)
-        self._atlas_stats_particle.draw()
 
     def _draw_atlas(
         self,
@@ -755,24 +753,33 @@ class AtlasDisplay(QWidget):
                     and len(self._data.keys()) == 1
                 ):
                     _key = list(self._data.keys())[0]
-                    imvs = [
-                        np.mean(self._data[_key].get(gs.grid_square_name, []))
-                        for gs in all_grid_squares
-                        if gs != grid_square
-                    ]
+                    pre_imvs = []
+                    for gs in all_grid_squares:
+                        if gs != grid_square:
+                            for_average = []
+                            for fh in (
+                                self._data[_key].get(gs.grid_square_name, {}).values()
+                            ):
+                                for_average.extend(fh)
+                            pre_imvs.append(for_average)
+                    imvs = [np.mean(p) for p in pre_imvs]
                     imvs = list(np.nan_to_num(imvs))
                 qsize = atlas_pixmap.size()
+                pre_value = []
+                if _key:
+                    for fh in (
+                        self._data[_key]
+                        .get(grid_square.grid_square_name, {"dummy": [0]})
+                        .values()
+                    ):
+                        pre_value.extend(fh)
                 atlas_lbl = ImageLabel(
                     _atlas,
                     grid_square,
                     (qsize.width(), qsize.height()),
                     parent=self,
                     overwrite_readout=True,
-                    value=np.mean(
-                        self._data[_key].get(grid_square.grid_square_name, [0])
-                    )
-                    if _key
-                    else None,
+                    value=np.mean(pre_value) if _key else None,
                     extra_images=[gs for gs in all_grid_squares if gs != grid_square]
                     if all_grid_squares
                     else [],

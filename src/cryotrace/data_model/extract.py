@@ -376,7 +376,7 @@ class Extractor:
                 if this_res:
                     stats[k].append(this_res[0])
                 else:
-                    stats[k].append(None)
+                    stats[k].append(0)
         if particle_keys:
             stats.update(
                 _parse_particle_data(
