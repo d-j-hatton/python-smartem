@@ -342,6 +342,8 @@ class MainDisplay(QWidget):
         self._select_exposure(self._exposure_combo.currentIndex())
         if self._atlas_view:
             self._atlas_view.load(
+                grid_square=self._grid_squares[self._square_combo.currentIndex()],
+                all_grid_squares=self._grid_squares,
                 stats=self._data,
             )
 
@@ -431,7 +433,10 @@ class MainDisplay(QWidget):
             self._grid_square_stats_fig.axes.set_xlabel(labels[0])
             self._grid_square_stats_fig.axes.set_ylabel(labels[1])
         if len(stats.keys()) > 2:
-            corr = np.corrcoef(list(stats.values()))
+            data = list(stats.values())
+            for i, _ in enumerate(data):
+                data[i] = np.nan_to_num(_)
+            corr = np.corrcoef(data)
             mat = self._grid_square_stats_fig.matshow(corr)
             self._colour_bar = self._grid_square_stats_fig.figure.colorbar(mat)
         self._grid_square_stats.draw()
@@ -667,10 +672,11 @@ class AtlasDisplay(QWidget):
         self._extractor = extractor
         self.grid = QGridLayout()
         self.setLayout(self.grid)
-        atlas_fig = Figure()
+        atlas_fig = Figure(tight_layout=True)
+        atlas_fig.set_facecolor("gray")
         self._atlas_stats_fig = atlas_fig.add_subplot(111)
+        self._atlas_stats_fig.set_facecolor("silver")
         self._atlas_stats = FigureCanvasQTAgg(atlas_fig)
-        self.grid.addWidget(self._atlas_stats, 2, 1)
         self._data: Dict[str, Dict[str, Dict[str, List[Optional[float]]]]] = {}
         self._particle_data: Dict[str, List[float]] = {}
         self._colour_bar = None
@@ -684,17 +690,28 @@ class AtlasDisplay(QWidget):
         if stats:
             self._data = stats
             self._update_atlas_stats()
-        if grid_square:
-            atlas_lbl = self._draw_atlas(
-                grid_square=grid_square, all_grid_squares=all_grid_squares
-            )
-            if atlas_lbl:
-                self.grid.addWidget(atlas_lbl, 1, 1)
-            tile_lbl = self._draw_tile(grid_square)
-            self.grid.addWidget(tile_lbl, 1, 2)
+        atlas_lbl = self._draw_atlas(
+            grid_square=grid_square, all_grid_squares=all_grid_squares
+        )
+        if atlas_lbl:
+            vbox = QVBoxLayout()
+            vbox.addWidget(atlas_lbl)
+            vbox.addStretch()
+            self.grid.addLayout(vbox, 0, 0)
+            if grid_square:
+                tile_lbl = self._draw_tile(grid_square)
+                vbox = QVBoxLayout()
+                vbox.addWidget(tile_lbl)
+                vbox.addStretch()
+                vbox.addWidget(self._atlas_stats)
+                self.grid.addLayout(vbox, 0, 1)
 
     def _update_atlas_stats(self):
-        self._atlas_stats_fig.cla()
+        atlas_fig = Figure(tight_layout=True)
+        atlas_fig.set_facecolor("gray")
+        self._atlas_stats_fig = atlas_fig.add_subplot(111)
+        self._atlas_stats_fig.set_facecolor("silver")
+        self._atlas_stats = FigureCanvasQTAgg(atlas_fig)
         try:
             if self._colour_bar:
                 self._colour_bar.remove()
@@ -705,7 +722,7 @@ class AtlasDisplay(QWidget):
             for gs in list(self._data.values())[0].values():
                 for fh in gs.values():
                     stats.extend(fh)
-            self._atlas_stats_fig.hist(stats)
+            self._atlas_stats_fig.hist(stats, color="darkturquoise")
         if len(self._data.keys()) == 2:
             stats = {}
             _foil_holes = {}
@@ -714,9 +731,16 @@ class AtlasDisplay(QWidget):
                 for gs, d in v.items():
                     if not _foil_holes.get(gs):
                         _foil_holes[gs] = list(d.keys())
-                    for f in d[_foil_holes[gs]]:
+                    for f in _foil_holes[gs]:
                         stats[k].extend(d[f])
-            self._atlas_stats_fig.scatter(*(v for v in stats.values()))
+            labels = []
+            data = []
+            for k, v in stats.items():
+                labels.append(k)
+                data.append(v)
+            self._atlas_stats_fig.scatter(data[0], data[1], color="darkturquoise")
+            self._atlas_stats_fig.axes.set_xlabel(labels[0])
+            self._atlas_stats_fig.axes.set_ylabel(labels[1])
         if len(self._data.keys()) > 2:
             stats = {}
             for k, v in self._data.items():
@@ -725,7 +749,7 @@ class AtlasDisplay(QWidget):
                 for gs, d in v.items():
                     if not _foil_holes.get(gs):
                         _foil_holes[gs] = list(d.keys())
-                    for f in d[_foil_holes[gs]]:
+                    for f in _foil_holes[gs]:
                         stats[k].extend(d[f])
             corr = np.corrcoef(list(stats.values()))
             mat = self._atlas_stats_fig.matshow(corr)
@@ -807,7 +831,6 @@ class AtlasDisplay(QWidget):
             tile_lbl = ImageLabel(
                 _tile, grid_square, (qsize.width(), qsize.height()), parent=self
             )
-            self.grid.addWidget(tile_lbl, 1, 1)
             tile_lbl.setPixmap(tile_pixmap)
             return tile_lbl
         return None
