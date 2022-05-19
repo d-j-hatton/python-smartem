@@ -392,16 +392,18 @@ class MainDisplay(QWidget):
                 list(stats.values())[0], color="darkturquoise"
             )
         if len(stats.keys()) == 2:
-            _labels, _data = stats.items()
-            labels = list(_labels)
-            data = list(_data)
+            labels = []
+            data = []
+            for k, v in stats.items():
+                labels.append(k)
+                data.append(v)
             self._grid_square_stats_fig.scatter(
                 data[0],
                 data[1],
-                xlabel=labels[0],
-                ylabel=labels[1],
                 color="darkturquoise",
             )
+            self._grid_square_stats_fig.axes.set_xlabel(labels[0])
+            self._grid_square_stats_fig.axes.set_ylabel(labels[1])
         if len(stats.keys()) > 2:
             corr = np.corrcoef(list(stats.values()))
             mat = self._grid_square_stats_fig.matshow(corr)
@@ -421,9 +423,16 @@ class MainDisplay(QWidget):
             )
         if len(stats.keys()) == 2:
             if all(stats.values()):
+                labels = []
+                data = []
+                for k, v in stats.items():
+                    labels.append(k)
+                    data.append(v)
                 self._foil_hole_stats_fig.scatter(
-                    *(v for v in stats.values()), color="darkturquoise"
+                    data[0], data[1], color="darkturquoise"
                 )
+                self._foil_hole_stats_fig.axes.set_xlabel(labels[0])
+                self._foil_hole_stats_fig.axes.set_ylabel(labels[1])
         if len(stats.keys()) > 2:
             if all(stats.values()):
                 corr = np.corrcoef(list(stats.values()))
@@ -450,9 +459,14 @@ class MainDisplay(QWidget):
                 list(stats.values())[0], color="darkturquoise"
             )
         if len(stats.keys()) == 2:
-            self._exposure_stats_fig.scatter(
-                *(v for v in stats.values()), color="darkturquoise"
-            )
+            labels = []
+            data = []
+            for k, v in stats.items():
+                labels.append(k)
+                data.append(v)
+            self._exposure_stats_fig.scatter(data[0], data[1], color="darkturquoise")
+            self._exposure_stats_fig.axes.set_xlabel(labels[0])
+            self._exposure_stats_fig.axes.set_ylabel(labels[1])
         if len(stats.keys()) > 2:
             corr = np.corrcoef(list(stats.values()))
             mat = self._exposure_stats_fig.matshow(corr)
