@@ -415,10 +415,6 @@ class Extractor:
                         for er in particle_set_results
                         if er[-1].key == k and er[0].exposure_name == exp
                     )
-        vals = list(stats.values())
-        if not all(len(v) == len(vals[0]) for v in vals):
-            print("Here:", foil_hole_name)
-        print([(k, len(v)) for k, v in stats.items()])
         return stats
 
     def get_grid_square_stats_all(
