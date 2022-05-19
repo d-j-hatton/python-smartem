@@ -332,8 +332,8 @@ class Extractor:
         particle_keys: List[str],
         particle_set_keys: List[str],
         avg_particles: bool = False,
-    ) -> Dict[str, List[float]]:
-        stats: Dict[str, List[float]] = {}
+    ) -> Dict[str, List[Optional[float]]]:
+        stats: Dict[str, List[Optional[float]]] = {}
         if not any((exposure_keys, particle_keys, particle_set_keys)):
             return stats
         exposures = self.get_exposure_names(foil_hole_name)
@@ -376,45 +376,25 @@ class Extractor:
                 if this_res:
                     stats[k].append(this_res[0])
                 else:
-                    stats[k].append(0)
-        for k in particle_keys:
-            stats[k] = []
-            for exp in exposures:
-                if avg_particles:
-                    stats[k].append(
-                        np.mean(
-                            [
-                                er[-1].value
-                                for er in particle_results
-                                if er[-1].key == k and er[0].exposure_name == exp
-                            ]
-                        )
-                    )
-                else:
-                    stats[k].extend(
-                        er[-1].value
-                        for er in particle_results
-                        if er[-1].key == k and er[0].exposure_name == exp
-                    )
-        for k in particle_set_keys:
-            stats[k] = []
-            for exp in exposures:
-                if avg_particles:
-                    stats[k].append(
-                        np.mean(
-                            [
-                                er[-1].value
-                                for er in particle_set_results
-                                if er[-1].key == k and er[0].exposure_name == exp
-                            ]
-                        )
-                    )
-                else:
-                    stats[k].extend(
-                        er[-1].value
-                        for er in particle_set_results
-                        if er[-1].key == k and er[0].exposure_name == exp
-                    )
+                    stats[k].append(None)
+        if particle_keys:
+            stats.update(
+                _parse_particle_data(
+                    particle_keys,
+                    particle_results,
+                    exposures,
+                    avg_particles=avg_particles,
+                )
+            )
+        if particle_set_keys:
+            stats.update(
+                _parse_particle_data(
+                    particle_set_keys,
+                    particle_set_results,
+                    exposures,
+                    avg_particles=avg_particles,
+                )
+            )
         return stats
 
     def get_grid_square_stats_all(
@@ -424,8 +404,8 @@ class Extractor:
         particle_keys: List[str],
         particle_set_keys: List[str],
         avg_particles: bool = False,
-    ) -> Dict[str, Dict[str, List[float]]]:
-        stats: Dict[str, Dict[str, List[float]]] = {}
+    ) -> Dict[str, Dict[str, List[Optional[float]]]]:
+        stats: Dict[str, Dict[str, List[Optional[float]]]] = {}
         if not any((exposure_keys, particle_keys, particle_set_keys)):
             return stats
         foil_holes = self.get_foil_holes(grid_square_name)
@@ -444,14 +424,37 @@ class Extractor:
                     stats[k] = {fh.foil_hole_name: v}
         return stats
 
+    def get_atlas_stats_all(
+        self,
+        exposure_keys: List[str],
+        particle_keys: List[str],
+        particle_set_keys: List[str],
+        avg_particles: bool = False,
+    ) -> Dict[str, Dict[str, Dict[str, List[Optional[float]]]]]:
+        stats: Dict[str, Dict[str, Dict[str, List[Optional[float]]]]] = {}
+        grid_squares = self.get_grid_squares()
+        for k in exposure_keys + particle_keys + particle_set_keys:
+            stats[k] = {}
+        for gs in grid_squares:
+            gs_data = self.get_grid_square_stats_all(
+                gs.grid_square_name,
+                exposure_keys,
+                particle_keys,
+                particle_set_keys,
+                avg_particles=avg_particles,
+            )
+            for k in gs_data.keys():
+                stats[k][gs.grid_square_name] = gs_data[k]
+        return stats
+
     def get_atlas_stats(
         self,
         exposure_keys: List[str],
         particle_keys: List[str],
         particle_set_keys: List[str],
         avg_particles: bool = False,
-    ) -> Dict[str, Dict[str, List[float]]]:
-        stats: Dict[str, Dict[str, List[float]]] = {}
+    ) -> Dict[str, Dict[str, List[Optional[float]]]]:
+        stats: Dict[str, Dict[str, List[Optional[float]]]] = {}
         grid_squares = self.get_grid_squares()
         for k in exposure_keys + particle_keys + particle_set_keys:
             stats[k] = {}
@@ -469,3 +472,29 @@ class Extractor:
                 for fh in foil_holes:
                     stats[k][gs.grid_square_name].extend(gs_data[k][fh.foil_hole_name])
         return stats
+
+
+def _parse_particle_data(
+    keys: List[str], data: list, exposures: List[str], avg_particles: bool = False
+) -> dict:
+    stats: dict = {}
+    for k in keys:
+        stats[k] = []
+        for exp in exposures:
+            if avg_particles:
+                stats[k].append(
+                    np.mean(
+                        [
+                            er[-1].value
+                            for er in data
+                            if er[-1].key == k and er[0].exposure_name == exp
+                        ]
+                    )
+                )
+            else:
+                stats[k].extend(
+                    er[-1].value
+                    for er in data
+                    if er[-1].key == k and er[0].exposure_name == exp
+                )
+    return stats

@@ -241,7 +241,7 @@ class MainDisplay(QWidget):
     def __init__(self, extractor: Extractor, atlas_view: Optional[AtlasDisplay] = None):
         super().__init__()
         self._extractor = extractor
-        self._data: Dict[str, Dict[str, List[float]]] = {}
+        self._data: Dict[str, Dict[str, Dict[str, List[float]]]] = {}
         self._particle_data: Dict[str, List[float]] = {}
         self.grid = QGridLayout()
         self.setLayout(self.grid)
@@ -296,6 +296,10 @@ class MainDisplay(QWidget):
             "set_group": [],
         }
 
+        self._gather_btn = QPushButton("Gather data")
+        self._gather_btn.clicked.connect(self._gather_data)
+        self.grid.addWidget(self._gather_btn, 3, 1)
+
     def load(self):
         self._grid_squares = self._extractor.get_grid_squares()
         self._square_combo.clear()
@@ -317,9 +321,8 @@ class MainDisplay(QWidget):
             for k in keys:
                 self._pick_list.addItem(k)
 
-    def _select_square(self, index: int):
+    def _gather_data(self):
         selected_keys = [d.text() for d in self._data_list.selectedItems()]
-        self._data = {}
         _exposure_keys = [
             k for k in selected_keys if k in self._data_keys["micrograph"]
         ]
@@ -328,13 +331,14 @@ class MainDisplay(QWidget):
             k for k in selected_keys if k in self._data_keys["particle_set"]
         ]
         avg_particles = len(_exposure_keys + _particle_keys + _particle_set_keys) > 1
-        self._data = self._extractor.get_grid_square_stats_all(
-            self._square_combo.currentText(),
-            _exposure_keys,
-            _particle_keys,
-            _particle_set_keys,
+        self._data = self._extractor.get_atlas_stats_all(
+            _exposure_keys or [],
+            _particle_keys or [],
+            _particle_set_keys or [],
             avg_particles=avg_particles,
         )
+
+    def _select_square(self, index: int):
         try:
             square_lbl = self._draw_grid_square(self._grid_squares[index])
         except IndexError:
@@ -342,21 +346,25 @@ class MainDisplay(QWidget):
         self.grid.addWidget(square_lbl, 1, 1)
         self._update_fh_choices(self._square_combo.currentText())
 
-        if self._atlas_view:
-            self._atlas_view.load(
-                grid_square=self._grid_squares[index],
-                all_grid_squares=self._grid_squares,
-                exposure_keys=_exposure_keys,
-                particle_keys=_particle_keys,
-                particle_set_keys=_particle_set_keys,
-            )
-
-        for_correlation = {}
-        for k, v in self._data.items():
-            for_correlation[k] = [
-                elem for foil_hole in v.values() for elem in foil_hole
-            ]
-        self._update_grid_square_stats(for_correlation)
+        # if self._atlas_view:
+        #    self._atlas_view.load(
+        #        grid_square=self._grid_squares[index],
+        #        all_grid_squares=self._grid_squares,
+        #        exposure_keys=_exposure_keys,
+        #        particle_keys=_particle_keys,
+        #        particle_set_keys=_particle_set_keys,
+        #    )
+        if self._data:
+            for_correlation = {}
+            for k, v in self._data.items():
+                for_correlation[k] = [
+                    elem
+                    for foil_hole in v[
+                        self._grid_squares[index].grid_square_name
+                    ].values()
+                    for elem in foil_hole
+                ]
+            self._update_grid_square_stats(for_correlation)
 
     def _select_foil_hole(self, index: int):
         try:
@@ -373,7 +381,11 @@ class MainDisplay(QWidget):
             try:
                 self._update_foil_hole_stats(
                     {
-                        k: v[self._foil_hole_combo.currentText()]
+                        k: v[
+                            self._grid_squares[
+                                self._square_combo.currentIndex()
+                            ].grid_square_name
+                        ][self._foil_hole_combo.currentText()]
                         for k, v in self._data.items()
                     }
                 )
@@ -505,7 +517,11 @@ class MainDisplay(QWidget):
             if len(self._data.keys()) == 1:
                 _key = list(self._data.keys())[0]
                 imvs = [
-                    np.mean(self._data[_key].get(fh.foil_hole_name, []))
+                    np.mean(
+                        self._data[_key][grid_square.grid_square_name].get(
+                            fh.foil_hole_name, []
+                        )
+                    )
                     for fh in self._foil_holes
                     if fh != foil_hole
                 ]
@@ -515,9 +531,18 @@ class MainDisplay(QWidget):
                 foil_hole,
                 (qsize.width(), qsize.height()),
                 parent=self,
-                value=np.mean(self._data[_key].get(foil_hole.foil_hole_name, [0]))
+                value=np.mean(
+                    self._data[_key][grid_square.grid_square_name].get(
+                        foil_hole.foil_hole_name, [0]
+                    )
+                )
                 if _key
-                and isinstance(self._data[_key].get(foil_hole.foil_hole_name), list)
+                and isinstance(
+                    self._data[_key][grid_square.grid_square_name].get(
+                        foil_hole.foil_hole_name
+                    ),
+                    list,
+                )
                 else None,
                 extra_images=[fh for fh in self._foil_holes if fh != foil_hole],
                 image_values=imvs,
@@ -641,7 +666,7 @@ class AtlasDisplay(QWidget):
         self._atlas_stats_particle = FigureCanvasQTAgg(atlas_particle_fig)
         self.grid.addWidget(self._atlas_stats, 2, 1)
         self.grid.addWidget(self._atlas_stats_particle, 3, 1)
-        self._data: Dict[str, Dict[str, List[float]]] = {}
+        self._data: Dict[str, Dict[str, List[Optional[float]]]] = {}
         self._particle_data: Dict[str, List[float]] = {}
         self._colour_bar = None
 
