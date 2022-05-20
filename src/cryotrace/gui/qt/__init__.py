@@ -667,7 +667,7 @@ class AtlasDisplay(QWidget):
         refresh_vbox = QVBoxLayout()
         refresh_vbox.addStretch()
         refresh_vbox.addWidget(self._refresh_btn)
-        self.grid.addLayout(refresh_vbox, 2, 0)
+        self.grid.addLayout(refresh_vbox, 1, 0)
         self._grid_square: Optional[str] = None
         self._all_grid_squares: List[str] = []
 
@@ -701,13 +701,14 @@ class AtlasDisplay(QWidget):
             vbox = QVBoxLayout()
             vbox.addWidget(atlas_lbl)
             vbox.addStretch()
+            vbox.addWidget(self._refresh_btn)
             self.grid.addLayout(vbox, 0, 0)
             if self._grid_square:
                 tile_lbl = self._draw_tile(self._grid_square)
                 vbox = QVBoxLayout()
                 vbox.addWidget(tile_lbl)
-                vbox.addStretch()
                 vbox.addWidget(self._atlas_stats)
+                vbox.addStretch()
                 self.grid.addLayout(vbox, 0, 1)
         self._refresh_btn.setEnabled(False)
 
@@ -719,8 +720,14 @@ class AtlasDisplay(QWidget):
         grid_square: Optional[str] = None,
         all_grid_squares: Optional[List[str]] = None,
     ):
+        avg_particles = bool(exposure_keys) and (
+            bool(particle_keys) or bool(particle_set_keys)
+        )
         self._data = self._extractor.get_atlas_stats_flat(
-            exposure_keys or [], particle_keys or [], particle_set_keys or []
+            exposure_keys or [],
+            particle_keys or [],
+            particle_set_keys or [],
+            avg_particles=avg_particles,
         )
         self._grid_square = grid_square
         self._all_grid_squares = all_grid_squares or []
@@ -762,7 +769,10 @@ class AtlasDisplay(QWidget):
                 stats[k] = []
                 for d in v.values():
                     stats[k].extend(d)
-            corr = np.corrcoef(list(stats.values()))
+            data = list(stats.values())
+            for i, _ in enumerate(data):
+                data[i] = np.nan_to_num(_)
+            corr = np.corrcoef(data)
             mat = self._atlas_stats_fig.matshow(corr)
             self._colour_bar = self._atlas_stats_fig.figure.colorbar(mat)
         self._atlas_stats.draw()
