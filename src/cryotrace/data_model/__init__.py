@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, Optional, Type, Union, cast
+from typing import Any, List, Optional, Type, Union, cast
 
 import yaml
 from sqlalchemy import Column
@@ -242,7 +242,7 @@ class ParticleSetLinker(Base):
     ParticleSet = relationship("ParticleSet")
 
 
-_tables = [
+_tables: List[Type[Base]] = [
     Atlas,
     Tile,
     GridSquare,
