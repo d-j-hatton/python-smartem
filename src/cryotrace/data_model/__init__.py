@@ -217,8 +217,8 @@ class ParticleSet(Base):
         nullable=False,
     )
 
-    atlas_id: Column = Column(ForeignKey("Atlas.atlas_id"), nullable=False)
-    Atlas = relationship("Atlas")
+    project_name: Column = Column(ForeignKey("Project.project_name"), nullable=False)
+    Project = relationship("Project")
 
 
 class ParticleSetInfo(InfoStore, Base):

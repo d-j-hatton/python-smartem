@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Optional, Sequence, Tuple, Type, Union
 
 import numpy as np
 from sqlalchemy import create_engine
@@ -23,6 +23,318 @@ from cryotrace.data_model import (
     Tile,
     url,
 )
+
+
+class DataAPI:
+    def __init__(self, project: str = ""):
+        _url = url()
+        self._project = project
+        engine = create_engine(_url)
+        self.session = sessionmaker(bind=engine)()
+
+    def set_project(self, project: str):
+        self._project = project
+
+    def get_atlases(self) -> Union[Atlas, List[Atlas]]:
+        if self._project:
+            query = (
+                self.session.query(Project, Atlas)
+                .join(Project, Project.atlas_id == Atlas.atlas_id)
+                .filter(Project.project_name == self._project)
+            )
+            atlases = [q[1] for q in query.all()]
+            if len(atlases) == 1:
+                return atlases[0]
+            return atlases
+        return []
+
+    def get_tile(
+        self, stage_position: Tuple[float, float], atlas_id: Optional[int] = None
+    ) -> Optional[Tile]:
+        if atlas_id is None:
+            atlas = self.get_atlases()
+            if not atlas or isinstance(atlas, list):
+                return None
+            atlas_id = atlas.atlas_id
+        query = self.session.query(Tile).filter(Tile.atlas_id == atlas_id)
+        tiles = query.all()
+        for tile in tiles:
+            left = tile.stage_position_x - 0.5 * (tile.pixel_size * tile.readout_area_x)
+            right = tile.stage_position_x + 0.5 * (
+                tile.pixel_size * tile.readout_area_x
+            )
+            top = tile.stage_position_y + 0.5 * (tile.pixel_size * tile.readout_area_y)
+            bottom = tile.stage_position_y - 0.5 * (
+                tile.pixel_size * tile.readout_area_y
+            )
+            if stage_position[0] > left and stage_position[0] < right:
+                if stage_position[1] < top and stage_position[1] > bottom:
+                    return tile
+        return None
+
+    def get_grid_squares(
+        self, atlas_id: Optional[int] = None, tile_id: Optional[int] = None
+    ) -> List[GridSquare]:
+        if self._project:
+            tables: List[Type[Base]] = [GridSquare]
+            if tile_id is None:
+                tables.append(Tile)
+                if atlas_id is None:
+                    tables.append(Project)
+            query = self.session.query(*tables)
+            if tile_id is not None:
+                query = query.filter(GridSquare.tile_id == tile_id)
+            elif atlas_id is not None:
+                query = query.join(Tile, Tile.tile_id == GridSquare.tile_id).filter(
+                    Tile.atlas_id == atlas_id
+                )
+            else:
+                query = (
+                    query.join(Project, Project.atlas_id == Tile.atlas_id)
+                    .join(GridSquare, GridSquare.tile_id == Tile.tile_id)
+                    .filter(Project.project_name == self._project)
+                )
+            return [q[0] for q in query.all()]
+        return []
+
+    def get_foil_holes(
+        self,
+        atlas_id: Optional[int] = None,
+        tile_id: Optional[int] = None,
+        grid_square_name: str = "",
+    ) -> List[FoilHole]:
+        if self._project:
+            tables: List[Type[Base]] = [FoilHole]
+            if not grid_square_name:
+                tables.append(GridSquare)
+                if tile_id is None:
+                    tables.append(Tile)
+                    if atlas_id is None:
+                        tables.append(Project)
+            query = self.session.query(*tables)
+            if grid_square_name:
+                query = query.filter(FoilHole.grid_square_name == grid_square_name)
+            elif tile_id is not None:
+                query = query.join(
+                    FoilHole, FoilHole.grid_square_name == GridSquare.grid_square_name
+                ).filter(GridSquare.tile_id == tile_id)
+            elif atlas_id is not None:
+                query = (
+                    query.join(
+                        FoilHole,
+                        FoilHole.grid_square_name == GridSquare.grid_square_name,
+                    )
+                    .join(Tile, Tile.tile_id == GridSquare.tile_id)
+                    .filter(Tile.atlas_id == atlas_id)
+                )
+            else:
+                query = (
+                    query.join(Project, Project.atlas_id == Tile.atlas_id)
+                    .join(GridSquare, GridSquare.tile_id == Tile.tile_id)
+                    .join(
+                        FoilHole,
+                        FoilHole.grid_square_name == GridSquare.grid_square_name,
+                    )
+                    .filter(Project.project_name == self._project)
+                )
+            return [q[0] for q in query.all()]
+        return []
+
+    def get_exposures(
+        self,
+        atlas_id: Optional[int] = None,
+        tile_id: Optional[int] = None,
+        grid_square_name: str = "",
+        foil_hole_name: str = "",
+    ) -> List[Exposure]:
+        if self._project:
+            tables: List[Type[Base]] = [Exposure]
+            if not foil_hole_name:
+                tables.append(FoilHole)
+                if not grid_square_name:
+                    tables.append(GridSquare)
+                    if tile_id is None:
+                        tables.append(Tile)
+                        if atlas_id is None:
+                            tables.append(Project)
+            query = self.session.query(*tables)
+            if foil_hole_name:
+                query = query.filter(Exposure.foil_hole_name == foil_hole_name)
+            elif grid_square_name:
+                query = query.join(
+                    Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name
+                ).filter(FoilHole.grid_square_name == grid_square_name)
+            elif tile_id is not None:
+                query = (
+                    query.join(
+                        FoilHole,
+                        FoilHole.grid_square_name == GridSquare.grid_square_name,
+                    )
+                    .join(Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name)
+                    .filter(GridSquare.tile_id == tile_id)
+                )
+            elif atlas_id is not None:
+                query = (
+                    query.join(
+                        FoilHole,
+                        FoilHole.grid_square_name == GridSquare.grid_square_name,
+                    )
+                    .join(Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name)
+                    .join(Tile, Tile.tile_id == GridSquare.tile_id)
+                    .filter(Tile.atlas_id == atlas_id)
+                )
+            else:
+                query = (
+                    query.join(Project, Project.atlas_id == Tile.atlas_id)
+                    .join(GridSquare, GridSquare.tile_id == Tile.tile_id)
+                    .join(
+                        FoilHole,
+                        FoilHole.grid_square_name == GridSquare.grid_square_name,
+                    )
+                    .join(Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name)
+                    .filter(Project.project_name == self._project)
+                )
+            return [q[0] for q in query.all()]
+        return []
+
+    def get_particles(
+        self,
+        atlas_id: Optional[int] = None,
+        tile_id: Optional[int] = None,
+        grid_square_name: str = "",
+        foil_hole_name: str = "",
+        exposure_name: str = "",
+        source: str = "",
+    ) -> List[Particle]:
+        if self._project:
+            tables: List[Type[Base]] = [Particle]
+            if source:
+                tables.extend([ParticleSet, ParticleSetLinker])
+            elif not exposure_name:
+                tables.append(Exposure)
+                if not foil_hole_name:
+                    tables.append(FoilHole)
+                    if not grid_square_name:
+                        tables.append(GridSquare)
+                        if tile_id is None:
+                            tables.append(Tile)
+                            if atlas_id is None:
+                                tables.append(Project)
+            query = self.session.query(*tables)
+            if source:
+                query = (
+                    query.join(
+                        Particle, Particle.particle_id == ParticleSetLinker.particle_id
+                    )
+                    .join(
+                        ParticleSetLinker,
+                        ParticleSetLinker.set_name == ParticleSet.identifier,
+                    )
+                    .filter(ParticleSet.project_name == self._project)
+                )
+            elif exposure_name:
+                query = query.filter(Particle.exposure_name == exposure_name)
+            elif foil_hole_name:
+                query = query.join(
+                    Particle, Particle.exposure_name == Exposure.exposure_name
+                ).filter(Exposure.foil_hole_name == foil_hole_name)
+            elif grid_square_name:
+                query = (
+                    query.join(
+                        Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name
+                    )
+                    .join(Particle, Particle.exposure_name == Exposure.exposure_name)
+                    .filter(FoilHole.grid_square_name == grid_square_name)
+                )
+            elif tile_id is not None:
+                query = (
+                    query.join(
+                        FoilHole,
+                        FoilHole.grid_square_name == GridSquare.grid_square_name,
+                    )
+                    .join(Particle, Particle.exposure_name == Exposure.exposure_name)
+                    .join(Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name)
+                    .filter(GridSquare.tile_id == tile_id)
+                )
+            elif atlas_id is not None:
+                query = (
+                    query.join(
+                        FoilHole,
+                        FoilHole.grid_square_name == GridSquare.grid_square_name,
+                    )
+                    .join(Particle, Particle.exposure_name == Exposure.exposure_name)
+                    .join(Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name)
+                    .join(Tile, Tile.tile_id == GridSquare.tile_id)
+                    .filter(Tile.atlas_id == atlas_id)
+                )
+            else:
+                query = (
+                    query.join(Project, Project.atlas_id == Tile.atlas_id)
+                    .join(Particle, Particle.exposure_name == Exposure.exposure_name)
+                    .join(GridSquare, GridSquare.tile_id == Tile.tile_id)
+                    .join(
+                        FoilHole,
+                        FoilHole.grid_square_name == GridSquare.grid_square_name,
+                    )
+                    .join(Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name)
+                    .filter(Project.project_name == self._project)
+                )
+            return [q[0] for q in query.all()]
+        return []
+
+    def get_exposure_keys(self) -> List[str]:
+        if not self._project:
+            return []
+        query = (
+            self.session.query(
+                Project, Tile, GridSquare, FoilHole, Exposure, ExposureInfo
+            )
+            .options(Load(Tile).load_only("tile_id", "atlas_id"), Load(FoilHole).load_only("grid_square_name", "foil_hole_name"), Load(Exposure).load_only("foil_hole_name", "exposure_name"), Load(ExposureInfo).load_only("key"))  # type: ignore
+            .join(Project, Project.atlas_id == Tile.atlas_id)
+            .join(GridSquare, GridSquare.tile_id == Tile.tile_id)
+            .join(FoilHole, FoilHole.grid_square_name == GridSquare.grid_square_name)
+            .join(Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name)
+            .join(ExposureInfo, ExposureInfo.exposure_name == Exposure.exposure_name)
+            .filter(Project.project_name == self._project)
+            .distinct(ExposureInfo.key)
+        )
+        return [q[-1].key for q in query.all()]
+
+    def get_particle_keys(self) -> List[str]:
+        if not self._project:
+            return []
+        query = (
+            self.session.query(
+                Project, Tile, GridSquare, FoilHole, Exposure, Particle, ParticleInfo
+            )
+            .options(Load(Tile).load_only("tile_id", "atlas_id"), Load(FoilHole).load_only("grid_square_name", "foil_hole_name"), Load(Exposure).load_only("foil_hole_name", "exposure_name"), Load(Particle).load_only("exposure_name", "particle_id"), Load(ParticleInfo).load_only("key"))  # type: ignore
+            .join(Project, Project.atlas_id == Tile.atlas_id)
+            .join(GridSquare, GridSquare.tile_id == Tile.tile_id)
+            .join(FoilHole, FoilHole.grid_square_name == GridSquare.grid_square_name)
+            .join(Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name)
+            .join(Particle, Particle.exposure_name == Exposure.exposure_name)
+            .join(ParticleInfo, ParticleInfo.particle_id == Particle.particle_id)
+            .filter(Project.project_name == self._project)
+            .distinct(ParticleInfo.key)
+        )
+        return [q[-1].key for q in query.all()]
+
+    def get_particle_set_keys(self) -> List[str]:
+        if not self._project:
+            return []
+        query = (
+            self.session.query(ParticleSet, ParticleSetInfo)
+            .options(Load(ParticleSet).load_only("atlas_id", "identifier"), Load(ParticleSetInfo).load_only("key"))  # type: ignore
+            .join(ParticleSet, ParticleSet.identifier == ParticleSetInfo.set_name)
+            .filter(ParticleSet.project_name == self._project)
+            .distinct(ParticleSetInfo.key)
+        )
+        return [q[-1].key for q in query.all()]
+
+    def put(self, entries: Sequence[Base]):
+        for entry in entries:
+            self.session.add(entry)
+        self.session.commit()
 
 
 class Extractor:
@@ -139,11 +451,12 @@ class Extractor:
 
     def get_particle_set_group_names(self) -> List[str]:
         query = (
-            self.session.query(ParticleSet)
-            .filter(ParticleSet.atlas_id == self._atlas_id)
+            self.session.query(ParticleSet, Project)
+            .join(Project, Project.project_name == ParticleSet.project_name)
+            .filter(Project.atlas_id == self._atlas_id)
             .distinct(ParticleSet.group_name)
         )
-        return [q.group_name for q in query.all()]
+        return [q[0].group_name for q in query.all()]
 
     def get_particle_info_sources(self) -> List[str]:
         query = (
@@ -192,10 +505,11 @@ class Extractor:
 
     def get_all_particle_set_keys(self) -> List[str]:
         query = (
-            self.session.query(ParticleSet, ParticleSetInfo)
+            self.session.query(Project, ParticleSet, ParticleSetInfo)
             .options(Load(ParticleSet).load_only("atlas_id", "identifier"), Load(ParticleSetInfo).load_only("key"))  # type: ignore
             .join(ParticleSet, ParticleSet.identifier == ParticleSetInfo.set_name)
-            .filter(ParticleSet.atlas_id == self._atlas_id)
+            .join(Project, Project.project_name == ParticleSet.project_name)
+            .filter(Project.atlas_id == self._atlas_id)
             .distinct(ParticleSetInfo.key)
         )
         return [q[-1].key for q in query.all()]
