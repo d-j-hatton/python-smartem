@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Dict, List, Optional, Sequence, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 import numpy as np
 from sqlalchemy import create_engine
@@ -23,6 +23,7 @@ from cryotrace.data_model import (
     Tile,
     url,
 )
+from cryotrace.data_model.construct import linear_joins, table_chain
 
 
 class DataAPI:
@@ -76,23 +77,23 @@ class DataAPI:
         self, atlas_id: Optional[int] = None, tile_id: Optional[int] = None
     ) -> List[GridSquare]:
         if self._project:
-            tables: List[Type[Base]] = [GridSquare]
-            if tile_id is None:
-                tables.append(Tile)
-                if atlas_id is None:
-                    tables.append(Project)
-            query = self.session.query(*tables)
+            primary_filter: Any = None
+            end: Type[Base] = Project
             if tile_id is not None:
-                query = query.filter(GridSquare.tile_id == tile_id)
+                end = GridSquare
+                primary_filter = tile_id
             elif atlas_id is not None:
-                query = query.join(Tile, Tile.tile_id == GridSquare.tile_id).filter(
-                    Tile.atlas_id == atlas_id
+                end = Tile
+                primary_filter = atlas_id
+            tables = table_chain(GridSquare, end)
+            if primary_filter is None:
+                query = linear_joins(self.session, tables)
+                query = query.join(Project, Project.atlas_id == Tile.atlas_id).filter(
+                    Project.project_name == self._project
                 )
             else:
-                query = (
-                    query.join(Project, Project.atlas_id == Tile.atlas_id)
-                    .join(GridSquare, GridSquare.tile_id == Tile.tile_id)
-                    .filter(Project.project_name == self._project)
+                query = linear_joins(
+                    self.session, tables, primary_filter=primary_filter
                 )
             return [q[0] for q in query.all()]
         return []
@@ -104,38 +105,25 @@ class DataAPI:
         grid_square_name: str = "",
     ) -> List[FoilHole]:
         if self._project:
-            tables: List[Type[Base]] = [FoilHole]
-            if not grid_square_name:
-                tables.append(GridSquare)
-                if tile_id is None:
-                    tables.append(Tile)
-                    if atlas_id is None:
-                        tables.append(Project)
-            query = self.session.query(*tables)
+            primary_filter: Any = None
+            end: Type[Base] = Project
             if grid_square_name:
-                query = query.filter(FoilHole.grid_square_name == grid_square_name)
+                end = FoilHole
             elif tile_id is not None:
-                query = query.join(
-                    FoilHole, FoilHole.grid_square_name == GridSquare.grid_square_name
-                ).filter(GridSquare.tile_id == tile_id)
+                end = GridSquare
+                primary_filter = tile_id
             elif atlas_id is not None:
-                query = (
-                    query.join(
-                        FoilHole,
-                        FoilHole.grid_square_name == GridSquare.grid_square_name,
-                    )
-                    .join(Tile, Tile.tile_id == GridSquare.tile_id)
-                    .filter(Tile.atlas_id == atlas_id)
+                end = Tile
+                primary_filter = atlas_id
+            tables = table_chain(GridSquare, end)
+            if primary_filter is None:
+                query = linear_joins(self.session, tables)
+                query = query.join(Project, Project.atlas_id == Tile.atlas_id).filter(
+                    Project.project_name == self._project
                 )
             else:
-                query = (
-                    query.join(Project, Project.atlas_id == Tile.atlas_id)
-                    .join(GridSquare, GridSquare.tile_id == Tile.tile_id)
-                    .join(
-                        FoilHole,
-                        FoilHole.grid_square_name == GridSquare.grid_square_name,
-                    )
-                    .filter(Project.project_name == self._project)
+                query = linear_joins(
+                    self.session, tables, primary_filter=primary_filter
                 )
             return [q[0] for q in query.all()]
         return []
@@ -148,51 +136,29 @@ class DataAPI:
         foil_hole_name: str = "",
     ) -> List[Exposure]:
         if self._project:
-            tables: List[Type[Base]] = [Exposure]
-            if not foil_hole_name:
-                tables.append(FoilHole)
-                if not grid_square_name:
-                    tables.append(GridSquare)
-                    if tile_id is None:
-                        tables.append(Tile)
-                        if atlas_id is None:
-                            tables.append(Project)
-            query = self.session.query(*tables)
+            primary_filter: Any = None
+            end: Type[Base] = Project
             if foil_hole_name:
-                query = query.filter(Exposure.foil_hole_name == foil_hole_name)
+                end = Exposure
+                primary_filter = foil_hole_name
             elif grid_square_name:
-                query = query.join(
-                    Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name
-                ).filter(FoilHole.grid_square_name == grid_square_name)
+                end = FoilHole
+                primary_filter = grid_square_name
             elif tile_id is not None:
-                query = (
-                    query.join(
-                        FoilHole,
-                        FoilHole.grid_square_name == GridSquare.grid_square_name,
-                    )
-                    .join(Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name)
-                    .filter(GridSquare.tile_id == tile_id)
-                )
+                end = GridSquare
+                primary_filter = tile_id
             elif atlas_id is not None:
-                query = (
-                    query.join(
-                        FoilHole,
-                        FoilHole.grid_square_name == GridSquare.grid_square_name,
-                    )
-                    .join(Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name)
-                    .join(Tile, Tile.tile_id == GridSquare.tile_id)
-                    .filter(Tile.atlas_id == atlas_id)
+                end = Tile
+                primary_filter = atlas_id
+            tables = table_chain(GridSquare, end)
+            if primary_filter is None:
+                query = linear_joins(self.session, tables)
+                query = query.join(Project, Project.atlas_id == Tile.atlas_id).filter(
+                    Project.project_name == self._project
                 )
             else:
-                query = (
-                    query.join(Project, Project.atlas_id == Tile.atlas_id)
-                    .join(GridSquare, GridSquare.tile_id == Tile.tile_id)
-                    .join(
-                        FoilHole,
-                        FoilHole.grid_square_name == GridSquare.grid_square_name,
-                    )
-                    .join(Exposure, Exposure.foil_hole_name == FoilHole.foil_hole_name)
-                    .filter(Project.project_name == self._project)
+                query = linear_joins(
+                    self.session, tables, primary_filter=primary_filter
                 )
             return [q[0] for q in query.all()]
         return []
