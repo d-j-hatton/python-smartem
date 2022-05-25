@@ -46,18 +46,29 @@ def table_chain(start: Type[Base], end: Type[Base]) -> List[Type[Base]]:
 
 
 def linear_joins(
-    session: Session, tables: List[Type[Base]], primary_filter: Any = None
+    session: Session,
+    tables: List[Type[Base]],
+    primary_filter: Any = None,
+    skip: Optional[List[Type[Base]]] = None,
 ) -> Query:
+    if not skip:
+        skip = []
     query = session.query(*tables)
     for i, tab in enumerate(tables[:-1]):
-        query = query.join(
-            tab,
-            getattr(tab, _foreign_key(tab))
-            == getattr(tables[i + 1], _foreign_key(tables[i + 1])),
-        )
+        if tab in skip or tables[i + 1] in skip:
+            continue
+        try:
+            query = query.join(
+                tables[i + 1],
+                getattr(tables[i + 1], _foreign_key(tab))
+                == getattr(tab, _foreign_key(tab)),
+            )
+        except IndexError:
+            pass
     if primary_filter is not None:
         try:
-            primary_key = _primary_keys(tables[-1])[0]
+            # primary_key = _primary_keys(tables[-1])[0]
+            primary_key = _foreign_key(tables[-1])
         except IndexError:
             return query
         query = query.filter(getattr(tables[-1], primary_key) == primary_filter)

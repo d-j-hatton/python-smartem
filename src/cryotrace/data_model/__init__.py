@@ -6,6 +6,7 @@ import yaml
 from sqlalchemy import Column
 from sqlalchemy import Float as Float_org
 from sqlalchemy import ForeignKey, Integer, String, create_engine, inspect
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.type_api import TypeEngine
@@ -215,6 +216,7 @@ class ParticleSet(Base):
         String,
         primary_key=True,
         nullable=False,
+        unique=True,
     )
 
     project_name: Column = Column(ForeignKey("Project.project_name"), nullable=False)
@@ -244,6 +246,7 @@ class ParticleSetLinker(Base):
 
 _tables: List[Type[Base]] = [
     Atlas,
+    Project,
     Tile,
     GridSquare,
     FoilHole,
@@ -253,7 +256,6 @@ _tables: List[Type[Base]] = [
     ParticleSet,
     ParticleSetInfo,
     ParticleSetLinker,
-    Project,
     ExposureInfo,
 ]
 
@@ -283,4 +285,7 @@ def setup():
 def teardown():
     engine = create_engine(url())
     for tab in _tables[::-1]:
-        tab.__table__.drop(engine)
+        try:
+            tab.__table__.drop(engine)
+        except ProgrammingError:
+            pass

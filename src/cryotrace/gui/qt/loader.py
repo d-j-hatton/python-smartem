@@ -245,7 +245,7 @@ class ParticleDataLoader(ExposureDataLoader):
                 source_set = ParticleSet(
                     group_name=str(star_file_path),
                     identifier=str(star_file_path),
-                    atlas_id=self._extractor._atlas_id,
+                    project_name=self._extractor._project,
                 )
                 self._extractor.put([source_set])
                 linkers = [

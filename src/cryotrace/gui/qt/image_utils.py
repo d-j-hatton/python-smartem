@@ -165,11 +165,17 @@ class ImageLabel(QLabel):
             )
 
             if self._image_values:
-                shifted = [
-                    iv - min(self._image_values + [self._value])
-                    for iv in self._image_values
-                ]
-                maxv = max(self._image_values + [self._value])
+                if self._value is not None:
+                    shifted = [
+                        iv - min(self._image_values + [self._value])
+                        for iv in self._image_values
+                    ]
+                    maxv = max(self._image_values + [self._value])
+                else:
+                    shifted = [
+                        iv - min(self._image_values) for iv in self._image_values
+                    ]
+                    maxv = max(self._image_values)
                 if maxv:
                     normalised = [s / maxv for s in shifted]
                 else:
