@@ -102,6 +102,12 @@ class DataAPI:
                     return tile
         return None
 
+    def get_tile_id(self, stage_position: Tuple[float, float]) -> Optional[int]:
+        tile = self.get_tile(stage_position)
+        if tile:
+            return tile.tile_id
+        return None
+
     def get_grid_squares(
         self, atlas_id: Optional[int] = None, tile_id: Optional[int] = None
     ) -> List[GridSquare]:
@@ -124,7 +130,6 @@ class DataAPI:
                 query = linear_joins(
                     self.session, tables, primary_filter=primary_filter
                 )
-            print("grid square query", query)
             if len(tables) == 1:
                 return query.all()
             return [q[0] for q in query.all()]
@@ -174,7 +179,6 @@ class DataAPI:
             primary_filter: Any = None
             end: Type[Base] = Tile
             if foil_hole_name:
-                # print("foil hole name found to be", foil_hole_name)
                 end = Exposure
                 primary_filter = foil_hole_name
             elif grid_square_name:
@@ -252,7 +256,6 @@ class DataAPI:
                     query = linear_joins(
                         self.session, tables, primary_filter=primary_filter
                     )
-                print(query)
                 if len(tables) == 1:
                     return query.all()
             return [q[0] for q in query.all()]

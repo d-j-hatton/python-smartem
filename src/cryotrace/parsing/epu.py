@@ -25,21 +25,20 @@ def parse_epu_xml(xml_path: Path) -> Dict[str, Any]:
     }
 
 
-def create_atlas_and_tiles(atlas_image: Path, extractor: Extractor):
+def create_atlas_and_tiles(atlas_image: Path, extractor: Extractor) -> int:
     atlas_data = parse_epu_xml(atlas_image.with_suffix(".xml"))
-    atlas_id = extractor.put_image_data(
-        [
-            Atlas(
-                stage_position_x=atlas_data["stage_position"][0],
-                stage_position_y=atlas_data["stage_position"][1],
-                thumbnail=str(atlas_image),
-                pixel_size=atlas_data["pixel_size"],
-                readout_area_x=atlas_data["readout_area"][0],
-                readout_area_y=atlas_data["readout_area"][1],
-            )
-        ],
-        return_key="atlas_id",
-    )
+    atlas = [
+        Atlas(
+            stage_position_x=atlas_data["stage_position"][0],
+            stage_position_y=atlas_data["stage_position"][1],
+            thumbnail=str(atlas_image),
+            pixel_size=atlas_data["pixel_size"],
+            readout_area_x=atlas_data["readout_area"][0],
+            readout_area_y=atlas_data["readout_area"][1],
+        )
+    ]
+    extractor.put(atlas)
+    atlas_id = atlas[0].atlas_id
     if not atlas_id:
         raise RuntimeError(f"Atlas record was not correctly inserted: {atlas_image}")
     tiles = []
@@ -47,7 +46,7 @@ def create_atlas_and_tiles(atlas_image: Path, extractor: Extractor):
         tile_data = parse_epu_xml(tile.with_suffix(".xml"))
         tiles.append(
             Tile(
-                atlas_id=atlas_id[0],
+                atlas_id=atlas_id,
                 stage_position_x=tile_data["stage_position"][0],
                 stage_position_y=tile_data["stage_position"][1],
                 thumbnail=str(tile),
@@ -56,7 +55,8 @@ def create_atlas_and_tiles(atlas_image: Path, extractor: Extractor):
                 readout_area_y=tile_data["readout_area"][1],
             )
         )
-    extractor.put_image_data(tiles)
+    extractor.put(tiles)
+    return atlas_id
 
 
 def parse_epu_dir(epu_path: Path, extractor: Extractor):
@@ -68,7 +68,7 @@ def parse_epu_dir(epu_path: Path, extractor: Extractor):
             grid_square_data = parse_epu_xml(grid_square_jpeg.with_suffix(".xml"))
             tile_id = extractor.get_tile_id(grid_square_data["stage_position"])
             if tile_id is not None:
-                extractor.put_image_data(
+                extractor.put(
                     [
                         GridSquare(
                             grid_square_name=grid_square_dir.name,
@@ -101,7 +101,7 @@ def parse_epu_dir(epu_path: Path, extractor: Extractor):
                     readout_area_y=foil_hole_data["readout_area"][0],
                     foil_hole_name="_".join(foil_hole_jpeg.stem.split("_")[:2]),
                 )
-            extractor.put_image_data(list(foil_holes.values()))
+            extractor.put(list(foil_holes.values()))
             for exposure_jpeg in (grid_square_dir / "Data").glob("*.jpg"):
                 for fh_name in foil_holes.keys():
                     if fh_name in exposure_jpeg.name:
@@ -120,4 +120,4 @@ def parse_epu_dir(epu_path: Path, extractor: Extractor):
                     readout_area_x=exposure_data["readout_area"][0],
                     readout_area_y=exposure_data["readout_area"][1],
                 )
-            extractor.put_image_data(list(exposures.values()))
+            extractor.put(list(exposures.values()))
