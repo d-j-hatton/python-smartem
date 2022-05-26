@@ -210,7 +210,6 @@ class ProjectLoader(QWidget):
         self._particle_set_loader._set_project_directory(Path(self.project_dir))
 
     def _create_project(self):
-        # self._project_name = self._combo.currentText()
         self._project_name = self._name_input.text()
         found = self._extractor.set_project(self._project_name)
         if not found:
@@ -222,13 +221,15 @@ class ProjectLoader(QWidget):
                 processing_directory=self.project_dir,
             )
             self._extractor.put([proj])
-            # create_atlas_and_tiles(Path(self.atlas), self._extractor)
         atlas_found = self._extractor.set_project(self._project_name)
         if not atlas_found:
             raise ValueError(
                 "Project record not found despite having just been inserted"
             )
         parse_epu_dir(Path(self.epu_dir), self._extractor)
+        self._update_loaders()
+        self._main_display.load()
+        self._atlas_display.load()
         self._update_loaders()
 
     def load(self):
