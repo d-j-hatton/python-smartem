@@ -13,7 +13,7 @@ from cryotrace.data_model import (
     ParticleSetInfo,
     ParticleSetLinker,
 )
-from cryotrace.data_model.extract import Extractor
+from cryotrace.data_model.extract import DataAPI
 
 
 def open_star_file(star_file_path: Path):
@@ -44,7 +44,7 @@ def insert_exposure_data(
     data: Dict[str, List[str]],
     exposure_tag: str,
     star_file_path: str,
-    extractor: Extractor,
+    extractor: DataAPI,
     validate: bool = True,
 ):
     if validate:
@@ -110,7 +110,7 @@ def insert_particle_data(
     x_tag: str,
     y_tag: str,
     star_file_path: str,
-    extractor: Extractor,
+    extractor: DataAPI,
 ) -> List[Particle]:
     exposures = [e.exposure_name for e in extractor.get_exposures()]
     particle_info: List[ParticleInfo] = []
@@ -176,7 +176,7 @@ def insert_particle_set(
     x_tag: str,
     y_tag: str,
     star_file_path: str,
-    extractor: Extractor,
+    extractor: DataAPI,
     add_source_to_id: bool = False,
 ):
     extra_keys = [

@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
 
@@ -40,8 +40,8 @@ def extract_keys(
     )
     flat_results = {}
     flat_counts = {}
-    unused_indices = {}
-    indices = {}
+    unused_indices: Dict[Union[int, str], List[bool]] = {}
+    indices: Dict[Union[int, str], int] = {}
 
     if use_particles:
         for i, p in enumerate(particles):
@@ -108,10 +108,10 @@ def extract_keys_with_foil_hole_averages(
     )
     flat_results = {}
     flat_counts = {}
-    unused_indices = {}
-    indices = {}
-    foil_hole_sums = {}
-    foil_hole_counts = {}
+    unused_indices: Dict[Union[int, str], List[bool]] = {}
+    indices: Dict[Union[int, str], int] = {}
+    foil_hole_sums: Dict[str, float] = {}
+    foil_hole_counts: Dict[str, int] = {}
     if use_particles:
         for i, p in enumerate(particles):
             unused_indices[p.particle_id] = [False for _ in keys]

@@ -29,8 +29,8 @@ from PyQt5.QtWidgets import (
 )
 
 import cryotrace.gui
-from cryotrace.data_model import Exposure, FoilHole, GridSquare, Project
-from cryotrace.data_model.extract import Extractor
+from cryotrace.data_model import Atlas, Exposure, FoilHole, GridSquare, Project
+from cryotrace.data_model.extract import DataAPI
 from cryotrace.data_model.structure import (
     extract_keys,
     extract_keys_with_foil_hole_averages,
@@ -45,7 +45,7 @@ from cryotrace.parsing.epu import create_atlas_and_tiles, parse_epu_dir
 
 
 class App:
-    def __init__(self, extractor: Extractor):
+    def __init__(self, extractor: DataAPI):
         self.app = QApplication([])
         self.window = QtFrame(extractor)
         self.app.setStyleSheet(
@@ -58,7 +58,7 @@ class App:
 
 
 class QtFrame(QWidget):
-    def __init__(self, extractor: Extractor):
+    def __init__(self, extractor: DataAPI):
         super().__init__()
         self.tabs = QTabWidget()
         self.layout = QVBoxLayout(self)
@@ -88,7 +88,7 @@ class QtFrame(QWidget):
 class ProjectLoader(QWidget):
     def __init__(
         self,
-        extractor: Extractor,
+        extractor: DataAPI,
         data_loader: ExposureDataLoader,
         particle_loader: ParticleDataLoader,
         particle_set_loader: ParticleSetDataLoader,
@@ -243,10 +243,10 @@ class ProjectLoader(QWidget):
 
 
 class MainDisplay(QWidget):
-    def __init__(self, extractor: Extractor, atlas_view: Optional[AtlasDisplay] = None):
+    def __init__(self, extractor: DataAPI, atlas_view: Optional[AtlasDisplay] = None):
         super().__init__()
         self._extractor = extractor
-        self._data: Dict[str, Dict[str, List[float]]] = {}
+        self._data: Dict[str, List[float]] = {}
         self._foil_hole_averages: Dict[str, float] = {}
         self._particle_data: Dict[str, List[float]] = {}
         self._exposure_keys: List[str] = []
@@ -438,7 +438,7 @@ class MainDisplay(QWidget):
             except KeyError:
                 pass
 
-    def _update_grid_square_stats(self, stats: Dict[str, List[Optional[float]]]):
+    def _update_grid_square_stats(self, stats: Dict[str, List[float]]):
         gs_fig = Figure(tight_layout=True)
         gs_fig.set_facecolor("gray")
         self._grid_square_stats_fig = gs_fig.add_subplot(111)
@@ -690,7 +690,7 @@ class MainDisplay(QWidget):
 
 
 class AtlasDisplay(QWidget):
-    def __init__(self, extractor: Extractor):
+    def __init__(self, extractor: DataAPI):
         super().__init__()
         self._extractor = extractor
         self.grid = QGridLayout()
@@ -816,7 +816,12 @@ class AtlasDisplay(QWidget):
         all_grid_squares: Optional[List[GridSquare]] = None,
         flip: Tuple[int, int] = (1, 1),
     ) -> Optional[QLabel]:
-        _atlas = self._extractor.get_atlas()
+        _atlas: Optional[Atlas] = None
+        _atlases = self._extractor.get_atlases()
+        if isinstance(_atlases, Atlas):
+            _atlas = _atlases
+        elif _atlases:
+            _atlas = _atlases[0]
         if _atlas:
             atlas_pixmap = QPixmap(_atlas.thumbnail)
             if flip != (1, 1):

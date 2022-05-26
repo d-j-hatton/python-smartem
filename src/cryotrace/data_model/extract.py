@@ -365,8 +365,8 @@ class DataAPI:
         exposure_name: str,
         particle_keys: List[str],
         particle_set_keys: List[str],
-    ) -> Dict[str, List[tuple]]:
-        info = []
+    ) -> List[tuple]:
+        info: List[tuple] = []
         if not any((particle_keys, particle_set_keys)):
             return info
         particle_query = (
@@ -399,8 +399,8 @@ class DataAPI:
         particle_keys: List[str],
         particle_set_keys: List[str],
         avg_particles: bool = False,
-    ) -> Dict[str, List[tuple]]:
-        info = []
+    ) -> List[tuple]:
+        info: List[tuple] = []
         if not any((exposure_keys, particle_keys, particle_set_keys)):
             return info
         exposure_query = (
@@ -442,8 +442,8 @@ class DataAPI:
         particle_keys: List[str],
         particle_set_keys: List[str],
         avg_particles: bool = False,
-    ) -> Dict[str, List[tuple]]:
-        info = []
+    ) -> List[tuple]:
+        info: List[tuple] = []
         if not any((exposure_keys, particle_keys, particle_set_keys)):
             return info
         exposure_query = (
