@@ -562,7 +562,7 @@ class MainDisplay(QWidget):
             if len(self._data.keys()) == 1:
                 _key = list(self._data.keys())[0]
                 imvs = [
-                    self._foil_hole_averages.get(fh.foil_hole_name, 0)
+                    self._foil_hole_averages.get(fh.foil_hole_name)
                     for fh in self._foil_holes
                     if fh != foil_hole
                 ]
@@ -571,7 +571,7 @@ class MainDisplay(QWidget):
                 foil_hole,
                 (qsize.width(), qsize.height()),
                 parent=self,
-                value=self._foil_hole_averages[foil_hole.foil_hole_name]
+                value=self._foil_hole_averages.get(foil_hole.foil_hole_name)
                 if _key
                 else None,
                 extra_images=[fh for fh in self._foil_holes if fh != foil_hole],
