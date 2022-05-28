@@ -4,7 +4,7 @@ from typing import Any, Dict
 import xmltodict
 
 from cryotrace.data_model import Atlas, Exposure, FoilHole, GridSquare, Tile
-from cryotrace.data_model.extract import Extractor
+from cryotrace.data_model.extract import DataAPI
 
 
 def parse_epu_xml(xml_path: Path) -> Dict[str, Any]:
@@ -25,7 +25,7 @@ def parse_epu_xml(xml_path: Path) -> Dict[str, Any]:
     }
 
 
-def create_atlas_and_tiles(atlas_image: Path, extractor: Extractor) -> int:
+def create_atlas_and_tiles(atlas_image: Path, extractor: DataAPI) -> int:
     atlas_data = parse_epu_xml(atlas_image.with_suffix(".xml"))
     atlas = [
         Atlas(
@@ -59,7 +59,7 @@ def create_atlas_and_tiles(atlas_image: Path, extractor: Extractor) -> int:
     return atlas_id
 
 
-def parse_epu_dir(epu_path: Path, extractor: Extractor):
+def parse_epu_dir(epu_path: Path, extractor: DataAPI):
     foil_holes: Dict[str, FoilHole] = {}
     exposures = {}
     for grid_square_dir in epu_path.glob("GridSquare*"):

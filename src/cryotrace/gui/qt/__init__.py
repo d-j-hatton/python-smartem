@@ -44,6 +44,19 @@ from cryotrace.gui.qt.loader import (
 from cryotrace.parsing.epu import create_atlas_and_tiles, parse_epu_dir
 
 
+class ComponentTab(QWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        if kwargs.get("refreshers"):
+            self._refreshers = kwargs["refreshers"]
+        else:
+            self._refreshers = []
+
+    def refresh(self):
+        for refr in self._refreshers:
+            refr.refresh()
+
+
 class App:
     def __init__(self, extractor: DataAPI):
         self.app = QApplication([])
@@ -64,9 +77,11 @@ class QtFrame(QWidget):
         self.layout = QVBoxLayout(self)
         atlas_display = AtlasDisplay(extractor)
         main_display = MainDisplay(extractor, atlas_view=atlas_display)
-        data_loader = ExposureDataLoader(extractor)
-        particle_loader = ParticleDataLoader(extractor)
-        particle_set_loader = ParticleSetDataLoader(extractor)
+        data_loader = ExposureDataLoader(extractor, refreshers=[main_display])
+        particle_loader = ParticleDataLoader(extractor, refreshers=[main_display])
+        particle_set_loader = ParticleSetDataLoader(
+            extractor, refreshers=[main_display]
+        )
         proj_loader = ProjectLoader(
             extractor,
             data_loader,
@@ -85,7 +100,7 @@ class QtFrame(QWidget):
         self.setLayout(self.layout)
 
 
-class ProjectLoader(QWidget):
+class ProjectLoader(ComponentTab):
     def __init__(
         self,
         extractor: DataAPI,
@@ -94,8 +109,9 @@ class ProjectLoader(QWidget):
         particle_set_loader: ParticleSetDataLoader,
         main_display: MainDisplay,
         atlas_display: AtlasDisplay,
+        refreshers: Optional[List[ComponentTab]] = None,
     ):
-        super().__init__()
+        super().__init__(refreshers=refreshers)
         self._extractor = extractor
         self._data_loader = data_loader
         self._particle_loader = particle_loader
@@ -227,24 +243,31 @@ class ProjectLoader(QWidget):
                 "Project record not found despite having just been inserted"
             )
         parse_epu_dir(Path(self.epu_dir), self._extractor)
-        self._update_loaders()
-        self._main_display.load()
-        self._atlas_display.load()
+        self.refresh()
         self._update_loaders()
 
     def load(self):
         atlas_found = self._extractor.set_project(self._project_name)
         if not atlas_found:
             raise ValueError("Atlas record not found")
-        self._main_display.load()
-        self._atlas_display.load()
+        self.refresh()
         self._update_loaders()
         return
 
+    def refresh(self):
+        super().refresh()
+        self._main_display.load()
+        self._atlas_display.load()
 
-class MainDisplay(QWidget):
-    def __init__(self, extractor: DataAPI, atlas_view: Optional[AtlasDisplay] = None):
-        super().__init__()
+
+class MainDisplay(ComponentTab):
+    def __init__(
+        self,
+        extractor: DataAPI,
+        atlas_view: Optional[AtlasDisplay] = None,
+        refreshers: Optional[List[ComponentTab]] = None,
+    ):
+        super().__init__(refreshers=refreshers)
         self._extractor = extractor
         self._data: Dict[str, List[float]] = {}
         self._foil_hole_averages: Dict[str, float] = {}
@@ -315,20 +338,7 @@ class MainDisplay(QWidget):
         for gs in self._grid_squares:
             self._square_combo.addItem(gs.grid_square_name)
         self._update_fh_choices(self._grid_squares[0].grid_square_name)
-        self._data_list.clear()
-
-        self._data_keys["micrograph"] = self._extractor.get_exposure_keys()
-        self._data_keys["particle"] = self._extractor.get_particle_keys()
-        self._data_keys["particle_set"] = self._extractor.get_particle_set_keys()
-        for keys in self._data_keys.values():
-            for k in keys:
-                self._data_list.addItem(k)
-
-        self._pick_keys["source"] = self._extractor.get_particle_info_sources()
-        self._pick_keys["set_group"] = self._extractor.get_particle_set_group_names()
-        for keys in self._pick_keys.values():
-            for k in keys:
-                self._pick_list.addItem(k)
+        self.refresh()
 
     def _gather_data(self):
         selected_keys = [d.text() for d in self._data_list.selectedItems()]
@@ -687,6 +697,24 @@ class MainDisplay(QWidget):
         self._exposure_combo.clear()
         for ex in self._exposures:
             self._exposure_combo.addItem(ex.exposure_name)
+
+    def refresh(self):
+        super.refresh()
+        self._data_list.clear()
+        self._pick_list.clear()
+
+        self._data_keys["micrograph"] = self._extractor.get_exposure_keys()
+        self._data_keys["particle"] = self._extractor.get_particle_keys()
+        self._data_keys["particle_set"] = self._extractor.get_particle_set_keys()
+        for keys in self._data_keys.values():
+            for k in keys:
+                self._data_list.addItem(k)
+
+        self._pick_keys["source"] = self._extractor.get_particle_info_sources()
+        self._pick_keys["set_group"] = self._extractor.get_particle_set_group_names()
+        for keys in self._pick_keys.values():
+            for k in keys:
+                self._pick_list.addItem(k)
 
 
 class AtlasDisplay(QWidget):
