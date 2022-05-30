@@ -1,8 +1,8 @@
-from cryotrace.data_model.extract import Extractor
+from cryotrace.data_model.extract import DataAPI
 from cryotrace.gui.qt import App
 
 
 def run():
-    extractor = Extractor()
+    extractor = DataAPI()
     app = App(extractor)
     app.start()

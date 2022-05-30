@@ -9,11 +9,11 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QPushButton,
     QVBoxLayout,
-    QWidget,
 )
 
 from cryotrace.data_model import ParticleSet, ParticleSetLinker
-from cryotrace.data_model.extract import Extractor
+from cryotrace.data_model.extract import DataAPI
+from cryotrace.gui.qt.component_tab import ComponentTab
 from cryotrace.parsing.star import (
     get_column_data,
     get_columns,
@@ -40,9 +40,14 @@ def _string_to_glob(glob_string: str) -> Generator[Path, None, None]:
     return root_path.glob("/".join(split_string[end_index:]))
 
 
-class StarDataLoader(QWidget):
-    def __init__(self, extractor: Extractor, project_directory: Optional[Path] = None):
-        super().__init__()
+class StarDataLoader(ComponentTab):
+    def __init__(
+        self,
+        extractor: DataAPI,
+        project_directory: Optional[Path] = None,
+        refreshers: Optional[List[ComponentTab]] = None,
+    ):
+        super().__init__(refreshers=refreshers)
         self._extractor = extractor
         self.grid = QGridLayout()
         self.setLayout(self.grid)
@@ -121,8 +126,13 @@ class StarDataLoader(QWidget):
 
 
 class ExposureDataLoader(StarDataLoader):
-    def __init__(self, extractor: Extractor, project_directory: Optional[Path] = None):
-        super().__init__(extractor, project_directory)
+    def __init__(
+        self,
+        extractor: DataAPI,
+        project_directory: Optional[Path] = None,
+        refreshers: Optional[List[ComponentTab]] = None,
+    ):
+        super().__init__(extractor, project_directory, refreshers=refreshers)
         exposure_lbl = QLabel()
         exposure_lbl.setText("Micrograph identifier:")
 
@@ -171,11 +181,17 @@ class ExposureDataLoader(StarDataLoader):
                     self._insert_from_star_file(Path(sfp))
             else:
                 self._insert_from_star_file(Path(self._file_combo.currentText()))
+            self.refresh()
 
 
 class ParticleDataLoader(ExposureDataLoader):
-    def __init__(self, extractor: Extractor, project_directory: Optional[Path] = None):
-        super().__init__(extractor, project_directory)
+    def __init__(
+        self,
+        extractor: DataAPI,
+        project_directory: Optional[Path] = None,
+        refreshers: Optional[List[ComponentTab]] = None,
+    ):
+        super().__init__(extractor, project_directory, refreshers=refreshers)
 
         x_lbl = QLabel()
         x_lbl.setText("x coordinate identifier:")
@@ -245,7 +261,7 @@ class ParticleDataLoader(ExposureDataLoader):
                 source_set = ParticleSet(
                     group_name=str(star_file_path),
                     identifier=str(star_file_path),
-                    atlas_id=self._extractor._atlas_id,
+                    project_name=self._extractor._project,
                 )
                 self._extractor.put([source_set])
                 linkers = [
@@ -287,11 +303,17 @@ class ParticleDataLoader(ExposureDataLoader):
                 self._insert_from_star_file(
                     Path(self._file_combo.currentText()), just_particles=True
                 )
+        self.refresh()
 
 
 class ParticleSetDataLoader(ParticleDataLoader):
-    def __init__(self, extractor: Extractor, project_directory: Optional[Path] = None):
-        super().__init__(extractor, project_directory)
+    def __init__(
+        self,
+        extractor: DataAPI,
+        project_directory: Optional[Path] = None,
+        refreshers: Optional[List[ComponentTab]] = None,
+    ):
+        super().__init__(extractor, project_directory, refreshers=refreshers)
 
         self._group_name_box = QLineEdit()
         self.grid.addWidget(self._group_name_box, 5, 2)
@@ -511,3 +533,4 @@ class ParticleSetDataLoader(ParticleDataLoader):
                         self._insert_from_star_file(Path(sfp))
             else:
                 self._insert_from_star_file(Path(self._file_combo.currentText()))
+            self.refresh()

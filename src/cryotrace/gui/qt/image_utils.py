@@ -165,13 +165,26 @@ class ImageLabel(QLabel):
             )
 
             if self._image_values:
+                try:
+                    min_value = min(
+                        imv
+                        for imv in self._image_values + [self._value]
+                        if imv is not None
+                    )
+                # catch when an empty sequence is passed to min
+                except ValueError:
+                    return
                 shifted = [
-                    iv - min(self._image_values + [self._value])
+                    iv - min_value if iv is not None else None
                     for iv in self._image_values
                 ]
-                maxv = max(self._image_values + [self._value])
+                all_shifted = [
+                    iv - min_value if iv is not None else None
+                    for iv in self._image_values + [self._value]
+                ]
+                maxv = max(abs(imv) for imv in all_shifted if imv is not None)
                 if maxv:
-                    normalised = [s / maxv for s in shifted]
+                    normalised = [s / maxv if s is not None else None for s in shifted]
                 else:
                     normalised = shifted
             for i, im in enumerate(self._extra_images):
@@ -190,10 +203,8 @@ class ImageLabel(QLabel):
             pen.setWidth(3)
             painter.setPen(pen)
 
-            if self._value:
-                norm_value = (
-                    self._value - min(self._image_values + [self._value])
-                ) / max(self._image_values + [self._value])
+            if self._value is not None and self._image_values:
+                norm_value = (self._value - min_value) / maxv
             else:
                 norm_value = 0
 
