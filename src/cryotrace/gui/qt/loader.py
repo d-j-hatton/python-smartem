@@ -181,6 +181,7 @@ class ExposureDataLoader(StarDataLoader):
                     self._insert_from_star_file(Path(sfp))
             else:
                 self._insert_from_star_file(Path(self._file_combo.currentText()))
+            self.refresh()
 
 
 class ParticleDataLoader(ExposureDataLoader):
@@ -302,6 +303,7 @@ class ParticleDataLoader(ExposureDataLoader):
                 self._insert_from_star_file(
                     Path(self._file_combo.currentText()), just_particles=True
                 )
+        self.refresh()
 
 
 class ParticleSetDataLoader(ParticleDataLoader):
@@ -531,3 +533,4 @@ class ParticleSetDataLoader(ParticleDataLoader):
                         self._insert_from_star_file(Path(sfp))
             else:
                 self._insert_from_star_file(Path(self._file_combo.currentText()))
+            self.refresh()
