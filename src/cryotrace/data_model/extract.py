@@ -460,7 +460,9 @@ class DataAPI:
             .order_by(Particle.particle_id)
         )
         particle_set_query = (
-            self.session.query(ParticleSetInfo, ParticleSetLinker, Particle, Exposure)
+            self.session.query(
+                ParticleSetInfo, ParticleSetLinker, FoilHole, Particle, Exposure
+            )
             .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
             .join(Particle, Particle.exposure_name == Exposure.exposure_name)
             .join(
@@ -471,6 +473,69 @@ class DataAPI:
             )
             .filter(ParticleSetInfo.key.in_(particle_set_keys))
             .filter(FoilHole.grid_square_name == grid_square_name)
+            .order_by(Particle.particle_id)
+        )
+        info.extend(exposure_query.all())
+        info.extend(particle_query.all())
+        info.extend(particle_set_query.all())
+        return info
+
+    def get_atlas_info(
+        self,
+        atlas_id: int,
+        exposure_keys: List[str],
+        particle_keys: List[str],
+        particle_set_keys: List[str],
+        avg_particles: bool = False,
+    ) -> List[tuple]:
+        info: List[tuple] = []
+        if not any((exposure_keys, particle_keys, particle_set_keys)):
+            return info
+        exposure_query = (
+            self.session.query(ExposureInfo, FoilHole, GridSquare, Tile, Exposure)
+            .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
+            .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
+            .join(GridSquare, GridSquare.grid_square_name == FoilHole.grid_square_name)
+            .join(Tile, Tile.tile_id == GridSquare.tile_id)
+            .filter(ExposureInfo.key.in_(exposure_keys))
+            .filter(Tile.atlas_id == atlas_id)
+            .order_by(Exposure.exposure_name)
+        )
+        particle_query = (
+            self.session.query(
+                ParticleInfo, FoilHole, Particle, GridSquare, Tile, Exposure
+            )
+            .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
+            .join(Particle, Particle.exposure_name == Exposure.exposure_name)
+            .join(GridSquare, GridSquare.grid_square_name == FoilHole.grid_square_name)
+            .join(Tile, Tile.tile_id == GridSquare.tile_id)
+            .join(ParticleInfo, ParticleInfo.particle_id == Particle.particle_id)
+            .filter(ParticleInfo.key.in_(particle_keys))
+            .filter(Tile.atlas_id == atlas_id)
+            .order_by(Particle.particle_id)
+        )
+        particle_set_query = (
+            self.session.query(
+                ParticleSetInfo,
+                ParticleSetLinker,
+                FoilHole,
+                GridSquare,
+                Particle,
+                Tile,
+                Exposure,
+            )
+            .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
+            .join(GridSquare, GridSquare.grid_square_name == FoilHole.grid_square_name)
+            .join(Tile, Tile.tile_id == GridSquare.tile_id)
+            .join(Particle, Particle.exposure_name == Exposure.exposure_name)
+            .join(
+                ParticleSetLinker, ParticleSetLinker.particle_id == Particle.particle_id
+            )
+            .join(
+                ParticleSetInfo, ParticleSetInfo.set_name == ParticleSetLinker.set_name
+            )
+            .filter(ParticleSetInfo.key.in_(particle_set_keys))
+            .filter(Tile.atlas_id == atlas_id)
             .order_by(Particle.particle_id)
         )
         info.extend(exposure_query.all())
