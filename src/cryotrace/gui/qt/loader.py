@@ -114,7 +114,7 @@ class StarDataLoader(ComponentTab):
         for combo in column_combos:
             combo.clear()
             combo.addItem("")
-        for c in columns:
+        for c in set(columns):
             for combo in column_combos:
                 combo.addItem(c)
 
@@ -386,7 +386,7 @@ class ParticleSetDataLoader(ParticleDataLoader):
             columns = get_columns(star_file, ignore=["pipeline"])
             self._cross_ref_combo.clear()
             self._set_id_combo.clear()
-            for c in columns:
+            for c in set(columns):
                 self._cross_ref_combo.addItem(c)
                 self._set_id_combo.addItem(c)
 
@@ -397,6 +397,7 @@ class ParticleSetDataLoader(ParticleDataLoader):
         self, index: int, column_combos: Optional[List[QComboBox]] = None
     ):
         if self._cross_ref_file_combo.currentText():
+            self._cross_ref_combo.clear()
             super()._select_star_file(
                 index,
                 column_combos=column_combos
@@ -446,6 +447,13 @@ class ParticleSetDataLoader(ParticleDataLoader):
                     [self._cross_ref_combo.currentText(), self._set_id_tag],
                     "model_classes",
                 )
+                for v in cross_ref_column_data.values():
+                    for i, elem in enumerate(v):
+                        if "@" in elem:
+                            _elem = elem.split("@")[0]
+                            while _elem.startswith("0"):
+                                _elem = _elem[1:]
+                            v[i] = _elem
                 cross_ref_dict = {
                     k: v
                     for k, v in zip(
