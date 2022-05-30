@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
 
 from cryotrace.data_model import ParticleSet, ParticleSetLinker
 from cryotrace.data_model.extract import DataAPI
-from cryotrace.gui.qt import ComponentTab
+from cryotrace.gui.qt.component_tab import ComponentTab
 from cryotrace.parsing.star import (
     get_column_data,
     get_columns,

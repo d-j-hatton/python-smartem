@@ -165,9 +165,15 @@ class ImageLabel(QLabel):
             )
 
             if self._image_values:
-                min_value = min(
-                    imv for imv in self._image_values + [self._value] if imv is not None
-                )
+                try:
+                    min_value = min(
+                        imv
+                        for imv in self._image_values + [self._value]
+                        if imv is not None
+                    )
+                # catch when an empty sequence is passed to min
+                except ValueError:
+                    return
                 shifted = [
                     iv - min_value if iv is not None else None
                     for iv in self._image_values

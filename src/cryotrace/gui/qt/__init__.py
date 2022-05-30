@@ -35,6 +35,7 @@ from cryotrace.data_model.structure import (
     extract_keys,
     extract_keys_with_foil_hole_averages,
 )
+from cryotrace.gui.qt.component_tab import ComponentTab
 from cryotrace.gui.qt.image_utils import ImageLabel, ParticleImageLabel
 from cryotrace.gui.qt.loader import (
     ExposureDataLoader,
@@ -42,19 +43,6 @@ from cryotrace.gui.qt.loader import (
     ParticleSetDataLoader,
 )
 from cryotrace.parsing.epu import create_atlas_and_tiles, parse_epu_dir
-
-
-class ComponentTab(QWidget):
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-        if kwargs.get("refreshers"):
-            self._refreshers = kwargs["refreshers"]
-        else:
-            self._refreshers = []
-
-    def refresh(self):
-        for refr in self._refreshers:
-            refr.refresh()
 
 
 class App:
@@ -380,17 +368,22 @@ class MainDisplay(ComponentTab):
             grid_square_particles,
         )
 
-        self._select_square(self._square_combo.currentIndex())
-        self._select_foil_hole(self._foil_hole_combo.currentIndex())
-        self._select_exposure(self._exposure_combo.currentIndex())
-        if self._atlas_view:
-            self._atlas_view.load(
-                exposure_keys=self._exposure_keys,
-                particle_keys=self._particle_keys,
-                particle_set_keys=self._particle_set_keys,
-                grid_square=self._grid_squares[self._square_combo.currentIndex()],
-                all_grid_squares=self._grid_squares,
+        try:
+            self._draw_grid_square(
+                self._grid_squares[self._square_combo.currentIndex()],
+                foil_hole=self._foil_holes[self._foil_hole_combo.currentIndex()],
             )
+            self._draw_foil_hole(
+                self._foil_holes[self._foil_hole_combo.currentIndex()], flip=(-1, -1)
+            )
+            self._draw_exposure(
+                self._exposures[self._exposure_combo.currentIndex()], flip=(1, -1)
+            )
+        except IndexError:
+            self._draw_grid_square(
+                self._grid_squares[self._square_combo.currentIndex()]
+            )
+        self._update_grid_square_stats(self._data)
 
     def _select_square(self, index: int):
         try:
@@ -406,7 +399,7 @@ class MainDisplay(ComponentTab):
                 all_grid_squares=self._grid_squares,
             )
         if self._data:
-            self._update_grid_square_stats(self._data)
+            self._gather_data()
 
     def _select_foil_hole(self, index: int):
         try:
@@ -699,7 +692,7 @@ class MainDisplay(ComponentTab):
             self._exposure_combo.addItem(ex.exposure_name)
 
     def refresh(self):
-        super.refresh()
+        super().refresh()
         self._data_list.clear()
         self._pick_list.clear()
 
