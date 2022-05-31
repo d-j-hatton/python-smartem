@@ -43,6 +43,7 @@ from smartem.gui.qt.loader import (
     ParticleSetDataLoader,
 )
 from smartem.parsing.epu import create_atlas_and_tiles, parse_epu_dir
+from smartem.parsing.relion_default import gather_relion_defaults
 
 
 class App:
@@ -154,18 +155,24 @@ class ProjectLoader(ComponentTab):
         self._create_btn = QPushButton("Create")
         self._create_btn.clicked.connect(self._create_project)
         self.grid.addWidget(self._create_btn, 5, 2)
+        self._create_gather_btn = QPushButton("Create and load default data")
+        self._create_gather_btn.clicked.connect(self._create_and_gather)
+        self.grid.addWidget(self._create_gather_btn, 6, 2)
         self._button_check()
 
     def _button_check(self):
         if self._combo.currentText():
             self._load_btn.setEnabled(True)
             self._create_btn.setEnabled(False)
+            self._create_gather_btn.setEnabled(False)
         elif self._name_input.text() and self.atlas and self.epu_dir:
             self._load_btn.setEnabled(False)
             self._create_btn.setEnabled(True)
+            self._create_gather_btn.setEnabled(True)
         else:
             self._load_btn.setEnabled(False)
             self._create_btn.setEnabled(False)
+            self._create_gather_btn.setEnabled(False)
 
     def _select_project(self):
         if self._combo.currentText():
@@ -240,7 +247,11 @@ class ProjectLoader(ComponentTab):
             raise ValueError("Atlas record not found")
         self.refresh()
         self._update_loaders()
-        return
+
+    def _create_and_gather(self):
+        self._create_project()
+        gather_relion_defaults(Path(self.project_dir), self._extractor)
+        self.refresh()
 
     def refresh(self):
         super().refresh()

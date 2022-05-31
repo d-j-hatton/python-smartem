@@ -489,7 +489,7 @@ class ParticleSetDataLoader(ParticleDataLoader):
                         self._x_tag,
                         self._y_tag,
                         self._set_id_tag,
-                        self._cross_ref_combo.currentText(),
+                        # self._cross_ref_combo.currentText(),
                     ],
                     "particles",
                 )
