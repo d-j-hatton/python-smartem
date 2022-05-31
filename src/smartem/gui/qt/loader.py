@@ -98,7 +98,10 @@ class StarDataLoader(ComponentTab):
                 self._file_combo.addItem(str_sf)
 
     def _select_star_file(
-        self, index: int, column_combos: Optional[List[QComboBox]] = None
+        self,
+        index: int,
+        column_combos: Optional[List[QComboBox]] = None,
+        defaults: Optional[List[str]] = None,
     ):
         if "*" in self._file_combo.currentText():
             star_file_path = next(_string_to_glob(self._file_combo.currentText()))
@@ -116,8 +119,10 @@ class StarDataLoader(ComponentTab):
             combo.clear()
             combo.addItem("")
         for c in sorted(set(columns)):
-            for combo in column_combos:
+            for i, combo in enumerate(column_combos):
                 combo.addItem(c)
+                if defaults and c == defaults[i]:
+                    combo.setCurrentText(c)
 
     def _select_column(self, index: int):
         self._column = self._column_combo.currentText()
@@ -157,12 +162,16 @@ class ExposureDataLoader(StarDataLoader):
         self._exposure_tag = self._exposure_tag_combo.currentText()
 
     def _select_star_file(
-        self, index: int, column_combos: Optional[List[QComboBox]] = None
+        self,
+        index: int,
+        column_combos: Optional[List[QComboBox]] = None,
+        defaults: Optional[List[str]] = None,
     ):
         super()._select_star_file(
             index,
             column_combos=column_combos
             or [self._column_combo, self._exposure_tag_combo],
+            defaults=defaults or ["", "_rlnmicrographname"],
         )
 
     def _insert_from_star_file(self, star_file_path: Path):
@@ -179,7 +188,8 @@ class ExposureDataLoader(StarDataLoader):
         if self._exposure_tag and self._column:
             if "*" in self._file_combo.currentText():
                 for sfp in _string_to_glob(self._file_combo.currentText()):
-                    self._insert_from_star_file(Path(sfp))
+                    if not sfp.parent.is_symlink():
+                        self._insert_from_star_file(Path(sfp))
             else:
                 self._insert_from_star_file(Path(self._file_combo.currentText()))
             self.refresh()
@@ -227,7 +237,10 @@ class ParticleDataLoader(ExposureDataLoader):
         self._y_tag = self._y_tag_combo.currentText()
 
     def _select_star_file(
-        self, index: int, column_combos: Optional[List[QComboBox]] = None
+        self,
+        index: int,
+        column_combos: Optional[List[QComboBox]] = None,
+        defaults: Optional[List[str]] = None,
     ):
         super()._select_star_file(
             index,
@@ -238,6 +251,8 @@ class ParticleDataLoader(ExposureDataLoader):
                 self._x_tag_combo,
                 self._y_tag_combo,
             ],
+            defaults=defaults
+            or ["", "_rlnmicrographname", "_rlncoordinatex", "_rlncoordinatey"],
         )
 
     def _insert_from_star_file(
@@ -293,13 +308,15 @@ class ParticleDataLoader(ExposureDataLoader):
         if self._exposure_tag and self._x_tag and self._y_tag and self._column:
             if "*" in self._file_combo.currentText():
                 for sfp in _string_to_glob(self._file_combo.currentText()):
-                    self._insert_from_star_file(Path(sfp))
+                    if not sfp.parent.is_symlink():
+                        self._insert_from_star_file(Path(sfp))
             else:
                 self._insert_from_star_file(Path(self._file_combo.currentText()))
         elif self._exposure_tag and self._x_tag and self._y_tag:
             if "*" in self._file_combo.currentText():
                 for sfp in _string_to_glob(self._file_combo.currentText()):
-                    self._insert_from_star_file(Path(sfp), just_particles=True)
+                    if not sfp.parent.is_symlink():
+                        self._insert_from_star_file(Path(sfp), just_particles=True)
             else:
                 self._insert_from_star_file(
                     Path(self._file_combo.currentText()), just_particles=True
@@ -371,6 +388,7 @@ class ParticleSetDataLoader(ParticleDataLoader):
             if (
                 all(p not in str_sf for p in ("gui", "pipeline", "Nodes", "NODES"))
                 and "job" not in sf.name
+                and not sf.parent.is_symlink()
             ):
                 self._file_combo.addItem(str_sf)
                 self._cross_ref_file_combo.addItem(str_sf)
@@ -387,17 +405,20 @@ class ParticleSetDataLoader(ParticleDataLoader):
             columns = get_columns(star_file, ignore=["pipeline"])
             self._cross_ref_combo.clear()
             self._column_combo.clear()
-            # self._set_id_combo.clear()
             for c in sorted(set(columns)):
                 self._cross_ref_combo.addItem(c)
+                if c == "_rlnreferenceimage":
+                    self._cross_ref_combo.setCurrentText(c)
                 self._column_combo.addItem(c)
-                # self._set_id_combo.addItem(c)
 
     def _select_set_id_tag(self, index: int):
         self._set_id_tag = self._set_id_combo.currentText()
 
     def _select_star_file(
-        self, index: int, column_combos: Optional[List[QComboBox]] = None
+        self,
+        index: int,
+        column_combos: Optional[List[QComboBox]] = None,
+        defaults: Optional[List[str]] = None,
     ):
         if self._cross_ref_file_combo.currentText():
             self._cross_ref_combo.clear()
@@ -405,13 +426,32 @@ class ParticleSetDataLoader(ParticleDataLoader):
                 index,
                 column_combos=column_combos
                 or [
-                    # self._column_combo,
                     self._exposure_tag_combo,
                     self._x_tag_combo,
                     self._y_tag_combo,
                     self._set_id_combo,
                 ],
+                defaults=defaults
+                or [
+                    "_rlnmicrographname",
+                    "_rlncoordinatex",
+                    "_rlncoordinatey",
+                    "_rlnclassnumber",
+                ],
             )
+            star_file_path = Path(self._cross_ref_file_combo.currentText())
+            try:
+                star_file = open_star_file(star_file_path)
+            except (OSError, ValueError):
+                return
+            columns = get_columns(star_file, ignore=["pipeline"])
+            self._cross_ref_combo.clear()
+            self._column_combo.clear()
+            for c in sorted(set(columns)):
+                self._cross_ref_combo.addItem(c)
+                if c == "_rlnreferenceimage":
+                    self._cross_ref_combo.setCurrentText(c)
+                self._column_combo.addItem(c)
         else:
             super()._select_star_file(
                 index,
@@ -422,6 +462,14 @@ class ParticleSetDataLoader(ParticleDataLoader):
                     self._x_tag_combo,
                     self._y_tag_combo,
                     self._set_id_combo,
+                ],
+                defaults=defaults
+                or [
+                    "",
+                    "_rlnmicrographname",
+                    "_rlncoordinatex",
+                    "_rlncoordinatey",
+                    "_rlnclassnumber",
                 ],
             )
 
@@ -441,7 +489,6 @@ class ParticleSetDataLoader(ParticleDataLoader):
                         self._x_tag,
                         self._y_tag,
                         self._set_id_tag,
-                        # self._column,
                         self._cross_ref_combo.currentText(),
                     ],
                     "particles",
@@ -466,18 +513,6 @@ class ParticleSetDataLoader(ParticleDataLoader):
                     ):
                         if k01 == str(k02):
                             cross_ref_dict[i] = cross_ref_column_data[self._column][j]
-                # cross_ref_dict = {
-                #     k: v
-                #     for k, v in zip(
-                #         cross_ref_column_data[self._cross_ref_combo.currentText()],
-                #         cross_ref_column_data[self._set_id_tag],
-                #     )
-                # }
-                # column_data[self._set_id_tag] = [
-                #     cross_ref_dict[crf]
-                #     for crf in column_data[self._cross_ref_combo.currentText()]
-                # ]
-                # column_data.pop(self._cross_ref_combo.currentText())
                 column_data[self._column] = [
                     cross_ref_dict[i] for i in range(len(column_data[self._set_id_tag]))
                 ]
@@ -530,30 +565,33 @@ class ParticleSetDataLoader(ParticleDataLoader):
                 if "*" in self._cross_ref_file_combo.currentText():
                     split_file_name = self._file_combo.currentText().split("*")
                     for sfp in _string_to_glob(self._file_combo.currentText()):
-                        wildcard = (
-                            str(sfp)
-                            .replace(split_file_name[0], "")
-                            .replace(split_file_name[-1], "")
-                        )
-                        self._insert_from_star_file(
-                            sfp,
-                            cross_ref_file_path=Path(
-                                self._cross_ref_file_combo.currentText().replace(
-                                    "*", wildcard
-                                )
-                            ),
-                        )
+                        if not sfp.parent.is_symlink():
+                            wildcard = (
+                                str(sfp)
+                                .replace(split_file_name[0], "")
+                                .replace(split_file_name[-1], "")
+                            )
+                            self._insert_from_star_file(
+                                sfp,
+                                cross_ref_file_path=Path(
+                                    self._cross_ref_file_combo.currentText().replace(
+                                        "*", wildcard
+                                    )
+                                ),
+                            )
                 elif self._cross_ref_file_combo.currentText():
                     for sfp in _string_to_glob(self._file_combo.currentText()):
-                        self._insert_from_star_file(
-                            Path(sfp),
-                            cross_ref_file_path=Path(
-                                self._cross_ref_file_combo.currentText()
-                            ),
-                        )
+                        if not sfp.parent.is_symlink():
+                            self._insert_from_star_file(
+                                Path(sfp),
+                                cross_ref_file_path=Path(
+                                    self._cross_ref_file_combo.currentText()
+                                ),
+                            )
                 else:
                     for sfp in _string_to_glob(self._file_combo.currentText()):
-                        self._insert_from_star_file(Path(sfp))
+                        if not sfp.parent.is_symlink():
+                            self._insert_from_star_file(Path(sfp))
             elif self._cross_ref_file_combo.currentText():
                 self._insert_from_star_file(
                     Path(self._file_combo.currentText()),
