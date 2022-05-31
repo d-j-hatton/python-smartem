@@ -93,6 +93,7 @@ class StarDataLoader(ComponentTab):
             if (
                 all(p not in str_sf for p in ("gui", "pipeline", "Nodes", "NODES"))
                 and "job" not in sf.name
+                and not sf.parent.is_symlink()
             ):
                 self._file_combo.addItem(str_sf)
 
