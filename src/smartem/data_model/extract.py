@@ -3,7 +3,7 @@ from typing import Any, List, Optional, Sequence, Set, Tuple, Type, Union
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Load, load_only, sessionmaker
 
-from cryotrace.data_model import (
+from smartem.data_model import (
     Atlas,
     Base,
     Exposure,
@@ -19,7 +19,7 @@ from cryotrace.data_model import (
     Tile,
     url,
 )
-from cryotrace.data_model.construct import linear_joins, table_chain
+from smartem.data_model.construct import linear_joins, table_chain
 
 
 class DataAPI:

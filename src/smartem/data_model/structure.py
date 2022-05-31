@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple, Union
 
 import numpy as np
 
-from cryotrace.data_model import Base, Exposure, FoilHole, Particle
+from smartem.data_model import Base, Exposure, FoilHole, Particle
 
 
 def _particle_tab_index(tables: Tuple[Base], default: int = -2) -> int:
@@ -48,7 +48,6 @@ def extract_keys(
     use_particles = not bool(exposure_keys) and (
         bool(particle_keys) or bool(particle_set_keys)
     )
-    print(avg_particles, use_particles)
     flat_results = {}
     flat_counts = {}
     unused_indices: Dict[Union[int, str], List[bool]] = {}

@@ -3,8 +3,8 @@ from typing import Any, Dict
 
 import xmltodict
 
-from cryotrace.data_model import Atlas, Exposure, FoilHole, GridSquare, Tile
-from cryotrace.data_model.extract import DataAPI
+from smartem.data_model import Atlas, Exposure, FoilHole, GridSquare, Tile
+from smartem.data_model.extract import DataAPI
 
 
 def parse_epu_xml(xml_path: Path) -> Dict[str, Any]:

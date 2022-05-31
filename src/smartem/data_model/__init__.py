@@ -262,11 +262,11 @@ _tables: List[Type[Base]] = [
 
 def url(credentials_file: Optional[Union[str, Path]] = None) -> str:
     if not credentials_file:
-        credentials_file = os.getenv("CRYOTRACE_CREDENTIALS")
+        credentials_file = os.getenv("SMARTEM_CREDENTIALS")
 
     if not credentials_file:
         raise AttributeError(
-            "No credentials file specified for cryotrace database (environment variable CRYOTRACE_CREDENTIALS)"
+            "No credentials file specified for smartem database (environment variable SMARTEM_CREDENTIALS)"
         )
 
     with open(credentials_file, "r") as stream:
