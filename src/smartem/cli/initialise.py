@@ -92,3 +92,7 @@ def run():
         setup()
 
         subprocess.run(["pg_ctl", "-D", args.data_dir, "stop"])
+
+        print(
+            f"Run the following to setup database access credentials:\n export SMARTEM_CREDENTIALS={(Path(args.data_dir) / 'credentials.yaml').resolve()}"
+        )
