@@ -9,8 +9,8 @@ from PyQt5 import QtCore
 from PyQt5.QtGui import QBrush, QColor, QPainter, QPen
 from PyQt5.QtWidgets import QLabel
 
-from cryotrace.data_model import Atlas, Exposure, FoilHole, GridSquare, Particle, Tile
-from cryotrace.stage_model import find_point_pixel
+from smartem.data_model import Atlas, Exposure, FoilHole, GridSquare, Particle, Tile
+from smartem.stage_model import find_point_pixel
 
 
 def colour_gradient(value: float) -> str:

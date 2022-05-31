@@ -7,7 +7,7 @@ from pathlib import Path
 
 import yaml
 
-from cryotrace.data_model import setup
+from smartem.data_model import setup
 
 
 def run():
@@ -86,7 +86,7 @@ def run():
                 f"FATAL: smartem database was not created with return code {server_start.returncode}"
             )
 
-        os.environ["CRYOTRACE_CREDENTIALS"] = str(
+        os.environ["SMARTEM_CREDENTIALS"] = str(
             (Path(args.data_dir) / "credentials.yaml").resolve()
         )
         setup()

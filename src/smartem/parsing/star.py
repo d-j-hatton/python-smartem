@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 
 from gemmi import cif
 
-from cryotrace.data_model import (
+from smartem.data_model import (
     ExposureInfo,
     Particle,
     ParticleInfo,
@@ -13,7 +13,7 @@ from cryotrace.data_model import (
     ParticleSetInfo,
     ParticleSetLinker,
 )
-from cryotrace.data_model.extract import DataAPI
+from smartem.data_model.extract import DataAPI
 
 
 def open_star_file(star_file_path: Path):

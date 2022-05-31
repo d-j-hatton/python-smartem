@@ -27,22 +27,22 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-import cryotrace.gui
-from cryotrace.data_model import Atlas, Exposure, FoilHole, GridSquare, Project
-from cryotrace.data_model.extract import DataAPI
-from cryotrace.data_model.structure import (
+import smartem.gui
+from smartem.data_model import Atlas, Exposure, FoilHole, GridSquare, Project
+from smartem.data_model.extract import DataAPI
+from smartem.data_model.structure import (
     extract_keys,
     extract_keys_with_foil_hole_averages,
     extract_keys_with_grid_square_averages,
 )
-from cryotrace.gui.qt.component_tab import ComponentTab
-from cryotrace.gui.qt.image_utils import ImageLabel, ParticleImageLabel
-from cryotrace.gui.qt.loader import (
+from smartem.gui.qt.component_tab import ComponentTab
+from smartem.gui.qt.image_utils import ImageLabel, ParticleImageLabel
+from smartem.gui.qt.loader import (
     ExposureDataLoader,
     ParticleDataLoader,
     ParticleSetDataLoader,
 )
-from cryotrace.parsing.epu import create_atlas_and_tiles, parse_epu_dir
+from smartem.parsing.epu import create_atlas_and_tiles, parse_epu_dir
 
 
 class App:
@@ -50,7 +50,7 @@ class App:
         self.app = QApplication([])
         self.window = QtFrame(extractor)
         self.app.setStyleSheet(
-            importlib.resources.read_text(cryotrace.gui.qt, "qt_style.css")
+            importlib.resources.read_text(smartem.gui.qt, "qt_style.css")
         )
 
     def start(self):

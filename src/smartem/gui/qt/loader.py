@@ -11,10 +11,10 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
 )
 
-from cryotrace.data_model import ParticleSet, ParticleSetLinker
-from cryotrace.data_model.extract import DataAPI
-from cryotrace.gui.qt.component_tab import ComponentTab
-from cryotrace.parsing.star import (
+from smartem.data_model import ParticleSet, ParticleSetLinker
+from smartem.data_model.extract import DataAPI
+from smartem.gui.qt.component_tab import ComponentTab
+from smartem.parsing.star import (
     get_column_data,
     get_columns,
     insert_exposure_data,

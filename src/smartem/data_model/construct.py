@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional, Type
 
 from sqlalchemy.orm import Query, Session
 
-from cryotrace.data_model import Base, _tables
+from smartem.data_model import Base, _tables
 
 _tables_dict: Dict[str, Type[Base]] = {tab.__tablename__: tab for tab in _tables}  # type: ignore
 
