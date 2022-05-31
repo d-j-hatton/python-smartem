@@ -114,7 +114,7 @@ class StarDataLoader(ComponentTab):
         for combo in column_combos:
             combo.clear()
             combo.addItem("")
-        for c in set(columns):
+        for c in sorted(set(columns)):
             for combo in column_combos:
                 combo.addItem(c)
 
@@ -385,10 +385,12 @@ class ParticleSetDataLoader(ParticleDataLoader):
                 return
             columns = get_columns(star_file, ignore=["pipeline"])
             self._cross_ref_combo.clear()
-            self._set_id_combo.clear()
-            for c in set(columns):
+            self._column_combo.clear()
+            # self._set_id_combo.clear()
+            for c in sorted(set(columns)):
                 self._cross_ref_combo.addItem(c)
-                self._set_id_combo.addItem(c)
+                self._column_combo.addItem(c)
+                # self._set_id_combo.addItem(c)
 
     def _select_set_id_tag(self, index: int):
         self._set_id_tag = self._set_id_combo.currentText()
@@ -402,10 +404,11 @@ class ParticleSetDataLoader(ParticleDataLoader):
                 index,
                 column_combos=column_combos
                 or [
-                    self._column_combo,
+                    # self._column_combo,
                     self._exposure_tag_combo,
                     self._x_tag_combo,
                     self._y_tag_combo,
+                    self._set_id_combo,
                 ],
             )
         else:
@@ -436,7 +439,8 @@ class ParticleSetDataLoader(ParticleDataLoader):
                         self._exposure_tag,
                         self._x_tag,
                         self._y_tag,
-                        self._column,
+                        self._set_id_tag,
+                        # self._column,
                         self._cross_ref_combo.currentText(),
                     ],
                     "particles",
@@ -444,28 +448,38 @@ class ParticleSetDataLoader(ParticleDataLoader):
                 cross_ref_file = open_star_file(cross_ref_file_path)
                 cross_ref_column_data = get_column_data(
                     cross_ref_file,
-                    [self._cross_ref_combo.currentText(), self._set_id_tag],
+                    [self._cross_ref_combo.currentText(), self._column],
                     "model_classes",
                 )
                 for v in cross_ref_column_data.values():
                     for i, elem in enumerate(v):
-                        if "@" in elem:
+                        if isinstance(elem, str) and "@" in elem:
                             _elem = elem.split("@")[0]
                             while _elem.startswith("0"):
                                 _elem = _elem[1:]
                             v[i] = _elem
-                cross_ref_dict = {
-                    k: v
-                    for k, v in zip(
-                        cross_ref_column_data[self._cross_ref_combo.currentText()],
-                        cross_ref_column_data[self._set_id_tag],
-                    )
-                }
-                column_data[self._set_id_tag] = [
-                    cross_ref_dict[crf]
-                    for crf in column_data[self._cross_ref_combo.currentText()]
+                cross_ref_dict = {}
+                for i, k02 in enumerate(column_data[self._set_id_tag]):
+                    for j, k01 in enumerate(
+                        cross_ref_column_data[self._cross_ref_combo.currentText()]
+                    ):
+                        if k01 == str(k02):
+                            cross_ref_dict[i] = cross_ref_column_data[self._column][j]
+                # cross_ref_dict = {
+                #     k: v
+                #     for k, v in zip(
+                #         cross_ref_column_data[self._cross_ref_combo.currentText()],
+                #         cross_ref_column_data[self._set_id_tag],
+                #     )
+                # }
+                # column_data[self._set_id_tag] = [
+                #     cross_ref_dict[crf]
+                #     for crf in column_data[self._cross_ref_combo.currentText()]
+                # ]
+                # column_data.pop(self._cross_ref_combo.currentText())
+                column_data[self._column] = [
+                    cross_ref_dict[i] for i in range(len(column_data[self._set_id_tag]))
                 ]
-                column_data.pop(self._cross_ref_combo.currentText())
                 insert_particle_set(
                     column_data,
                     self._group_name_box.text(),
@@ -539,6 +553,11 @@ class ParticleSetDataLoader(ParticleDataLoader):
                 else:
                     for sfp in _string_to_glob(self._file_combo.currentText()):
                         self._insert_from_star_file(Path(sfp))
+            elif self._cross_ref_file_combo.currentText():
+                self._insert_from_star_file(
+                    Path(self._file_combo.currentText()),
+                    cross_ref_file_path=Path(self._cross_ref_file_combo.currentText()),
+                )
             else:
                 self._insert_from_star_file(Path(self._file_combo.currentText()))
             self.refresh()

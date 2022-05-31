@@ -1,3 +1,4 @@
+import math
 from itertools import cycle
 from typing import List, Optional, Tuple, Union
 
@@ -170,21 +171,36 @@ class ImageLabel(QLabel):
                         imv
                         for imv in self._image_values + [self._value]
                         if imv is not None
+                        and not math.isnan(imv)
+                        and not math.isinf(imv)
                     )
                 # catch when an empty sequence is passed to min
                 except ValueError:
                     return
                 shifted = [
-                    iv - min_value if iv is not None else None
+                    iv - min_value
+                    if iv is not None and not math.isnan(iv) and not math.isinf(iv)
+                    else None
                     for iv in self._image_values
                 ]
                 all_shifted = [
-                    iv - min_value if iv is not None else None
+                    iv - min_value
+                    if iv is not None and not math.isnan(iv) and not math.isinf(iv)
+                    else None
                     for iv in self._image_values + [self._value]
                 ]
-                maxv = max(abs(imv) for imv in all_shifted if imv is not None)
+                maxv = max(
+                    abs(imv)
+                    for imv in all_shifted
+                    if imv is not None and not math.isnan(imv) and not math.isinf(imv)
+                )
                 if maxv:
-                    normalised = [s / maxv if s is not None else None for s in shifted]
+                    normalised = [
+                        s / maxv
+                        if s is not None and not math.isnan(s) and not math.isinf(s)
+                        else None
+                        for s in shifted
+                    ]
                 else:
                     normalised = shifted
             for i, im in enumerate(self._extra_images):

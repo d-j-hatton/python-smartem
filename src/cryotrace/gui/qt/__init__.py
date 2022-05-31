@@ -520,7 +520,6 @@ class MainDisplay(ComponentTab):
             self._grid_square_stats_fig.axes.set_ylabel(labels[1])
         if len(stats.keys()) > 2:
             data = [list(v) for v in list(stats.values())]
-            # data = list(stats.values())
             for i, _ in enumerate(data):
                 data[i] = np.nan_to_num(_)
             corr = np.corrcoef(data)
@@ -555,7 +554,6 @@ class MainDisplay(ComponentTab):
             self._foil_hole_stats_fig.axes.set_ylabel(labels[1])
         if len(stats.keys()) > 2:
             data = [list(v) for v in list(stats.values())]
-            # corr = np.corrcoef(list(stats.values()))
             corr = np.corrcoef(data)
             mat = self._foil_hole_stats_fig.matshow(corr)
             self._fh_colour_bar = self._foil_hole_stats_fig.figure.colorbar(mat)

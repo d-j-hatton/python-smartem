@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Sequence, Tuple, Type, Union
+from typing import Any, List, Optional, Sequence, Set, Tuple, Type, Union
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Load, load_only, sessionmaker
@@ -256,6 +256,35 @@ class DataAPI:
                     return query.all()
             return [q[0] for q in query.all()]
         return []
+
+    def get_particle_sets(
+        self, group_name: str, set_ids: Union[Set[str], List[str]], source_name: str
+    ) -> List[ParticleSet]:
+        if not self._project:
+            return []
+        query = (
+            self.session.query(ParticleSet)
+            .filter(ParticleSet.project_name == self._project)
+            .filter(ParticleSet.group_name == group_name)
+            .filter(ParticleSet.identifier.in_([f"{source_name}:{s}" for s in set_ids]))
+        )
+        q = query.all()
+        return q
+
+    def get_particle_linkers(
+        self, set_ids: Union[Set[str], List[str]], source_name: str
+    ) -> List[ParticleSetLinker]:
+        if not self._project:
+            return []
+        query = (
+            self.session.query(ParticleSetLinker, ParticleSet)
+            .join(ParticleSet, ParticleSet.identifier == ParticleSetLinker.set_name)
+            .filter(ParticleSet.project_name == self._project)
+            .filter(
+                ParticleSetLinker.set_name.in_([f"{source_name}:{s}" for s in set_ids])
+            )
+        )
+        return [q[0] for q in query.all()]
 
     def get_exposure_keys(self) -> List[str]:
         if not self._project:

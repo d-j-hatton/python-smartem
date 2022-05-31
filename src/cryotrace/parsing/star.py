@@ -185,25 +185,33 @@ def insert_particle_set(
         if k and k not in (exposure_tag, x_tag, y_tag, set_id_tag)
     ]
     set_ids = set(data[set_id_tag])
-    if add_source_to_id:
-        particle_sets = [
-            ParticleSet(
-                group_name=set_name,
-                identifier=star_file_path + ":" + str(set_id),
-                project_name=extractor._project,
-            )
-            for set_id in set_ids
-        ]
+    _particle_sets = extractor.get_particle_sets(set_name, set_ids, star_file_path)
+    if not _particle_sets:
+        if add_source_to_id:
+            particle_sets = [
+                ParticleSet(
+                    group_name=set_name,
+                    identifier=star_file_path + ":" + str(set_id),
+                    project_name=extractor._project,
+                )
+                for set_id in set_ids
+            ]
+        else:
+            particle_sets = [
+                ParticleSet(
+                    group_name=set_name,
+                    identifier=str(set_id),
+                    project_name=extractor._project,
+                )
+                for set_id in set_ids
+            ]
+        extractor.put(particle_sets)
     else:
-        particle_sets = [
-            ParticleSet(
-                group_name=set_name,
-                identifier=str(set_id),
-                project_name=extractor._project,
-            )
-            for set_id in set_ids
-        ]
-    extractor.put(particle_sets)
+        particle_sets = []
+        for set_id in set_ids:
+            for ps in _particle_sets:
+                if ps.identifier == set_id:
+                    particle_sets.append(ps)
     exposures = [e.exposure_name for e in extractor.get_exposures()]
     structured_data = _structure_particle_data(
         data, exposures, exposure_tag, x_tag, y_tag
@@ -228,28 +236,29 @@ def insert_particle_set(
             particle_coords = {(p.x, p.y): p.particle_id for p in particles}
             for i, particle in enumerate(structured_data[exposure]["coordinates"]):
                 if particle_coords.get(particle):
-                    if add_source_to_id:
-                        linkers.append(
-                            ParticleSetLinker(
-                                set_name=star_file_path
-                                + ":"
-                                + str(
-                                    data[set_id_tag][
+                    if not _particle_sets:
+                        if add_source_to_id:
+                            linkers.append(
+                                ParticleSetLinker(
+                                    set_name=star_file_path
+                                    + ":"
+                                    + str(
+                                        data[set_id_tag][
+                                            structured_data[exposure]["indices"][i]
+                                        ]
+                                    ),
+                                    particle_id=particle_coords[particle],
+                                )
+                            )
+                        else:
+                            linkers.append(
+                                ParticleSetLinker(
+                                    set_name=data[set_id_tag][
                                         structured_data[exposure]["indices"][i]
-                                    ]
-                                ),
-                                particle_id=particle_coords[particle],
+                                    ],
+                                    particle_id=particle_coords[particle],
+                                )
                             )
-                        )
-                    else:
-                        linkers.append(
-                            ParticleSetLinker(
-                                set_name=data[set_id_tag][
-                                    structured_data[exposure]["indices"][i]
-                                ],
-                                particle_id=particle_coords[particle],
-                            )
-                        )
                 else:
                     new_particles.append(
                         Particle(x=particle[0], y=particle[1], exposure_name=exposure)
