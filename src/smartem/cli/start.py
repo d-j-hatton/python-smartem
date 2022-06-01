@@ -14,6 +14,12 @@ def run():
         help="Directory where database wil be initialised",
         dest="data_dir",
     )
+    parser.add_argument(
+        "--port",
+        help="Port the database server will serve, default is 5432",
+        dest="port",
+        default=5432,
+    )
     args = parser.parse_args()
 
     credentials_file = os.getenv("SMARTEM_CREDENTIALS")
@@ -28,6 +34,8 @@ def run():
     server_start = subprocess.run(
         [
             "pg_ctl",
+            "-o",
+            f'"-p {args.port}"',
             "-D",
             args.data_dir,
             "-l" f"{Path(args.data_dir) / 'logfile'}",

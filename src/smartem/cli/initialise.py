@@ -58,6 +58,8 @@ def run():
         server_start = subprocess.run(
             [
                 "pg_ctl",
+                "-o",
+                f'"-p {args.port}"',
                 "-D",
                 args.data_dir,
                 "-l" f"{Path(args.data_dir) / 'logfile'}",
