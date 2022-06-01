@@ -238,6 +238,7 @@ class ProjectLoader(ComponentTab):
                 "Project record not found despite having just been inserted"
             )
         parse_epu_dir(Path(self.epu_dir), self._extractor)
+        self._main_display._set_epu_directory(Path(self.epu_dir))
         self.refresh()
         self._update_loaders()
 
@@ -245,6 +246,7 @@ class ProjectLoader(ComponentTab):
         atlas_found = self._extractor.set_project(self._project_name)
         if not atlas_found:
             raise ValueError("Atlas record not found")
+        self._main_display._set_epu_directory(Path(self.epu_dir))
         self.refresh()
         self._update_loaders()
 
@@ -256,7 +258,7 @@ class ProjectLoader(ComponentTab):
     def refresh(self):
         super().refresh()
         self._main_display.load()
-        self._atlas_display.load()
+        self._atlas_display.load(Path(self.epu_dir))
 
 
 class MainDisplay(ComponentTab):
@@ -268,6 +270,7 @@ class MainDisplay(ComponentTab):
     ):
         super().__init__(refreshers=refreshers)
         self._extractor = extractor
+        self._epu_dir: Optional[Path] = None
         self._data: Dict[str, List[float]] = {}
         self._foil_hole_averages: Dict[str, float] = {}
         self._particle_data: Dict[str, List[float]] = {}
@@ -340,6 +343,9 @@ class MainDisplay(ComponentTab):
         self._update_fh_choices(self._grid_squares[0].grid_square_name)
         self.refresh()
 
+    def _set_epu_directory(self, epu_dir: Path):
+        self._epu_dir = epu_dir
+
     def _gather_atlas_data(self):
         _grid_square = self._grid_squares[self._square_combo.currentIndex()]
         _atlas = self._extractor.get_atlases()
@@ -359,10 +365,11 @@ class MainDisplay(ComponentTab):
             atlas_exposures,
             atlas_particles,
         )
-        if self._atlas_view:
+        if self._atlas_view and self._epu_dir:
             self._atlas_view._data = atlas_data
             self._atlas_view._grid_square_averages = grid_square_averages
             self._atlas_view.load(
+                self._epu_dir,
                 grid_square=_grid_square,
                 all_grid_squares=self._grid_squares,
                 data_changed=True,
@@ -477,8 +484,9 @@ class MainDisplay(ComponentTab):
         self.grid.addWidget(square_lbl, 1, 1)
         self._update_fh_choices(self._square_combo.currentText())
 
-        if self._atlas_view:
+        if self._atlas_view and self._epu_dir:
             self._atlas_view.load(
+                self._epu_dir,
                 grid_square=self._grid_squares[index],
                 all_grid_squares=self._grid_squares,
             )
@@ -615,10 +623,12 @@ class MainDisplay(ComponentTab):
         foil_hole: Optional[FoilHole] = None,
         flip: Tuple[int, int] = (1, 1),
     ) -> QLabel:
-        square_pixmap = QPixmap(grid_square.thumbnail)
+        if not self._epu_dir:
+            return
+        square_pixmap = QPixmap(str(self._epu_dir / grid_square.thumbnail))
         if flip != (1, 1):
             square_pixmap = square_pixmap.transformed(QTransform().scale(*flip))
-        if foil_hole:
+        if foil_hole and self._epu_dir:
             qsize = square_pixmap.size()
             imvs: Optional[list] = None
             _key = None
@@ -633,6 +643,7 @@ class MainDisplay(ComponentTab):
                 grid_square,
                 foil_hole,
                 (qsize.width(), qsize.height()),
+                self._epu_dir,
                 parent=self,
                 value=self._foil_hole_averages.get(foil_hole.foil_hole_name)
                 if _key
@@ -653,15 +664,18 @@ class MainDisplay(ComponentTab):
         exposure: Optional[Exposure] = None,
         flip: Tuple[int, int] = (1, 1),
     ) -> QLabel:
-        hole_pixmap = QPixmap(foil_hole.thumbnail)
+        if not self._epu_dir:
+            return
+        hole_pixmap = QPixmap(str(self._epu_dir / foil_hole.thumbnail))
         if flip != (1, 1):
             hole_pixmap = hole_pixmap.transformed(QTransform().scale(*flip))
-        if exposure:
+        if exposure and self._epu_dir:
             qsize = hole_pixmap.size()
             hole_lbl = ImageLabel(
                 foil_hole,
                 exposure,
                 (qsize.width(), qsize.height()),
+                self._epu_dir,
                 parent=self,
             )
             self.grid.addWidget(hole_lbl, 1, 2)
@@ -709,7 +723,9 @@ class MainDisplay(ComponentTab):
     def _draw_exposure(
         self, exposure: Exposure, flip: Tuple[int, int] = (1, 1)
     ) -> QLabel:
-        exposure_pixmap = QPixmap(exposure.thumbnail)
+        if not self._epu_dir:
+            return
+        exposure_pixmap = QPixmap(str(self._epu_dir / exposure.thumbnail))
         if flip != (1, 1):
             exposure_pixmap = exposure_pixmap.transformed(QTransform().scale(*flip))
         qsize = exposure_pixmap.size()
@@ -790,6 +806,7 @@ class AtlasDisplay(QWidget):
 
     def load(
         self,
+        epu_dir: Path,
         grid_square: Optional[GridSquare] = None,
         all_grid_squares: Optional[List[GridSquare]] = None,
         data_changed: bool = False,
@@ -799,7 +816,9 @@ class AtlasDisplay(QWidget):
         if data_changed:
             self._update_atlas_stats()
         atlas_lbl = self._draw_atlas(
-            grid_square=self._grid_square, all_grid_squares=self._all_grid_squares
+            epu_dir,
+            grid_square=self._grid_square,
+            all_grid_squares=self._all_grid_squares,
         )
         if atlas_lbl:
             vbox = QVBoxLayout()
@@ -807,7 +826,7 @@ class AtlasDisplay(QWidget):
             vbox.addStretch()
             self.grid.addLayout(vbox, 0, 0)
             if self._grid_square:
-                tile_lbl = self._draw_tile(self._grid_square)
+                tile_lbl = self._draw_tile(self._grid_square, epu_dir)
                 vbox = QVBoxLayout()
                 vbox.addWidget(tile_lbl)
                 vbox.addWidget(self._atlas_stats)
@@ -847,6 +866,7 @@ class AtlasDisplay(QWidget):
 
     def _draw_atlas(
         self,
+        epu_dir: Path,
         grid_square: Optional[GridSquare] = None,
         all_grid_squares: Optional[List[GridSquare]] = None,
         flip: Tuple[int, int] = (1, 1),
@@ -880,6 +900,7 @@ class AtlasDisplay(QWidget):
                     _atlas,
                     grid_square,
                     (qsize.width(), qsize.height()),
+                    epu_dir,
                     parent=self,
                     overwrite_readout=True,
                     value=self._grid_square_averages.get(grid_square.grid_square_name)
@@ -898,7 +919,7 @@ class AtlasDisplay(QWidget):
         return None
 
     def _draw_tile(
-        self, grid_square: GridSquare, flip: Tuple[int, int] = (1, 1)
+        self, grid_square: GridSquare, epu_dir: Path, flip: Tuple[int, int] = (1, 1)
     ) -> Optional[QLabel]:
         _tile = self._extractor.get_tile(
             (grid_square.stage_position_x, grid_square.stage_position_y)
@@ -909,7 +930,11 @@ class AtlasDisplay(QWidget):
                 tile_pixmap = tile_pixmap.transformed(QTransform().scale(*flip))
             qsize = tile_pixmap.size()
             tile_lbl = ImageLabel(
-                _tile, grid_square, (qsize.width(), qsize.height()), parent=self
+                _tile,
+                grid_square,
+                (qsize.width(), qsize.height()),
+                epu_dir,
+                parent=self,
             )
             tile_lbl.setPixmap(tile_pixmap)
             return tile_lbl

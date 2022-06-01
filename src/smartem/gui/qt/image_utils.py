@@ -1,5 +1,6 @@
 import math
 from itertools import cycle
+from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
 import matplotlib
@@ -84,6 +85,7 @@ class ImageLabel(QLabel):
         image: Union[Atlas, Tile, GridSquare, FoilHole, Exposure],
         contained_image: Optional[Union[GridSquare, FoilHole, Exposure]],
         image_size: Tuple[int, int],
+        image_directory: Path,
         overwrite_readout: bool = False,
         value: Optional[float] = None,
         extra_images: Optional[list] = None,
@@ -92,6 +94,7 @@ class ImageLabel(QLabel):
     ):
         super().__init__(**kwargs)
         self._image = image
+        self._image_directory = image_directory
         self._contained_image = contained_image
         self._extra_images = extra_images or []
         self._image_size = image_size
@@ -157,7 +160,9 @@ class ImageLabel(QLabel):
             pen.setWidth(3)
             painter.setPen(pen)
             if self._overwrite_readout:
-                with mrcfile.open(self._image.thumbnail.replace(".jpg", ".mrc")) as mrc:
+                with mrcfile.open(
+                    (self._image_directory / self._image.thumbnail).with_suffix(".mrc")
+                ) as mrc:
                     readout_area = mrc.data.shape
             else:
                 readout_area = (self._image.readout_area_x, self._image.readout_area_y)

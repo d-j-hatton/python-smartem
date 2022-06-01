@@ -48,6 +48,24 @@ class DataAPI:
             )
         return query.all()[0]
 
+    def update_project(
+        self,
+        project_name: str,
+        acquisition_directory: str = "",
+        processing_directory: str = "",
+    ):
+        updated_values = {}
+        if acquisition_directory:
+            updated_values["acquisition_directory"] = acquisition_directory
+        if processing_directory:
+            updated_values["processing_directory"] = processing_directory
+        if not updated_values:
+            return
+        self.session.query(Project).filter(Project.project_name == project_name).update(
+            updated_values
+        )
+        self.session.commit()
+
     def get_projects(self) -> List[str]:
         query = self.session.query(Project).options(load_only("project_name"))
         return [q.project_name for q in query.all()]
@@ -73,6 +91,17 @@ class DataAPI:
                 return atlases[0]
             return atlases
         return []
+
+    def update_atlas(self, atlas_id: int, thumbnail: str = ""):
+        updated_values = {}
+        if thumbnail:
+            updated_values["thumbnail"] = thumbnail
+        if not updated_values:
+            return
+        self.session.query(Atlas).filter(Atlas.atlas_id == atlas_id).update(
+            updated_values
+        )
+        self.session.commit()
 
     def get_tile(
         self, stage_position: Tuple[float, float], atlas_id: Optional[int] = None
