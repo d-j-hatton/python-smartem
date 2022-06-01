@@ -74,7 +74,7 @@ def parse_epu_dir(epu_path: Path, extractor: DataAPI):
                             grid_square_name=grid_square_dir.name,
                             stage_position_x=grid_square_data["stage_position"][0],
                             stage_position_y=grid_square_data["stage_position"][1],
-                            thumbnail=str(grid_square_jpeg),
+                            thumbnail=str(grid_square_jpeg.relative_to(epu_path)),
                             pixel_size=grid_square_data["pixel_size"],
                             readout_area_x=grid_square_data["readout_area"][0],
                             readout_area_y=grid_square_data["readout_area"][1],
@@ -86,16 +86,15 @@ def parse_epu_dir(epu_path: Path, extractor: DataAPI):
                 foil_hole_name = "_".join(foil_hole_jpeg.stem.split("_")[:2])
                 if foil_holes.get(foil_hole_name):
                     if (
-                        Path(foil_holes[foil_hole_name].thumbnail).stat().st_mtime
-                        > foil_hole_jpeg.stat().st_mtime
-                    ):
+                        epu_path / foil_holes[foil_hole_name].thumbnail
+                    ).stat().st_mtime > foil_hole_jpeg.stat().st_mtime:
                         continue
                 foil_hole_data = parse_epu_xml(foil_hole_jpeg.with_suffix(".xml"))
                 foil_holes[foil_hole_name] = FoilHole(
                     grid_square_name=grid_square_dir.name,
                     stage_position_x=foil_hole_data["stage_position"][0],
                     stage_position_y=foil_hole_data["stage_position"][1],
-                    thumbnail=str(foil_hole_jpeg),
+                    thumbnail=str(foil_hole_jpeg.relative_to(epu_path)),
                     pixel_size=foil_hole_data["pixel_size"],
                     readout_area_x=foil_hole_data["readout_area"][0],
                     readout_area_y=foil_hole_data["readout_area"][0],
@@ -115,7 +114,7 @@ def parse_epu_dir(epu_path: Path, extractor: DataAPI):
                     foil_hole_name=foil_hole_name,
                     stage_position_x=exposure_data["stage_position"][0],
                     stage_position_y=exposure_data["stage_position"][1],
-                    thumbnail=str(exposure_jpeg),
+                    thumbnail=str(exposure_jpeg.relative_to(epu_path)),
                     pixel_size=exposure_data["pixel_size"],
                     readout_area_x=exposure_data["readout_area"][0],
                     readout_area_y=exposure_data["readout_area"][1],
