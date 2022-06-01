@@ -45,7 +45,7 @@ class ParticleImageLabel(QLabel):
             coordinates[1] * 0.5 * (self._image_size[1] / self._image.readout_area_y)
             - diameter / 2
         )
-        painter.drawEllipse(x, y, diameter, diameter)
+        painter.drawEllipse(int(x), int(y), diameter, diameter)
 
     def paintEvent(self, e):
         super().paintEvent(e)
