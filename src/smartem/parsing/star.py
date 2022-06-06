@@ -54,7 +54,10 @@ def insert_exposure_data(
         if k != exposure_tag:
             for i, value in enumerate(v):
                 exposure_name = (
-                    Path(data[exposure_tag][i]).stem.replace("_fractions", "") + ".jpg"
+                    Path(data[exposure_tag][i])
+                    .stem.replace("_fractions", "")
+                    .replace("_Fractions", "")
+                    + ".jpg"
                 )
                 if validate:
                     if exposure_name in exposures:
