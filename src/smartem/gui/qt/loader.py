@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Generator, List, Optional
+from typing import Dict, Generator, List, Optional
 
 from PyQt5.QtWidgets import (
     QComboBox,
@@ -102,6 +102,7 @@ class StarDataLoader(ComponentTab):
         index: int,
         column_combos: Optional[List[QComboBox]] = None,
         defaults: Optional[List[str]] = None,
+        connections: Optional[Dict[str, str]] = None,
     ):
         if "*" in self._file_combo.currentText():
             star_file_path = next(_string_to_glob(self._file_combo.currentText()))
@@ -123,6 +124,8 @@ class StarDataLoader(ComponentTab):
                 combo.addItem(c)
                 if defaults and c == defaults[i]:
                     combo.setCurrentText(c)
+                    if connections and connections.get(defaults[i]):
+                        setattr(self, connections[defaults[i]], c)
 
     def _select_column(self, index: int):
         self._column = self._column_combo.currentText()
@@ -166,12 +169,14 @@ class ExposureDataLoader(StarDataLoader):
         index: int,
         column_combos: Optional[List[QComboBox]] = None,
         defaults: Optional[List[str]] = None,
+        connections: Optional[Dict[str, str]] = None,
     ):
         super()._select_star_file(
             index,
             column_combos=column_combos
             or [self._column_combo, self._exposure_tag_combo],
             defaults=defaults or ["", "_rlnmicrographname"],
+            connections=connections or {"_rlnmicrographname": "_exposure_tag"},
         )
 
     def _insert_from_star_file(self, star_file_path: Path):
@@ -246,6 +251,7 @@ class ParticleDataLoader(ExposureDataLoader):
         index: int,
         column_combos: Optional[List[QComboBox]] = None,
         defaults: Optional[List[str]] = None,
+        connections: Optional[Dict[str, str]] = None,
     ):
         super()._select_star_file(
             index,
@@ -258,6 +264,12 @@ class ParticleDataLoader(ExposureDataLoader):
             ],
             defaults=defaults
             or ["", "_rlnmicrographname", "_rlncoordinatex", "_rlncoordinatey"],
+            connections=connections
+            or {
+                "_rlnmicrographname": "_exposure_tag",
+                "_rlncoordinatex": "_x_tag",
+                "_rlncoordinatey": "_y_tag",
+            },
         )
 
     def _insert_from_star_file(
@@ -424,6 +436,7 @@ class ParticleSetDataLoader(ParticleDataLoader):
         index: int,
         column_combos: Optional[List[QComboBox]] = None,
         defaults: Optional[List[str]] = None,
+        connections: Optional[Dict[str, str]] = None,
     ):
         if self._cross_ref_file_combo.currentText():
             self._cross_ref_combo.clear()
@@ -443,6 +456,13 @@ class ParticleSetDataLoader(ParticleDataLoader):
                     "_rlncoordinatey",
                     "_rlnclassnumber",
                 ],
+                connections=connections
+                or {
+                    "_rlnmicrographname": "_exposure_tag",
+                    "_rlncoordinatex": "_x_tag",
+                    "_rlncoordinatey": "_y_tag",
+                    "_rlnclassnumber": "_set_id_tag",
+                },
             )
             star_file_path = Path(self._cross_ref_file_combo.currentText())
             try:
