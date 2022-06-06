@@ -185,12 +185,17 @@ class ExposureDataLoader(StarDataLoader):
             )
 
     def load(self):
-        if self._exposure_tag and self._column:
+        if (
+            self._exposure_tag or self._exposure_tag_combo.currentText()
+        ) and self._column:
+            if not self._exposure_tag:
+                self._exposure_tag = self._exposure_tag_combo.currentText()
             if "*" in self._file_combo.currentText():
                 for sfp in _string_to_glob(self._file_combo.currentText()):
                     if not sfp.parent.is_symlink():
                         self._insert_from_star_file(Path(sfp))
             else:
+                print("insert from", self._file_combo.currentText())
                 self._insert_from_star_file(Path(self._file_combo.currentText()))
             self.refresh()
 
