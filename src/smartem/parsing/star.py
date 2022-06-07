@@ -46,6 +46,7 @@ def insert_exposure_data(
     star_file_path: str,
     extractor: DataAPI,
     validate: bool = True,
+    extra_suffix: str = "",
 ):
     if validate:
         exposures = [e.exposure_name for e in extractor.get_exposures()]
@@ -57,6 +58,7 @@ def insert_exposure_data(
                     Path(data[exposure_tag][i])
                     .stem.replace("_fractions", "")
                     .replace("_Fractions", "")
+                    .replace(extra_suffix, "")
                     + ".jpg"
                 )
                 if validate:

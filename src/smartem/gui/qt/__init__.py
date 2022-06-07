@@ -43,6 +43,7 @@ from smartem.gui.qt.loader import (
     ParticleDataLoader,
     ParticleSetDataLoader,
 )
+from smartem.gui.qt.loader_csv import CSVDataLoader
 from smartem.parsing.epu import create_atlas_and_tiles, parse_epu_dir, parse_epu_version
 from smartem.parsing.relion_default import gather_relion_defaults
 
@@ -68,6 +69,7 @@ class QtFrame(QWidget):
         atlas_display = AtlasDisplay(extractor)
         main_display = MainDisplay(extractor, atlas_view=atlas_display)
         data_loader = ExposureDataLoader(extractor, refreshers=[main_display])
+        csv_data_loader = CSVDataLoader(extractor, refreshers=[main_display])
         particle_loader = ParticleDataLoader(extractor, refreshers=[main_display])
         particle_set_loader = ParticleSetDataLoader(
             extractor, refreshers=[main_display]
@@ -75,6 +77,7 @@ class QtFrame(QWidget):
         proj_loader = ProjectLoader(
             extractor,
             data_loader,
+            csv_data_loader,
             particle_loader,
             particle_set_loader,
             main_display,
@@ -82,6 +85,7 @@ class QtFrame(QWidget):
         )
         self.tabs.addTab(proj_loader, "Project")
         self.tabs.addTab(data_loader, "Load mic data")
+        self.tabs.addTab(csv_data_loader, "Load mic data (CSV)")
         self.tabs.addTab(particle_loader, "Load particle data")
         self.tabs.addTab(particle_set_loader, "Load particle set data")
         self.tabs.addTab(main_display, "Grid square view")
@@ -95,6 +99,7 @@ class ProjectLoader(ComponentTab):
         self,
         extractor: DataAPI,
         data_loader: ExposureDataLoader,
+        csv_data_loader: CSVDataLoader,
         particle_loader: ParticleDataLoader,
         particle_set_loader: ParticleSetDataLoader,
         main_display: MainDisplay,
@@ -104,6 +109,7 @@ class ProjectLoader(ComponentTab):
         super().__init__(refreshers=refreshers)
         self._extractor = extractor
         self._data_loader = data_loader
+        self._csv_data_loader = csv_data_loader
         self._particle_loader = particle_loader
         self._particle_set_loader = particle_set_loader
         self._main_display = main_display
@@ -218,6 +224,7 @@ class ProjectLoader(ComponentTab):
 
     def _update_loaders(self):
         self._data_loader._set_project_directory(Path(self.project_dir))
+        self._csv_data_loader._set_project_directory(Path(self.project_dir))
         self._particle_loader._set_project_directory(Path(self.project_dir))
         self._particle_set_loader._set_project_directory(Path(self.project_dir))
 
