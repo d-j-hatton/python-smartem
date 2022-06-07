@@ -68,17 +68,15 @@ class SmartEMDataLoader(DataLoader):
         return len(self._image_paths)
 
     def __getitem__(self, idx: int) -> Tuple[Tensor, List[float]]:
-        # ordered_labels = [
-        #     "_rlnaccummotiontotal",
-        #     "_rlnctfmaxresolution",
-        #     "_rlnestimatedresolution",
-        # ]
+        ordered_labels = [
+            "_rlnaccummotiontotal",
+            "_rlnctfmaxresolution",
+            "_rlnestimatedresolution",
+        ]
         if self._level == "grid_square":
             index_name = self._indexed[idx].grid_square_name  # type: ignore
         elif self._label == "foil_hole":
             index_name = self._indexed[idx].foil_hole_name  # type: ignore
         image = read_image(str(self._epu_dir / self._image_paths[index_name]))
-        labels = [
-            self._labels[index_name]
-        ]  # this needs changing so that we can get averages over all keys at once
+        labels = [self._labels[l][index_name] for l in ordered_labels]
         return image, labels
