@@ -706,7 +706,15 @@ class MainDisplay(ComponentTab):
     def _select_exposure(self, index: int):
         exposure_lbl = QLabel(self)
         try:
-            exposure_lbl = self._draw_exposure(self._exposures[index], flip=(1, -1))
+            _project = self._extractor.get_project()
+            _epu_version = _project.acquisition_software_version
+            if (
+                int(_epu_version.split(".")[0]) >= 2
+                and int(_epu_version.split(".")[1]) > 12
+            ):
+                exposure_lbl = self._draw_exposure(self._exposures[index], flip=(1, -1))
+            else:
+                exposure_lbl = self._draw_exposure(self._exposures[index], flip=(1, 1))
         except IndexError:
             return
         self.grid.addWidget(exposure_lbl, 1, 3)
