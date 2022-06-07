@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.resources
 
 import matplotlib
+import mrcfile
 
 matplotlib.use("Qt5Agg")
 from pathlib import Path
@@ -239,6 +240,7 @@ class ProjectLoader(ComponentTab):
             )
         parse_epu_dir(Path(self.epu_dir), self._extractor)
         self._main_display._set_epu_directory(Path(self.epu_dir))
+        self._main_display._set_data_size(Path(self.project_dir))
         self.refresh()
         self._update_loaders()
 
@@ -247,6 +249,7 @@ class ProjectLoader(ComponentTab):
         if not atlas_found:
             raise ValueError("Atlas record not found")
         self._main_display._set_epu_directory(Path(self.epu_dir))
+        self._main_display._set_data_size(Path(self.project_dir))
         self.refresh()
         self._update_loaders()
 
@@ -271,6 +274,7 @@ class MainDisplay(ComponentTab):
         super().__init__(refreshers=refreshers)
         self._extractor = extractor
         self._epu_dir: Optional[Path] = None
+        self._data_size: Optional[Tuple[int, int]] = None
         self._data: Dict[str, List[float]] = {}
         self._foil_hole_averages: Dict[str, float] = {}
         self._particle_data: Dict[str, List[float]] = {}
@@ -345,6 +349,15 @@ class MainDisplay(ComponentTab):
 
     def _set_epu_directory(self, epu_dir: Path):
         self._epu_dir = epu_dir
+
+    def _set_data_size(self, project_dir: Path):
+        try:
+            mcdir = project_dir / "MotionCorr" / "job002" / "Movies"
+            first_mrc = next(iter(mcdir.glob("**/*.mrc")))
+            with mrcfile.open(first_mrc) as mrc:
+                self._data_size = mrc.data.shape
+        except Exception:
+            return
 
     def _gather_atlas_data(self):
         _grid_square = self._grid_squares[self._square_combo.currentIndex()]
@@ -746,8 +759,17 @@ class MainDisplay(ComponentTab):
             particles = [
                 self._extractor.get_particles(exposure_name=exposure.exposure_name)
             ]
+        with mrcfile.open(
+            (self._epu_dir / exposure.thumbnail).with_suffix(".mrc")
+        ) as mrc:
+            thumbnail_size = mrc.data.shape
         exposure_lbl = ParticleImageLabel(
-            exposure, particles, (qsize.width(), qsize.height())
+            exposure,
+            particles,
+            (qsize.width(), qsize.height()),
+            image_scale=0.5
+            if self._data_size is None
+            else thumbnail_size[0] / self._data_size[0],
         )
         self.grid.addWidget(exposure_lbl, 1, 3)
         exposure_lbl.setPixmap(exposure_pixmap)

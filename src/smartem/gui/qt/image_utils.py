@@ -28,22 +28,28 @@ class ParticleImageLabel(QLabel):
         image: Exposure,
         particles: Union[List[Particle], List[List[Particle]]],
         image_size: Tuple[int, int],
+        image_scale: float = 0.5,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self._image = image
         self._image_size = image_size
         self._particles = particles
+        self._image_scale = image_scale
 
     def draw_circle(
         self, coordinates: Tuple[float, float], diameter: int, painter: QPainter
     ):
         x = (
-            coordinates[0] * 0.5 * (self._image_size[0] / self._image.readout_area_x)
+            coordinates[0]
+            * self._image_scale
+            * (self._image_size[0] / self._image.readout_area_x)
             - diameter / 2
         )
         y = (
-            coordinates[1] * 0.5 * (self._image_size[1] / self._image.readout_area_y)
+            coordinates[1]
+            * self._image_scale
+            * (self._image_size[1] / self._image.readout_area_y)
             - diameter / 2
         )
         painter.drawEllipse(int(x), int(y), diameter, diameter)
