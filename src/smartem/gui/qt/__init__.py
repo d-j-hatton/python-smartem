@@ -43,7 +43,7 @@ from smartem.gui.qt.loader import (
     ParticleDataLoader,
     ParticleSetDataLoader,
 )
-from smartem.parsing.epu import create_atlas_and_tiles, parse_epu_dir
+from smartem.parsing.epu import create_atlas_and_tiles, parse_epu_dir, parse_epu_version
 from smartem.parsing.relion_default import gather_relion_defaults
 
 
@@ -226,11 +226,14 @@ class ProjectLoader(ComponentTab):
         found = self._extractor.set_project(self._project_name)
         if not found:
             _atlas_id = create_atlas_and_tiles(Path(self.atlas), self._extractor)
+            software, version = parse_epu_version(Path(self.epu_dir))
             proj = Project(
                 atlas_id=_atlas_id,
                 acquisition_directory=self.epu_dir,
                 project_name=self._project_name,
                 processing_directory=self.project_dir,
+                acquisition_software=software,
+                acquisition_software_version=version,
             )
             self._extractor.put([proj])
         atlas_found = self._extractor.set_project(self._project_name)

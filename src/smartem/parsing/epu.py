@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 import xmltodict
 
@@ -22,6 +22,19 @@ def parse_epu_xml(xml_path: Path) -> Dict[str, Any]:
         "pixel_size": float(data["SpatialScale"]["pixelSize"]["x"]["numericValue"])
         * 1e9,
         "readout_area": (int(readout_area["a:width"]), int(readout_area["a:height"])),
+    }
+
+
+def parse_epu_xml_version(xml_path: Path) -> Dict[str, Any]:
+    with open(xml_path, "r") as xml:
+        for_parsing = xml.read()
+        data = xmltodict.parse(for_parsing)
+    data = data["MicroscopeImage"]
+    software = data["microscopeData"]["core"]["ApplicationSoftware"]
+    version = data["microscopeData"]["core"]["ApplicationSoftwareVersion"]
+    return {
+        "software": software,
+        "version": version,
     }
 
 
@@ -57,6 +70,12 @@ def create_atlas_and_tiles(atlas_image: Path, extractor: DataAPI) -> int:
         )
     extractor.put(tiles)
     return atlas_id
+
+
+def parse_epu_version(epu_path: Path) -> Tuple[str, str]:
+    xml_glob = iter(epu_path.glob("GridSquare*/*.xml"))
+    res = parse_epu_xml_version(next(xml_glob))
+    return (res["software"], res["version"])
 
 
 def parse_epu_dir(epu_path: Path, extractor: DataAPI):
