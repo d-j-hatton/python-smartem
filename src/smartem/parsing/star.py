@@ -91,7 +91,12 @@ def _structure_particle_data(
 ) -> Dict[str, Dict[str, list]]:
     structured_data: Dict[str, Dict[str, list]] = {}
     for i, micrograph_path in enumerate(data[exposure_tag]):
-        exposure_name = Path(micrograph_path).stem.replace("_fractions", "") + ".jpg"
+        exposure_name = (
+            Path(micrograph_path)
+            .stem.replace("_fractions", "")
+            .replace("_Fractions", "")
+            + ".jpg"
+        )
         if exposure_name in exposures:
             try:
                 structured_data[exposure_name]["coordinates"].append(
