@@ -276,7 +276,7 @@ class MainDisplay(ComponentTab):
         self._epu_dir: Optional[Path] = None
         self._data_size: Optional[Tuple[int, int]] = None
         self._data: Dict[str, List[float]] = {}
-        self._foil_hole_averages: Dict[str, float] = {}
+        self._foil_hole_averages: Dict[str, Dict[str, float]] = {}
         self._particle_data: Dict[str, List[float]] = {}
         self._exposure_keys: List[str] = []
         self._particle_keys: List[str] = []
@@ -648,7 +648,7 @@ class MainDisplay(ComponentTab):
             if len(self._data.keys()) == 1:
                 _key = list(self._data.keys())[0]
                 imvs = [
-                    self._foil_hole_averages.get(fh.foil_hole_name)
+                    list(self._foil_hole_averages.values())[0].get(fh.foil_hole_name)
                     for fh in self._foil_holes
                     if fh != foil_hole
                 ]
@@ -658,7 +658,9 @@ class MainDisplay(ComponentTab):
                 (qsize.width(), qsize.height()),
                 self._epu_dir,
                 parent=self,
-                value=self._foil_hole_averages.get(foil_hole.foil_hole_name)
+                value=list(self._foil_hole_averages.values())[0].get(
+                    foil_hole.foil_hole_name
+                )
                 if _key
                 else None,
                 extra_images=[fh for fh in self._foil_holes if fh != foil_hole],
@@ -820,7 +822,7 @@ class AtlasDisplay(QWidget):
         self._atlas_stats_fig.set_facecolor("silver")
         self._atlas_stats = FigureCanvasQTAgg(atlas_fig)
         self._data: Dict[str, List[float]] = {}
-        self._grid_square_averages: Dict[str, float] = {}
+        self._grid_square_averages: Dict[str, Dict[str, float]] = {}
         self._particle_data: Dict[str, List[float]] = {}
         self._colour_bar = None
         self._grid_square: Optional[GridSquare] = None
@@ -912,7 +914,9 @@ class AtlasDisplay(QWidget):
                     and len(self._data.keys()) == 1
                 ):
                     imvs = [
-                        self._grid_square_averages.get(gs.grid_square_name)
+                        list(self._grid_square_averages.values())[0].get(
+                            gs.grid_square_name
+                        )
                         for gs in all_grid_squares
                         if gs != grid_square
                     ]
@@ -925,7 +929,9 @@ class AtlasDisplay(QWidget):
                     epu_dir,
                     parent=self,
                     overwrite_readout=True,
-                    value=self._grid_square_averages.get(grid_square.grid_square_name)
+                    value=list(self._grid_square_averages.values())[0].get(
+                        grid_square.grid_square_name
+                    )
                     if imvs
                     else None,
                     extra_images=[gs for gs in all_grid_squares if gs != grid_square]

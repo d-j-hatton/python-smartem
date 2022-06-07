@@ -452,7 +452,6 @@ class DataAPI:
         exposure_keys: List[str],
         particle_keys: List[str],
         particle_set_keys: List[str],
-        avg_particles: bool = False,
     ) -> List[tuple]:
         info: List[tuple] = []
         if not any((exposure_keys, particle_keys, particle_set_keys)):
@@ -495,7 +494,6 @@ class DataAPI:
         exposure_keys: List[str],
         particle_keys: List[str],
         particle_set_keys: List[str],
-        avg_particles: bool = False,
     ) -> List[tuple]:
         info: List[tuple] = []
         if not any((exposure_keys, particle_keys, particle_set_keys)):
@@ -544,7 +542,6 @@ class DataAPI:
         exposure_keys: List[str],
         particle_keys: List[str],
         particle_set_keys: List[str],
-        avg_particles: bool = False,
     ) -> List[tuple]:
         info: List[tuple] = []
         if not any((exposure_keys, particle_keys, particle_set_keys)):

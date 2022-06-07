@@ -112,7 +112,7 @@ def extract_keys_with_foil_hole_averages(
     particle_set_keys: List[str],
     exposures: List[Exposure],
     particles: List[Particle],
-) -> Tuple[Dict[str, List[float]], Dict[str, float]]:
+) -> Tuple[Dict[str, List[float]], Dict[str, Dict[str, float]]]:
     keys = exposure_keys + particle_keys + particle_set_keys
     avg_particles = bool(exposure_keys) and (
         bool(particle_keys) or bool(particle_set_keys)
@@ -124,8 +124,8 @@ def extract_keys_with_foil_hole_averages(
     flat_counts = {}
     unused_indices: Dict[Union[int, str], List[bool]] = {}
     indices: Dict[Union[int, str], int] = {}
-    foil_hole_sums: Dict[str, float] = {}
-    foil_hole_counts: Dict[str, int] = {}
+    foil_hole_sums: Dict[str, Dict[str, float]] = {}
+    foil_hole_counts: Dict[str, Dict[str, int]] = {}
     if use_particles:
         for i, p in enumerate(particles):
             unused_indices[p.particle_id] = [False for _ in keys]
@@ -135,6 +135,8 @@ def extract_keys_with_foil_hole_averages(
             unused_indices[exp.exposure_name] = [False for _ in keys]
             indices[exp.exposure_name] = i
     for key in keys:
+        foil_hole_sums[key] = {}
+        foil_hole_counts[key] = {}
         if use_particles:
             flat_results[key] = np.full(len(particles), None)
         elif avg_particles:
@@ -167,15 +169,22 @@ def extract_keys_with_foil_hole_averages(
                 ] = True
         try:
             if not math.isinf(sr[0].value):
-                foil_hole_sums[sr[exposure_tab_index].foil_hole_name] += sr[0].value
-                foil_hole_counts[sr[exposure_tab_index].foil_hole_name] += 1
+                foil_hole_sums[sr[0].key][sr[exposure_tab_index].foil_hole_name] += sr[
+                    0
+                ].value
+                foil_hole_counts[sr[0].key][sr[exposure_tab_index].foil_hole_name] += 1
         except KeyError:
             if not math.isinf(sr[0].value):
-                foil_hole_sums[sr[exposure_tab_index].foil_hole_name] = sr[0].value
-                foil_hole_counts[sr[exposure_tab_index].foil_hole_name] = 1
-    foil_hole_averages = {
-        fh: foil_hole_sums[fh] / foil_hole_counts[fh] for fh in foil_hole_sums.keys()
-    }
+                foil_hole_sums[sr[0].key][sr[exposure_tab_index].foil_hole_name] = sr[
+                    0
+                ].value
+                foil_hole_counts[sr[0].key][sr[exposure_tab_index].foil_hole_name] = 1
+    foil_hole_averages = {}
+    for k in keys:
+        foil_hole_averages[k] = {
+            fh: foil_hole_sums[k][fh] / foil_hole_counts[k][fh]
+            for fh in foil_hole_sums[k].keys()
+        }
     collated_unused_indices = [k for k, v in unused_indices.items() if not all(v)]
     indices_for_deletion = [indices[i] for i in collated_unused_indices]
     for key in keys:
@@ -195,7 +204,7 @@ def extract_keys_with_grid_square_averages(
     particle_set_keys: List[str],
     exposures: List[Exposure],
     particles: List[Particle],
-) -> Tuple[Dict[str, List[float]], Dict[str, float]]:
+) -> Tuple[Dict[str, List[float]], Dict[str, Dict[str, float]]]:
     keys = exposure_keys + particle_keys + particle_set_keys
     avg_particles = bool(exposure_keys) and (
         bool(particle_keys) or bool(particle_set_keys)
@@ -207,8 +216,8 @@ def extract_keys_with_grid_square_averages(
     flat_counts = {}
     unused_indices: Dict[Union[int, str], List[bool]] = {}
     indices: Dict[Union[int, str], int] = {}
-    grid_square_sums: Dict[str, float] = {}
-    grid_square_counts: Dict[str, int] = {}
+    grid_square_sums: Dict[str, Dict[str, float]] = {}
+    grid_square_counts: Dict[str, Dict[str, int]] = {}
     if use_particles:
         for i, p in enumerate(particles):
             unused_indices[p.particle_id] = [False for _ in keys]
@@ -218,6 +227,8 @@ def extract_keys_with_grid_square_averages(
             unused_indices[exp.exposure_name] = [False for _ in keys]
             indices[exp.exposure_name] = i
     for key in keys:
+        grid_square_counts[key] = {}
+        grid_square_sums[key] = {}
         if use_particles:
             flat_results[key] = np.full(len(particles), None)
         elif avg_particles:
@@ -251,18 +262,26 @@ def extract_keys_with_grid_square_averages(
                 ] = True
         try:
             if not math.isinf(sr[0].value):
-                grid_square_sums[sr[foil_hole_tab_index].grid_square_name] += sr[
-                    0
-                ].value
-                grid_square_counts[sr[foil_hole_tab_index].grid_square_name] += 1
+                grid_square_sums[sr[0].key][
+                    sr[foil_hole_tab_index].grid_square_name
+                ] += sr[0].value
+                grid_square_counts[sr[0].key][
+                    sr[foil_hole_tab_index].grid_square_name
+                ] += 1
         except KeyError:
             if not math.isinf(sr[0].value):
-                grid_square_sums[sr[foil_hole_tab_index].grid_square_name] = sr[0].value
-                grid_square_counts[sr[foil_hole_tab_index].grid_square_name] = 1
-    grid_square_averages = {
-        gs: grid_square_sums[gs] / grid_square_counts[gs]
-        for gs in grid_square_sums.keys()
-    }
+                grid_square_sums[sr[0].key][
+                    sr[foil_hole_tab_index].grid_square_name
+                ] = sr[0].value
+                grid_square_counts[sr[0].key][
+                    sr[foil_hole_tab_index].grid_square_name
+                ] = 1
+    grid_square_averages = {}
+    for k in keys:
+        grid_square_averages[k] = {
+            gs: grid_square_sums[k][gs] / grid_square_counts[k][gs]
+            for gs in grid_square_sums[k].keys()
+        }
     collated_unused_indices = [k for k, v in unused_indices.items() if not all(v)]
     indices_for_deletion = [indices[i] for i in collated_unused_indices]
     for key in keys:
