@@ -280,7 +280,11 @@ def insert_particle_set(
 
         for exposure in exposures:
             if structured_data.get(exposure):
-                particle_coords = {(p.x, p.y): p.particle_id for p in new_particles}
+                particle_coords = {
+                    (p.x, p.y): p.particle_id
+                    for p in new_particles
+                    if p.exposure_name == exposure
+                }
                 for i, particle in enumerate(structured_data[exposure]["coordinates"]):
                     if particle_coords.get(particle):
                         if add_source_to_id:
