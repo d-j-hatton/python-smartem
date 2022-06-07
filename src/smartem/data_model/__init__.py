@@ -69,6 +69,16 @@ class Project(Base):
         nullable=False,
     )
 
+    acquisition_software = Column(
+        String,
+        nullable=False,
+    )
+
+    acquisition_software_version = Column(
+        String,
+        nullable=False,
+    )
+
     processing_directory = Column(String)
 
     atlas_id: Column = Column(ForeignKey("Atlas.atlas_id"), index=True)
