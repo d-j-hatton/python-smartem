@@ -1,7 +1,9 @@
 from pathlib import Path
 from typing import List, Sequence, Tuple
 
-from torch import Tensor
+import mrcfile
+import numpy as np
+from torch import Tensor, reshape
 from torch.utils.data import DataLoader
 from torchvision.io import read_image
 
@@ -11,6 +13,17 @@ from smartem.data_model.structure import (
     extract_keys_with_foil_hole_averages,
     extract_keys_with_grid_square_averages,
 )
+
+
+def mrc_to_tensor(mrc_file: Path) -> Tensor:
+    with mrcfile.open(mrc_file) as mrc:
+        data = mrc.data
+    shape = data.shape
+    if data.dtype.char in np.typecodes["AllInteger"]:
+        tensor_2d = Tensor(data.astype(np.int16))
+    else:
+        tensor_2d = Tensor(data.astype(np.float16))
+    return reshape(tensor_2d, (1, shape[0], shape[1]))
 
 
 class SmartEMDataLoader(DataLoader):
@@ -77,6 +90,11 @@ class SmartEMDataLoader(DataLoader):
             index_name = self._indexed[idx].grid_square_name  # type: ignore
         elif self._label == "foil_hole":
             index_name = self._indexed[idx].foil_hole_name  # type: ignore
-        image = read_image(str(self._epu_dir / self._image_paths[index_name]))
+        if self._mrc:
+            image = mrc_to_tensor(
+                (self._epu_dir / self._image_paths[index_name]).with_suffix(".mrc")
+            )
+        else:
+            image = read_image(str(self._epu_dir / self._image_paths[index_name]))
         labels = [self._labels[l][index_name] for l in ordered_labels]
         return image, labels
