@@ -3,6 +3,7 @@ from typing import List, Sequence, Tuple
 
 import mrcfile
 import numpy as np
+import pandas as pd
 from torch import Tensor, reshape
 from torch.utils.data import DataLoader
 from torchvision.io import read_image
@@ -97,4 +98,39 @@ class SmartEMDataLoader(DataLoader):
         else:
             image = read_image(str(self._epu_dir / self._image_paths[index_name]))
         labels = [self._labels[l][index_name] for l in ordered_labels]
+        return image, labels
+
+
+class SmartEMDiskDataLoader(DataLoader):
+    def __init__(
+        self,
+        level: str,
+        data_dir: Path,
+        mrc: bool = False,
+        labels_csv: str = "labels.csv",
+    ):
+        self._level = level
+        self._data_dir = data_dir
+        self._mrc = mrc
+        if self._level not in ("grid_square", "foil_hole"):
+            raise ValueError(
+                f"Unrecognised SmartEMDataLoader level {self._level}: accepted values are grid_sqaure or foil_hole"
+            )
+        self._df = pd.read_csv(self._data_dir / labels_csv)
+
+    def __len__(self) -> int:
+        return self._df[self._level].nunique()
+
+    def __getitem__(self, idx: int) -> Tuple[Tensor, List[float]]:
+        if self._mrc:
+            image = mrc_to_tensor(
+                (self._data_dir / self._df.iloc[idx][self._level]).with_suffix(".mrc")
+            )
+        else:
+            image = read_image(str(self._data_dir / self._df.iloc[idx][self._level]))
+        if self._level == "grid_square":
+            averaged_df = self._df.groupby("grid_square").mean()
+            labels = averaged_df.iloc[idx, 1:].to_list()
+        else:
+            labels = self._df.iloc[idx, 2:].to_list()
         return image, labels

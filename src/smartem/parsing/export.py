@@ -86,4 +86,4 @@ def export_foil_holes(data_api: DataAPI, out_dir: Path, project: str = ""):
             )
 
     df = DataFrame.from_dict(data)
-    df.to_csv(out_dir / "labels.csv")
+    df.to_csv(out_dir / "labels.csv", index=False)
