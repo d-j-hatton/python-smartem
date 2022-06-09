@@ -130,7 +130,7 @@ class SmartEMDiskDataLoader(DataLoader):
             image = read_image(str(self._data_dir / self._df.iloc[idx][self._level]))
         if self._level == "grid_square":
             averaged_df = self._df.groupby("grid_square").mean()
-            labels = averaged_df.iloc[idx, 1:].to_list()
+            labels = averaged_df.iloc[idx].to_list()
         else:
             labels = self._df.iloc[idx, 2:].to_list()
         return image, labels
