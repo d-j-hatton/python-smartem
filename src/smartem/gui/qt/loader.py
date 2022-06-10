@@ -36,7 +36,6 @@ def _string_to_glob(glob_string: str) -> Generator[Path, None, None]:
         else:
             end_index = i
             break
-    print(root_path, "/".join(split_string[end_index:]))
     return root_path.glob("/".join(split_string[end_index:]))
 
 

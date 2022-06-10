@@ -239,6 +239,8 @@ class DataAPI:
         exposure_name: str = "",
         source: str = "",
     ) -> List[Particle]:
+        res = []
+        particle_batch_size = 500000
         if self._project:
             if source:
                 tables = [Particle, ParticleSet, ParticleSetLinker]
@@ -253,6 +255,23 @@ class DataAPI:
                     )
                     .filter(ParticleSet.project_name == self._project)
                 )
+                particle_count = query.count()
+                num_full_batches = particle_count // particle_batch_size
+                for b in range(num_full_batches + 1):
+                    if len(tables) == 1:
+                        res.extend(
+                            query.limit(particle_batch_size)
+                            .offset(b * particle_batch_size)
+                            .all()
+                        )
+                    else:
+                        res.extend(
+                            q[0]
+                            for q in query.order_by(Particle.particle_id)
+                            .limit(particle_batch_size)
+                            .offset(b * particle_batch_size)
+                            .all()
+                        )
             else:
                 primary_filter: Any = None
                 end: Type[Base] = Tile
@@ -281,9 +300,25 @@ class DataAPI:
                     query = linear_joins(
                         self.session, tables, primary_filter=primary_filter
                     )
-                if len(tables) == 1:
-                    return query.all()
-            return [q[0] for q in query.all()]
+                particle_count = query.count()
+                num_full_batches = particle_count // particle_batch_size
+                for b in range(num_full_batches + 1):
+                    if len(tables) == 1:
+                        res.extend(
+                            query.order_by(Particle.particle_id)
+                            .limit(particle_batch_size)
+                            .offset(b * particle_batch_size)
+                            .all()
+                        )
+                    else:
+                        res.extend(
+                            q[0]
+                            for q in query.order_by(Particle.particle_id)
+                            .limit(particle_batch_size)
+                            .offset(b * particle_batch_size)
+                            .all()
+                        )
+            return res
         return []
 
     def get_particle_sets(
@@ -303,8 +338,10 @@ class DataAPI:
     def get_particle_linkers(
         self, set_ids: Union[Set[str], List[str]], source_name: str
     ) -> List[ParticleSetLinker]:
+        res: List[ParticleSetLinker] = []
         if not self._project:
-            return []
+            return res
+        particle_batch_size = 500000
         query = (
             self.session.query(ParticleSetLinker, ParticleSet)
             .join(ParticleSet, ParticleSet.identifier == ParticleSetLinker.set_name)
@@ -313,7 +350,17 @@ class DataAPI:
                 ParticleSetLinker.set_name.in_([f"{source_name}:{s}" for s in set_ids])
             )
         )
-        return [q[0] for q in query.all()]
+        particle_count = query.count()
+        num_full_batches = particle_count // particle_batch_size
+        for b in range(num_full_batches + 1):
+            res.extend(
+                q[0]
+                for q in query.order_by(ParticleSetLinker.particle_id)
+                .limit(particle_batch_size)
+                .offset(b * particle_batch_size)
+                .all()
+            )
+        return res
 
     def get_exposure_keys(self) -> List[str]:
         if not self._project:
@@ -495,6 +542,7 @@ class DataAPI:
         particle_keys: List[str],
         particle_set_keys: List[str],
     ) -> List[tuple]:
+        particle_batch_size = 500000
         info: List[tuple] = []
         if not any((exposure_keys, particle_keys, particle_set_keys)):
             return info
@@ -506,34 +554,52 @@ class DataAPI:
             .filter(FoilHole.grid_square_name == grid_square_name)
             .order_by(Exposure.exposure_name)
         )
-        particle_query = (
-            self.session.query(ParticleInfo, FoilHole, Particle, Exposure)
-            .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
-            .join(Particle, Particle.exposure_name == Exposure.exposure_name)
-            .join(ParticleInfo, ParticleInfo.particle_id == Particle.particle_id)
-            .filter(ParticleInfo.key.in_(particle_keys))
-            .filter(FoilHole.grid_square_name == grid_square_name)
-            .order_by(Particle.particle_id)
-        )
-        particle_set_query = (
-            self.session.query(
-                ParticleSetInfo, ParticleSetLinker, FoilHole, Particle, Exposure
-            )
-            .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
-            .join(Particle, Particle.exposure_name == Exposure.exposure_name)
-            .join(
-                ParticleSetLinker, ParticleSetLinker.particle_id == Particle.particle_id
-            )
-            .join(
-                ParticleSetInfo, ParticleSetInfo.set_name == ParticleSetLinker.set_name
-            )
-            .filter(ParticleSetInfo.key.in_(particle_set_keys))
-            .filter(FoilHole.grid_square_name == grid_square_name)
-            .order_by(Particle.particle_id)
-        )
         info.extend(exposure_query.all())
-        info.extend(particle_query.all())
-        info.extend(particle_set_query.all())
+        if particle_keys:
+            base_query = (
+                self.session.query(ParticleInfo, FoilHole, Particle, Exposure)
+                .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
+                .join(Particle, Particle.exposure_name == Exposure.exposure_name)
+                .join(ParticleInfo, ParticleInfo.particle_id == Particle.particle_id)
+                .filter(ParticleInfo.key.in_(particle_keys))
+                .filter(FoilHole.grid_square_name == grid_square_name)
+            )
+            particle_count = base_query.count()
+            num_full_batches = particle_count // particle_batch_size
+            for b in range(num_full_batches + 1):
+                particle_query = (
+                    base_query.order_by(Particle.particle_id)
+                    .limit(particle_batch_size)
+                    .offset(b * particle_batch_size)
+                )
+                info.extend(particle_query.all())
+        if particle_set_keys:
+            base_query = (
+                self.session.query(
+                    ParticleSetInfo, ParticleSetLinker, FoilHole, Particle, Exposure
+                )
+                .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
+                .join(Particle, Particle.exposure_name == Exposure.exposure_name)
+                .join(
+                    ParticleSetLinker,
+                    ParticleSetLinker.particle_id == Particle.particle_id,
+                )
+                .join(
+                    ParticleSetInfo,
+                    ParticleSetInfo.set_name == ParticleSetLinker.set_name,
+                )
+                .filter(ParticleSetInfo.key.in_(particle_set_keys))
+                .filter(FoilHole.grid_square_name == grid_square_name)
+            )
+            particle_count = base_query.count()
+            num_full_batches = particle_count // particle_batch_size
+            for b in range(num_full_batches + 1):
+                particle_set_query = (
+                    base_query.order_by(Particle.particle_id)
+                    .limit(particle_batch_size)
+                    .offset(b * particle_batch_size)
+                )
+                info.extend(particle_set_query.all())
         return info
 
     def get_atlas_info(
@@ -543,6 +609,7 @@ class DataAPI:
         particle_keys: List[str],
         particle_set_keys: List[str],
     ) -> List[tuple]:
+        particle_batch_size = 500000
         info: List[tuple] = []
         if not any((exposure_keys, particle_keys, particle_set_keys)):
             return info
@@ -556,46 +623,68 @@ class DataAPI:
             .filter(Tile.atlas_id == atlas_id)
             .order_by(Exposure.exposure_name)
         )
-        particle_query = (
-            self.session.query(
-                ParticleInfo, FoilHole, Particle, GridSquare, Tile, Exposure
-            )
-            .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
-            .join(Particle, Particle.exposure_name == Exposure.exposure_name)
-            .join(GridSquare, GridSquare.grid_square_name == FoilHole.grid_square_name)
-            .join(Tile, Tile.tile_id == GridSquare.tile_id)
-            .join(ParticleInfo, ParticleInfo.particle_id == Particle.particle_id)
-            .filter(ParticleInfo.key.in_(particle_keys))
-            .filter(Tile.atlas_id == atlas_id)
-            .order_by(Particle.particle_id)
-        )
-        particle_set_query = (
-            self.session.query(
-                ParticleSetInfo,
-                ParticleSetLinker,
-                FoilHole,
-                GridSquare,
-                Particle,
-                Tile,
-                Exposure,
-            )
-            .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
-            .join(GridSquare, GridSquare.grid_square_name == FoilHole.grid_square_name)
-            .join(Tile, Tile.tile_id == GridSquare.tile_id)
-            .join(Particle, Particle.exposure_name == Exposure.exposure_name)
-            .join(
-                ParticleSetLinker, ParticleSetLinker.particle_id == Particle.particle_id
-            )
-            .join(
-                ParticleSetInfo, ParticleSetInfo.set_name == ParticleSetLinker.set_name
-            )
-            .filter(ParticleSetInfo.key.in_(particle_set_keys))
-            .filter(Tile.atlas_id == atlas_id)
-            .order_by(Particle.particle_id)
-        )
         info.extend(exposure_query.all())
-        info.extend(particle_query.all())
-        info.extend(particle_set_query.all())
+        if particle_keys:
+            base_query = (
+                self.session.query(
+                    ParticleInfo, FoilHole, Particle, GridSquare, Tile, Exposure
+                )
+                .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
+                .join(Particle, Particle.exposure_name == Exposure.exposure_name)
+                .join(
+                    GridSquare, GridSquare.grid_square_name == FoilHole.grid_square_name
+                )
+                .join(Tile, Tile.tile_id == GridSquare.tile_id)
+                .join(ParticleInfo, ParticleInfo.particle_id == Particle.particle_id)
+                .filter(ParticleInfo.key.in_(particle_keys))
+                .filter(Tile.atlas_id == atlas_id)
+            )
+            particle_count = base_query.count()
+            num_full_batches = particle_count // particle_batch_size
+            for b in range(num_full_batches + 1):
+                particle_query = (
+                    base_query.order_by(Particle.particle_id)
+                    .limit(particle_batch_size)
+                    .offset(b * particle_batch_size)
+                )
+                info.extend(particle_query.all())
+        if particle_set_keys:
+            base_query = (
+                self.session.query(
+                    ParticleSetInfo,
+                    ParticleSetLinker,
+                    FoilHole,
+                    GridSquare,
+                    Particle,
+                    Tile,
+                    Exposure,
+                )
+                .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
+                .join(
+                    GridSquare, GridSquare.grid_square_name == FoilHole.grid_square_name
+                )
+                .join(Tile, Tile.tile_id == GridSquare.tile_id)
+                .join(Particle, Particle.exposure_name == Exposure.exposure_name)
+                .join(
+                    ParticleSetLinker,
+                    ParticleSetLinker.particle_id == Particle.particle_id,
+                )
+                .join(
+                    ParticleSetInfo,
+                    ParticleSetInfo.set_name == ParticleSetLinker.set_name,
+                )
+                .filter(ParticleSetInfo.key.in_(particle_set_keys))
+                .filter(Tile.atlas_id == atlas_id)
+            )
+            particle_count = base_query.count()
+            num_full_batches = particle_count // particle_batch_size
+            for b in range(num_full_batches + 1):
+                particle_set_query = (
+                    base_query.order_by(Particle.particle_id)
+                    .limit(particle_batch_size)
+                    .offset(b * particle_batch_size)
+                )
+                info.extend(particle_set_query.all())
         return info
 
     def put(self, entries: Sequence[Base]):
