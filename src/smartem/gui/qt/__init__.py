@@ -372,8 +372,6 @@ class MainDisplay(ComponentTab):
     def _gather_atlas_data(self):
         _grid_square = self._grid_squares[self._square_combo.currentIndex()]
         _atlas = self._extractor.get_atlases()
-        atlas_exposures = self._extractor.get_exposures(atlas_id=_atlas.atlas_id)
-        atlas_particles = self._extractor.get_particles(atlas_id=_atlas.atlas_id)
         atlas_sql_data = self._extractor.get_atlas_info(
             _atlas.atlas_id,
             self._exposure_keys,
@@ -385,8 +383,6 @@ class MainDisplay(ComponentTab):
             self._exposure_keys,
             self._particle_keys,
             self._particle_set_keys,
-            atlas_exposures,
-            atlas_particles,
         )
         if self._atlas_view and self._epu_dir:
             self._atlas_view._data = atlas_data
@@ -412,19 +408,11 @@ class MainDisplay(ComponentTab):
             self._particle_keys,
             self._particle_set_keys,
         )
-        grid_square_exposures = self._extractor.get_exposures(
-            grid_square_name=self._square_combo.currentText()
-        )
-        grid_square_particles = self._extractor.get_particles(
-            grid_square_name=self._square_combo.currentText()
-        )
         self._data, self._foil_hole_averages = extract_keys_with_foil_hole_averages(
             sql_data,
             self._exposure_keys,
             self._particle_keys,
             self._particle_set_keys,
-            grid_square_exposures,
-            grid_square_particles,
         )
 
     def _gather_foil_hole_data(self):
@@ -434,19 +422,11 @@ class MainDisplay(ComponentTab):
             self._particle_keys,
             self._particle_set_keys,
         )
-        foil_hole_exposures = self._extractor.get_exposures(
-            foil_hole_name=self._foil_hole_combo.currentText()
-        )
-        foil_hole_particles = self._extractor.get_particles(
-            foil_hole_name=self._foil_hole_combo.currentText()
-        )
         key_extracted_data = extract_keys(
             sql_data,
             self._exposure_keys,
             self._particle_keys,
             self._particle_set_keys,
-            foil_hole_exposures,
-            foil_hole_particles,
         )
         try:
             self._update_foil_hole_stats(key_extracted_data)
@@ -646,7 +626,7 @@ class MainDisplay(ComponentTab):
         foil_hole: Optional[FoilHole] = None,
         flip: Tuple[int, int] = (1, 1),
     ) -> QLabel:
-        if not self._epu_dir:
+        if not self._epu_dir or not grid_square.thumbnail:
             return
         square_pixmap = QPixmap(str(self._epu_dir / grid_square.thumbnail))
         if flip != (1, 1):
@@ -660,7 +640,7 @@ class MainDisplay(ComponentTab):
                 imvs = [
                     list(self._foil_hole_averages.values())[0].get(fh.foil_hole_name)
                     for fh in self._foil_holes
-                    if fh != foil_hole
+                    if fh != foil_hole and fh.thumbnail
                 ]
             square_lbl = ImageLabel(
                 grid_square,
@@ -673,7 +653,9 @@ class MainDisplay(ComponentTab):
                 )
                 if _key
                 else None,
-                extra_images=[fh for fh in self._foil_holes if fh != foil_hole],
+                extra_images=[
+                    fh for fh in self._foil_holes if fh != foil_hole and fh.thumbnail
+                ],
                 image_values=imvs,
             )
             self.grid.addWidget(square_lbl, 1, 1)
@@ -691,23 +673,28 @@ class MainDisplay(ComponentTab):
     ) -> QLabel:
         if not self._epu_dir:
             return
-        hole_pixmap = QPixmap(str(self._epu_dir / foil_hole.thumbnail))
-        if flip != (1, 1):
-            hole_pixmap = hole_pixmap.transformed(QTransform().scale(*flip))
+        if foil_hole.thumbnail:
+            hole_pixmap = QPixmap(str(self._epu_dir / foil_hole.thumbnail))
+            if flip != (1, 1):
+                hole_pixmap = hole_pixmap.transformed(QTransform().scale(*flip))
         if exposure and self._epu_dir:
-            qsize = hole_pixmap.size()
-            hole_lbl = ImageLabel(
-                foil_hole,
-                exposure,
-                (qsize.width(), qsize.height()),
-                self._epu_dir,
-                parent=self,
-            )
-            self.grid.addWidget(hole_lbl, 1, 2)
-            hole_lbl.setPixmap(hole_pixmap)
+            if foil_hole.thumbnail:
+                qsize = hole_pixmap.size()
+                hole_lbl = ImageLabel(
+                    foil_hole,
+                    exposure,
+                    (qsize.width(), qsize.height()),
+                    self._epu_dir,
+                    parent=self,
+                )
+                self.grid.addWidget(hole_lbl, 1, 2)
+                hole_lbl.setPixmap(hole_pixmap)
+            else:
+                hole_lbl = QLabel(self)
         else:
             hole_lbl = QLabel(self)
-            hole_lbl.setPixmap(hole_pixmap)
+            if foil_hole.thumbnail:
+                hole_lbl.setPixmap(hole_pixmap)
         return hole_lbl
 
     def _select_exposure(self, index: int):
@@ -740,23 +727,18 @@ class MainDisplay(ComponentTab):
                 self._particle_keys,
                 self._particle_set_keys,
             )
-            exposure_particles = self._extractor.get_particles(
-                exposure_name=self._exposure_combo.currentText()
-            )
             key_extracted_data = extract_keys(
                 sql_data,
                 [],
                 self._particle_keys,
                 self._particle_set_keys,
-                [],
-                exposure_particles,
             )
             self._update_exposure_stats(key_extracted_data)
 
     def _draw_exposure(
         self, exposure: Exposure, flip: Tuple[int, int] = (1, 1)
     ) -> QLabel:
-        if not self._epu_dir:
+        if not self._epu_dir or not exposure.thumbnail:
             return
         exposure_pixmap = QPixmap(str(self._epu_dir / exposure.thumbnail))
         if flip != (1, 1):

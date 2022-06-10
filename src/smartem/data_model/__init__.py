@@ -32,25 +32,25 @@ class EPUImage:
 
     thumbnail = Column(
         String(250),
-        nullable=False,
+        nullable=True,
         comment="Full path to EPU jpeg image of EPU image",
     )
 
     pixel_size: Column = Column(
         Float,
-        nullable=False,
+        nullable=True,
         comment="Pixel size of full readout image extracted from EPU XML [nm]",
     )
 
     readout_area_x = Column(
         Integer,
-        nullable=False,
+        nullable=True,
         comment="x-extent of detector readout area",
     )
 
     readout_area_y = Column(
         Integer,
-        nullable=False,
+        nullable=True,
         comment="y-extent of detector readout area",
     )
 

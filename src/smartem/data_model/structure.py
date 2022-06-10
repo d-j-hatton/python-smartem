@@ -38,9 +38,9 @@ def extract_keys(
     exposure_keys: List[str],
     particle_keys: List[str],
     particle_set_keys: List[str],
-    exposures: List[Exposure],
-    particles: List[Particle],
 ) -> Dict[str, List[float]]:
+    particles = {sr[_particle_tab_index(sr)] for sr in sql_result}
+    exposures = {sr[_exposure_tab_index(sr)] for sr in sql_result}
     keys = exposure_keys + particle_keys + particle_set_keys
     avg_particles = bool(exposure_keys) and (
         bool(particle_keys) or bool(particle_set_keys)
@@ -110,9 +110,9 @@ def extract_keys_with_foil_hole_averages(
     exposure_keys: List[str],
     particle_keys: List[str],
     particle_set_keys: List[str],
-    exposures: List[Exposure],
-    particles: List[Particle],
 ) -> Tuple[Dict[str, List[float]], Dict[str, Dict[str, float]]]:
+    particles = {sr[_particle_tab_index(sr)] for sr in sql_result}
+    exposures = {sr[_exposure_tab_index(sr)] for sr in sql_result}
     keys = exposure_keys + particle_keys + particle_set_keys
     avg_particles = bool(exposure_keys) and (
         bool(particle_keys) or bool(particle_set_keys)
@@ -202,9 +202,9 @@ def extract_keys_with_grid_square_averages(
     exposure_keys: List[str],
     particle_keys: List[str],
     particle_set_keys: List[str],
-    exposures: List[Exposure],
-    particles: List[Particle],
 ) -> Tuple[Dict[str, List[float]], Dict[str, Dict[str, float]]]:
+    particles = {sr[_particle_tab_index(sr)] for sr in sql_result}
+    exposures = {sr[_exposure_tab_index(sr)] for sr in sql_result}
     keys = exposure_keys + particle_keys + particle_set_keys
     avg_particles = bool(exposure_keys) and (
         bool(particle_keys) or bool(particle_set_keys)
