@@ -1,3 +1,4 @@
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Generator, List, Optional
 
@@ -22,6 +23,20 @@ from smartem.parsing.star import (
     insert_particle_set,
     open_star_file,
 )
+
+
+@lru_cache(maxsize=5)
+def relevant_star_files(directory: Path) -> List[str]:
+    sfiles = []
+    for sf in directory.glob("*/*/*.star"):
+        str_sf = str(sf)
+        if (
+            all(p not in str_sf for p in ("gui", "pipeline", "Nodes", "NODES"))
+            and "job" not in sf.name
+            and not sf.parent.is_symlink()
+        ):
+            sfiles.append(str_sf)
+    return sfiles
 
 
 def _string_to_glob(glob_string: str) -> Generator[Path, None, None]:
@@ -87,14 +102,8 @@ class StarDataLoader(ComponentTab):
 
     def _set_project_directory(self, project_directory: Path):
         self._proj_dir = project_directory
-        for sf in self._proj_dir.glob("*/*/*.star"):
-            str_sf = str(sf)
-            if (
-                all(p not in str_sf for p in ("gui", "pipeline", "Nodes", "NODES"))
-                and "job" not in sf.name
-                and not sf.parent.is_symlink()
-            ):
-                self._file_combo.addItem(str_sf)
+        star_files = relevant_star_files(project_directory)
+        self._file_combo.addItems(star_files)
 
     def _select_star_file(
         self,
