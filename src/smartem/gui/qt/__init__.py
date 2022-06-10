@@ -378,12 +378,14 @@ class MainDisplay(ComponentTab):
             self._particle_keys,
             self._particle_set_keys,
         )
-        atlas_data, grid_square_averages = extract_keys_with_grid_square_averages(
+        extracted_atlas_data = extract_keys_with_grid_square_averages(
             atlas_sql_data,
             self._exposure_keys,
             self._particle_keys,
             self._particle_set_keys,
         )
+        atlas_data = {k: v.flattened_data for k, v in extracted_atlas_data.items()}
+        grid_square_averages = {k: v.averages for k, v in extracted_atlas_data.items()}
         if self._atlas_view and self._epu_dir:
             self._atlas_view._data = atlas_data
             self._atlas_view._grid_square_averages = grid_square_averages
@@ -408,12 +410,18 @@ class MainDisplay(ComponentTab):
             self._particle_keys,
             self._particle_set_keys,
         )
-        self._data, self._foil_hole_averages = extract_keys_with_foil_hole_averages(
+        extracted_grid_square_data = extract_keys_with_foil_hole_averages(
             sql_data,
             self._exposure_keys,
             self._particle_keys,
             self._particle_set_keys,
         )
+        self._data = {
+            k: v.flattened_data for k, v in extracted_grid_square_data.items()
+        }
+        self._foil_hole_averages = {
+            k: v.averages for k, v in extracted_grid_square_data.items()
+        }
 
     def _gather_foil_hole_data(self):
         sql_data = self._extractor.get_foil_hole_info(

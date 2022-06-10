@@ -1,9 +1,15 @@
 import math
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 
 from smartem.data_model import Base, Exposure, FoilHole, Particle
+
+
+class ExtractedData(NamedTuple):
+    flattened_data: List[float]
+    averages: Optional[Dict[str, float]] = None
+    counts: Optional[Dict[str, int]] = None
 
 
 def _particle_tab_index(tables: Tuple[Base], default: int = -2) -> int:
@@ -110,7 +116,7 @@ def extract_keys_with_foil_hole_averages(
     exposure_keys: List[str],
     particle_keys: List[str],
     particle_set_keys: List[str],
-) -> Tuple[Dict[str, List[float]], Dict[str, Dict[str, float]]]:
+) -> Dict[str, ExtractedData]:
     particles = {sr[_particle_tab_index(sr)] for sr in sql_result}
     exposures = {sr[_exposure_tab_index(sr)] for sr in sql_result}
     keys = exposure_keys + particle_keys + particle_set_keys
@@ -194,7 +200,15 @@ def extract_keys_with_foil_hole_averages(
     if avg_particles:
         for k, v in flat_results.items():
             flat_results[k] = np.divide(v, flat_counts[k])
-    return (flat_results, foil_hole_averages)
+    extracted_data = {
+        k: ExtractedData(
+            flattened_data=flat_results[k],
+            averages=foil_hole_averages[k],
+            counts=foil_hole_counts[k],
+        )
+        for k in keys
+    }
+    return extracted_data
 
 
 def extract_keys_with_grid_square_averages(
@@ -202,7 +216,7 @@ def extract_keys_with_grid_square_averages(
     exposure_keys: List[str],
     particle_keys: List[str],
     particle_set_keys: List[str],
-) -> Tuple[Dict[str, List[float]], Dict[str, Dict[str, float]]]:
+) -> Dict[str, ExtractedData]:
     particles = {sr[_particle_tab_index(sr)] for sr in sql_result}
     exposures = {sr[_exposure_tab_index(sr)] for sr in sql_result}
     keys = exposure_keys + particle_keys + particle_set_keys
@@ -291,4 +305,12 @@ def extract_keys_with_grid_square_averages(
     if avg_particles:
         for k, v in flat_results.items():
             flat_results[k] = np.divide(v, flat_counts[k])
-    return (flat_results, grid_square_averages)
+    extracted_data = {
+        k: ExtractedData(
+            flattened_data=flat_results[k],
+            averages=grid_square_averages[k],
+            counts=grid_square_counts[k],
+        )
+        for k in keys
+    }
+    return extracted_data
