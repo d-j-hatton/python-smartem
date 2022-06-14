@@ -116,7 +116,9 @@ def extract_keys_with_foil_hole_averages(
     exposure_keys: List[str],
     particle_keys: List[str],
     particle_set_keys: List[str],
+    limits: Optional[Dict[str, Tuple[float, float]]] = None,
 ) -> Dict[str, ExtractedData]:
+    limits = limits or {}
     particles = {sr[_particle_tab_index(sr)] for sr in sql_result}
     exposures = {sr[_exposure_tab_index(sr)] for sr in sql_result}
     keys = exposure_keys + particle_keys + particle_set_keys
@@ -153,38 +155,44 @@ def extract_keys_with_foil_hole_averages(
     for sr in sql_result:
         particle_tab_index = _particle_tab_index(sr)
         exposure_tab_index = _exposure_tab_index(sr)
-        if use_particles:
-            particle_index = indices[sr[particle_tab_index].particle_id]
-            if not math.isinf(sr[0].value):
-                flat_results[sr[0].key][particle_index] = sr[0].value
-                unused_indices[sr[particle_tab_index].particle_id][
-                    keys.index(sr[0].key)
-                ] = True
-        else:
-            exposure_index = indices[sr[-1].exposure_name]
-            if avg_particles:
+        current_bound = limits.get(sr[0].key, (-np.inf, np.inf))
+        if sr[0].value > current_bound[0] and sr[0].value < current_bound[1]:
+            if use_particles:
+                particle_index = indices[sr[particle_tab_index].particle_id]
                 if not math.isinf(sr[0].value):
-                    flat_results[sr[0].key][exposure_index] += sr[0].value
-                    flat_counts[sr[0].key][exposure_index] += 1
+                    flat_results[sr[0].key][particle_index] = sr[0].value
+                    unused_indices[sr[particle_tab_index].particle_id][
+                        keys.index(sr[0].key)
+                    ] = True
             else:
+                exposure_index = indices[sr[-1].exposure_name]
+                if avg_particles:
+                    if not math.isinf(sr[0].value):
+                        flat_results[sr[0].key][exposure_index] += sr[0].value
+                        flat_counts[sr[0].key][exposure_index] += 1
+                else:
+                    if not math.isinf(sr[0].value):
+                        flat_results[sr[0].key][exposure_index] = sr[0].value
                 if not math.isinf(sr[0].value):
-                    flat_results[sr[0].key][exposure_index] = sr[0].value
-            if not math.isinf(sr[0].value):
-                unused_indices[sr[exposure_tab_index].exposure_name][
-                    keys.index(sr[0].key)
-                ] = True
-        try:
-            if not math.isinf(sr[0].value):
-                foil_hole_sums[sr[0].key][sr[exposure_tab_index].foil_hole_name] += sr[
-                    0
-                ].value
-                foil_hole_counts[sr[0].key][sr[exposure_tab_index].foil_hole_name] += 1
-        except KeyError:
-            if not math.isinf(sr[0].value):
-                foil_hole_sums[sr[0].key][sr[exposure_tab_index].foil_hole_name] = sr[
-                    0
-                ].value
-                foil_hole_counts[sr[0].key][sr[exposure_tab_index].foil_hole_name] = 1
+                    unused_indices[sr[exposure_tab_index].exposure_name][
+                        keys.index(sr[0].key)
+                    ] = True
+            try:
+                if not math.isinf(sr[0].value):
+                    foil_hole_sums[sr[0].key][
+                        sr[exposure_tab_index].foil_hole_name
+                    ] += sr[0].value
+                    foil_hole_counts[sr[0].key][
+                        sr[exposure_tab_index].foil_hole_name
+                    ] += 1
+            except KeyError:
+                if not math.isinf(sr[0].value):
+                    foil_hole_sums[sr[0].key][
+                        sr[exposure_tab_index].foil_hole_name
+                    ] = sr[0].value
+                    foil_hole_counts[sr[0].key][
+                        sr[exposure_tab_index].foil_hole_name
+                    ] = 1
     foil_hole_averages = {}
     for k in keys:
         foil_hole_averages[k] = {
