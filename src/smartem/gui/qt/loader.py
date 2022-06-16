@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (
 
 from smartem.data_model import ParticleSet, ParticleSetLinker
 from smartem.data_model.extract import DataAPI
-from smartem.gui.qt.component_tab import ComponentTab
+from smartem.gui.qt.component_tab import ComponentTab, background
 from smartem.parsing.star import (
     get_column_data,
     get_columns,
@@ -100,6 +100,7 @@ class StarDataLoader(ComponentTab):
         load_btn.clicked.connect(self.load)
         self.grid.addWidget(load_btn, 5, 1)
 
+    @background
     def _set_project_directory(self, project_directory: Path):
         self._proj_dir = project_directory
         star_files = relevant_star_files(project_directory)
@@ -403,6 +404,7 @@ class ParticleSetDataLoader(ParticleDataLoader):
 
         self._file_vbox.addLayout(cross_ref_file_hbox, 1)
 
+    @background
     def _set_project_directory(self, project_directory: Path):
         self._proj_dir = project_directory
         self._file_combo.clear()
