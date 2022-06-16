@@ -665,6 +665,7 @@ class MainDisplay(ComponentTab):
                     fh for fh in self._foil_holes if fh != foil_hole and fh.thumbnail
                 ],
                 image_values=imvs,
+                selection_box=self._square_combo,
             )
             self.grid.addWidget(square_lbl, 1, 1)
             square_lbl.setPixmap(square_pixmap)
@@ -694,6 +695,7 @@ class MainDisplay(ComponentTab):
                     (qsize.width(), qsize.height()),
                     self._epu_dir,
                     parent=self,
+                    selection_box=self._foil_hole_combo,
                 )
                 self.grid.addWidget(hole_lbl, 1, 2)
                 hole_lbl.setPixmap(hole_pixmap)
@@ -780,6 +782,7 @@ class MainDisplay(ComponentTab):
             image_scale=0.5
             if self._data_size is None
             else thumbnail_size[0] / self._data_size[0],
+            selection_box=self._exposure_combo,
         )
         self.grid.addWidget(exposure_lbl, 1, 3)
         exposure_lbl.setPixmap(exposure_pixmap)
