@@ -8,7 +8,7 @@ import mrcfile
 import numpy as np
 from PyQt5 import QtCore
 from PyQt5.QtGui import QBrush, QColor, QPainter, QPen
-from PyQt5.QtWidgets import QLabel
+from PyQt5.QtWidgets import QComboBox, QLabel
 
 from smartem.data_model import Atlas, Exposure, FoilHole, GridSquare, Particle, Tile
 from smartem.stage_model import find_point_pixel
@@ -29,6 +29,7 @@ class ParticleImageLabel(QLabel):
         particles: Union[List[Particle], List[List[Particle]]],
         image_size: Tuple[int, int],
         image_scale: float = 0.5,
+        selection_box: Optional[QComboBox] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -36,6 +37,12 @@ class ParticleImageLabel(QLabel):
         self._image_size = image_size
         self._particles = particles
         self._image_scale = image_scale
+        self._selection_box = selection_box
+
+    def mousePressEvent(self, ev):
+        if self._selection_box is not None:
+            self._selection_box.setFocus()
+            self._selection_box.activateWindow()
 
     def draw_circle(
         self, coordinates: Tuple[float, float], diameter: int, painter: QPainter
@@ -97,6 +104,7 @@ class ImageLabel(QLabel):
         value: Optional[float] = None,
         extra_images: Optional[list] = None,
         image_values: Optional[List[float]] = None,
+        selection_box: Optional[QComboBox] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -108,6 +116,12 @@ class ImageLabel(QLabel):
         self._overwrite_readout = overwrite_readout
         self._value = value
         self._image_values = image_values or []
+        self._selection_box = selection_box
+
+    def mousePressEvent(self, ev):
+        if self._selection_box is not None:
+            self._selection_box.setFocus()
+            self._selection_box.activateWindow()
 
     def draw_rectangle(
         self,
