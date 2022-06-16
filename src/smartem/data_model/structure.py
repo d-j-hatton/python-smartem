@@ -1,5 +1,5 @@
 import math
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -110,7 +110,10 @@ def extract_keys_with_foil_hole_averages(
     exposure_keys: List[str],
     particle_keys: List[str],
     particle_set_keys: List[str],
+    particle_set_bounds: Optional[Dict[str, Tuple[float, float]]] = None,
 ) -> Tuple[Dict[str, List[float]], Dict[str, Dict[str, float]]]:
+    if not particle_set_bounds:
+        particle_set_bounds = {}
     particles = {sr[_particle_tab_index(sr)] for sr in sql_result}
     exposures = {sr[_exposure_tab_index(sr)] for sr in sql_result}
     keys = exposure_keys + particle_keys + particle_set_keys
@@ -158,8 +161,14 @@ def extract_keys_with_foil_hole_averages(
             exposure_index = indices[sr[-1].exposure_name]
             if avg_particles:
                 if not math.isinf(sr[0].value):
-                    flat_results[sr[0].key][exposure_index] += sr[0].value
-                    flat_counts[sr[0].key][exposure_index] += 1
+                    current_bound = particle_set_bounds.get(sr[0].key)
+                    if not current_bound or (
+                        current_bound
+                        and sr[0].value > current_bound[0]
+                        and sr[0].value < current_bound[1]
+                    ):
+                        flat_results[sr[0].key][exposure_index] += sr[0].value
+                        flat_counts[sr[0].key][exposure_index] += 1
             else:
                 if not math.isinf(sr[0].value):
                     flat_results[sr[0].key][exposure_index] = sr[0].value
@@ -169,16 +178,32 @@ def extract_keys_with_foil_hole_averages(
                 ] = True
         try:
             if not math.isinf(sr[0].value):
-                foil_hole_sums[sr[0].key][sr[exposure_tab_index].foil_hole_name] += sr[
-                    0
-                ].value
-                foil_hole_counts[sr[0].key][sr[exposure_tab_index].foil_hole_name] += 1
+                current_bound = particle_set_bounds.get(sr[0].key)
+                if not current_bound or (
+                    current_bound
+                    and sr[0].value > current_bound[0]
+                    and sr[0].value < current_bound[1]
+                ):
+                    foil_hole_sums[sr[0].key][
+                        sr[exposure_tab_index].foil_hole_name
+                    ] += sr[0].value
+                    foil_hole_counts[sr[0].key][
+                        sr[exposure_tab_index].foil_hole_name
+                    ] += 1
         except KeyError:
             if not math.isinf(sr[0].value):
-                foil_hole_sums[sr[0].key][sr[exposure_tab_index].foil_hole_name] = sr[
-                    0
-                ].value
-                foil_hole_counts[sr[0].key][sr[exposure_tab_index].foil_hole_name] = 1
+                current_bound = particle_set_bounds.get(sr[0].key)
+                if not current_bound or (
+                    current_bound
+                    and sr[0].value > current_bound[0]
+                    and sr[0].value < current_bound[1]
+                ):
+                    foil_hole_sums[sr[0].key][
+                        sr[exposure_tab_index].foil_hole_name
+                    ] = sr[0].value
+                    foil_hole_counts[sr[0].key][
+                        sr[exposure_tab_index].foil_hole_name
+                    ] = 1
     foil_hole_averages = {}
     for k in keys:
         foil_hole_averages[k] = {
