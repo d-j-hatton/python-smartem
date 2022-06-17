@@ -1,17 +1,27 @@
 from threading import Thread
-from typing import Optional
+from typing import List, Optional
 
 from PyQt5.QtWidgets import QWidget
 
 
-def background(func):
-    def wrapper(cl, *args, **kwargs):
-        if cl._thread and cl._thread.is_alive():
-            return
-        cl._thread = Thread(target=cl._background, args=(func, *args), kwargs=kwargs)
-        cl._thread.start()
+def background(children: Optional[List[str]] = None):
+    if not children:
+        children = []
 
-    return wrapper
+    def background_decorator(func, *args, **kwargs):
+        def wrapper(cl, *args, **kwargs):
+            if cl._thread and cl._thread.is_alive():
+                return
+            cl._thread = Thread(
+                target=cl._background,
+                args=(func, *args),
+                kwargs={"_children": [getattr(cl, ch) for ch in children], **kwargs},
+            )
+            cl._thread.start()
+
+        return wrapper
+
+    return background_decorator
 
 
 class ComponentTab(QWidget):
@@ -28,8 +38,21 @@ class ComponentTab(QWidget):
             refr.refresh()
 
     def _background(self, _background_process, *args, **kwargs):
-        for ch in self.findChildren():
-            ch.setEnabled(False)
-        _background_process(*args, **kwargs)
-        for ch in self.findChildren():
-            ch.setEnabled(True)
+        children = kwargs.get("_children")
+        try:
+            kwargs.pop("_children")
+        except KeyError:
+            pass
+        if children is not None:
+            for ch in children:
+                ch.setEnabled(False)
+        else:
+            for ch in self.findChildren(QWidget):
+                ch.setEnabled(False)
+        _background_process(self, *args, **kwargs)
+        if children is not None:
+            for ch in children:
+                ch.setEnabled(True)
+        else:
+            for ch in self.findChildren(QWidget):
+                ch.setEnabled(True)

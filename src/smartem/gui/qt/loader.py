@@ -100,7 +100,7 @@ class StarDataLoader(ComponentTab):
         load_btn.clicked.connect(self.load)
         self.grid.addWidget(load_btn, 5, 1)
 
-    @background
+    @background(children=None)
     def _set_project_directory(self, project_directory: Path):
         self._proj_dir = project_directory
         star_files = relevant_star_files(project_directory)
@@ -209,7 +209,6 @@ class ExposureDataLoader(StarDataLoader):
                     if not sfp.parent.is_symlink():
                         self._insert_from_star_file(Path(sfp))
             else:
-                print("insert from", self._file_combo.currentText())
                 self._insert_from_star_file(Path(self._file_combo.currentText()))
             self.refresh()
 
@@ -404,7 +403,7 @@ class ParticleSetDataLoader(ParticleDataLoader):
 
         self._file_vbox.addLayout(cross_ref_file_hbox, 1)
 
-    @background
+    @background(children=None)
     def _set_project_directory(self, project_directory: Path):
         self._proj_dir = project_directory
         self._file_combo.clear()
