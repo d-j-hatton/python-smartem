@@ -453,30 +453,31 @@ class MainDisplay(ComponentTab):
             k for k in selected_keys if k in self._data_keys["particle_set"]
         ]
 
-        self._gather_atlas_data()
-
         self._gather_grid_square_data()
 
         self._gather_foil_hole_data()
 
         self._data_gathered = True
 
+        self._draw_foil_hole(
+            self._foil_holes[self._foil_hole_combo.currentIndex()], flip=(-1, -1)
+        )
+        self._draw_exposure(
+            self._exposures[self._exposure_combo.currentIndex()], flip=(1, -1)
+        )
+
         try:
             self._draw_grid_square(
                 self._grid_squares[self._square_combo.currentIndex()],
                 foil_hole=self._foil_holes[self._foil_hole_combo.currentIndex()],
-            )
-            self._draw_foil_hole(
-                self._foil_holes[self._foil_hole_combo.currentIndex()], flip=(-1, -1)
-            )
-            self._draw_exposure(
-                self._exposures[self._exposure_combo.currentIndex()], flip=(1, -1)
             )
         except IndexError:
             self._draw_grid_square(
                 self._grid_squares[self._square_combo.currentIndex()]
             )
         self._update_grid_square_stats(self._data)
+
+        self._gather_atlas_data()
 
     def _select_square(self, index: int):
         if self._data_gathered:
@@ -821,7 +822,7 @@ class MainDisplay(ComponentTab):
                 self._pick_list.addItem(k)
 
 
-class AtlasDisplay(QWidget):
+class AtlasDisplay(ComponentTab):
     def __init__(self, extractor: DataAPI):
         super().__init__()
         self._extractor = extractor

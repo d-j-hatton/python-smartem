@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (
 )
 
 from smartem.data_model.extract import DataAPI
-from smartem.gui.qt.component_tab import ComponentTab
+from smartem.gui.qt.component_tab import ComponentTab, background
 from smartem.parsing.star import insert_exposure_data
 
 
@@ -84,6 +84,7 @@ class CSVDataLoader(ComponentTab):
     def _select_exposure_tag(self, index: int):
         self._exposure_tag = self._exposure_tag_combo.currentText()
 
+    @background(children=None)
     def _set_project_directory(self, project_directory: Path):
         self._proj_dir = project_directory
         for sf in self._proj_dir.glob("*/*/*.csv"):

@@ -1,10 +1,13 @@
+from multiprocessing import Process
 from threading import Thread
 from typing import List, Optional
 
 from PyQt5.QtWidgets import QWidget
 
 
-def background(children: Optional[List[str]] = None):
+def background(
+    children: Optional[List[str]] = None, lock_self: bool = False, process: bool = False
+):
     if not children:
         children = []
 
@@ -12,11 +15,21 @@ def background(children: Optional[List[str]] = None):
         def wrapper(cl, *args, **kwargs):
             if cl._thread and cl._thread.is_alive():
                 return
-            cl._thread = Thread(
-                target=cl._background,
-                args=(func, *args),
-                kwargs={"_children": [getattr(cl, ch) for ch in children], **kwargs},
-            )
+            frozen_widgets = [getattr(cl, ch) for ch in children]
+            if lock_self:
+                frozen_widgets.append(cl)
+            if process:
+                cl._thread = Process(
+                    target=cl._background,
+                    args=(func, *args),
+                    kwargs={"_children": frozen_widgets, **kwargs},
+                )
+            else:
+                cl._thread = Thread(
+                    target=cl._background,
+                    args=(func, *args),
+                    kwargs={"_children": frozen_widgets, **kwargs},
+                )
             cl._thread.start()
 
         return wrapper
