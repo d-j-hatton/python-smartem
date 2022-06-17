@@ -68,6 +68,7 @@ class StarDataLoader(ComponentTab):
         self._exposure_tag = None
         self._column = None
         self._proj_dir = project_directory
+        self.project = ""
 
         star_lbl = QLabel()
         star_lbl.setText("Star file:")
@@ -559,6 +560,7 @@ class ParticleSetDataLoader(ParticleDataLoader):
                     self._y_tag,
                     str(star_file_path),
                     self._extractor,
+                    self.project,
                     add_source_to_id=True,
                 )
             else:
@@ -583,6 +585,7 @@ class ParticleSetDataLoader(ParticleDataLoader):
                     self._y_tag,
                     str(star_file_path),
                     self._extractor,
+                    self.project,
                     add_source_to_id=True,
                 )
 

@@ -187,6 +187,7 @@ def insert_particle_set(
     y_tag: str,
     star_file_path: str,
     extractor: DataAPI,
+    project: str,
     add_source_to_id: bool = False,
 ):
     extra_keys = [
@@ -195,7 +196,9 @@ def insert_particle_set(
         if k and k not in (exposure_tag, x_tag, y_tag, set_id_tag)
     ]
     set_ids = set(data[set_id_tag])
-    _particle_sets = extractor.get_particle_sets(set_name, set_ids, star_file_path)
+    _particle_sets = extractor.get_particle_sets(
+        project, set_name, set_ids, star_file_path
+    )
     if not _particle_sets:
         if add_source_to_id:
             particle_sets = [

@@ -30,6 +30,7 @@ class CSVDataLoader(ComponentTab):
         self._exposure_tag = None
         self._column = None
         self._proj_dir = project_directory
+        self.project = ""
 
         csv_lbl = QLabel()
         csv_lbl.setText("CSV file:")

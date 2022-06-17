@@ -31,7 +31,7 @@ def _ctf(relion_dir: Path, data_handler: DataAPI):
     )
 
 
-def _class2d(relion_dir: Path, data_handler: DataAPI):
+def _class2d(relion_dir: Path, data_handler: DataAPI, project: str):
     for class_file_path in (relion_dir / "Class2D").glob("job*"):
         star_file = open_star_file(class_file_path / "run_it020_data.star")
         cross_ref_star_file = open_star_file(class_file_path / "run_it020_model.star")
@@ -76,11 +76,12 @@ def _class2d(relion_dir: Path, data_handler: DataAPI):
             "_rlncoordinatey",
             str(class_file_path / "run_it020_data.star"),
             data_handler,
+            project,
             add_source_to_id=True,
         )
 
 
-def gather_relion_defaults(relion_dir: Path, data_handler: DataAPI):
+def gather_relion_defaults(relion_dir: Path, data_handler: DataAPI, project: str):
     _motion_corr(relion_dir, data_handler)
     _ctf(relion_dir, data_handler)
-    _class2d(relion_dir, data_handler)
+    _class2d(relion_dir, data_handler, project)

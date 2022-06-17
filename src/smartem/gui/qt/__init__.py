@@ -251,6 +251,8 @@ class ProjectLoader(ComponentTab):
         parse_epu_dir(Path(self.epu_dir), self._extractor)
         self._main_display._set_epu_directory(Path(self.epu_dir))
         self._main_display._set_data_size(Path(self.project_dir))
+        self._main_display.project = self._project_name
+        self._atlas_display.project = self._project_name
         self.refresh()
         self._update_loaders()
 
@@ -260,12 +262,16 @@ class ProjectLoader(ComponentTab):
             raise ValueError("Atlas record not found")
         self._main_display._set_epu_directory(Path(self.epu_dir))
         self._main_display._set_data_size(Path(self.project_dir))
+        self._main_display.project = self._project_name
+        self._atlas_display.project = self._project_name
         self.refresh()
         self._update_loaders()
 
     def _create_and_gather(self):
         self._create_project()
-        gather_relion_defaults(Path(self.project_dir), self._extractor)
+        gather_relion_defaults(
+            Path(self.project_dir), self._extractor, self._project_name
+        )
         self.refresh()
 
     def refresh(self):
@@ -348,9 +354,10 @@ class MainDisplay(ComponentTab):
         self._gather_btn = QPushButton("Gather data")
         self._gather_btn.clicked.connect(self._gather_data)
         self.grid.addWidget(self._gather_btn, 3, 1)
+        self.project = ""
 
     def load(self):
-        self._grid_squares = self._extractor.get_grid_squares()
+        self._grid_squares = self._extractor.get_grid_squares(project=self.project)
         self._square_combo.clear()
         for gs in self._grid_squares:
             self._square_combo.addItem(gs.grid_square_name)
@@ -371,7 +378,7 @@ class MainDisplay(ComponentTab):
 
     def _gather_atlas_data(self):
         _grid_square = self._grid_squares[self._square_combo.currentIndex()]
-        _atlas = self._extractor.get_atlases()
+        _atlas = self._extractor.get_atlases(project=self.project)
         atlas_sql_data = self._extractor.get_atlas_info(
             _atlas.atlas_id,
             self._exposure_keys,
@@ -711,7 +718,7 @@ class MainDisplay(ComponentTab):
     def _select_exposure(self, index: int):
         exposure_lbl = QLabel(self)
         try:
-            _project = self._extractor.get_project()
+            _project = self._extractor.get_project(project_name=self.project)
             _epu_version = _project.acquisition_software_version
             if (
                 int(_epu_version.split(".")[0]) >= 2
@@ -808,15 +815,21 @@ class MainDisplay(ComponentTab):
         self._data_list.clear()
         self._pick_list.clear()
 
-        self._data_keys["micrograph"] = self._extractor.get_exposure_keys()
-        self._data_keys["particle"] = self._extractor.get_particle_keys()
-        self._data_keys["particle_set"] = self._extractor.get_particle_set_keys()
+        self._data_keys["micrograph"] = self._extractor.get_exposure_keys(self.project)
+        self._data_keys["particle"] = self._extractor.get_particle_keys(self.project)
+        self._data_keys["particle_set"] = self._extractor.get_particle_set_keys(
+            self.project
+        )
         for keys in self._data_keys.values():
             for k in keys:
                 self._data_list.addItem(k)
 
-        self._pick_keys["source"] = self._extractor.get_particle_info_sources()
-        self._pick_keys["set_group"] = self._extractor.get_particle_set_group_names()
+        self._pick_keys["source"] = self._extractor.get_particle_info_sources(
+            self.project
+        )
+        self._pick_keys["set_group"] = self._extractor.get_particle_set_group_names(
+            self.project
+        )
         for keys in self._pick_keys.values():
             for k in keys:
                 self._pick_list.addItem(k)
@@ -839,6 +852,7 @@ class AtlasDisplay(ComponentTab):
         self._colour_bar = None
         self._grid_square: Optional[GridSquare] = None
         self._all_grid_squares: List[GridSquare] = []
+        self.project = ""
 
     def load(
         self,
@@ -908,7 +922,7 @@ class AtlasDisplay(ComponentTab):
         flip: Tuple[int, int] = (1, 1),
     ) -> Optional[QLabel]:
         _atlas: Optional[Atlas] = None
-        _atlases = self._extractor.get_atlases()
+        _atlases = self._extractor.get_atlases(project=self.project)
         if isinstance(_atlases, Atlas):
             _atlas = _atlases
         elif _atlases:
@@ -962,7 +976,8 @@ class AtlasDisplay(ComponentTab):
         self, grid_square: GridSquare, epu_dir: Path, flip: Tuple[int, int] = (1, 1)
     ) -> Optional[QLabel]:
         _tile = self._extractor.get_tile(
-            (grid_square.stage_position_x, grid_square.stage_position_y)
+            (grid_square.stage_position_x, grid_square.stage_position_y),
+            project=self.project,
         )
         if _tile:
             tile_pixmap = QPixmap(_tile.thumbnail)
