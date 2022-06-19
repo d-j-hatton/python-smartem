@@ -26,7 +26,7 @@ import smartem.gui
 from smartem.data_model import Project
 from smartem.data_model.extract import DataAPI
 from smartem.gui.qt.component_tab import ComponentTab
-from smartem.gui.qt.display import AtlasDisplay, MainDisplay
+from smartem.gui.qt.display import AtlasDisplayWrapper, MainDisplay
 from smartem.gui.qt.loader import (
     ExposureDataLoader,
     ParticleDataLoader,
@@ -55,7 +55,7 @@ class QtFrame(QWidget):
         super().__init__()
         self.tabs = QTabWidget()
         self.layout = QVBoxLayout(self)
-        atlas_display = AtlasDisplay(extractor)
+        atlas_display = AtlasDisplayWrapper(extractor)
         main_display = MainDisplay(extractor, atlas_view=atlas_display)
         data_loader = ExposureDataLoader(extractor, refreshers=[main_display])
         csv_data_loader = CSVDataLoader(extractor, refreshers=[main_display])
@@ -92,7 +92,7 @@ class ProjectLoader(ComponentTab):
         particle_loader: ParticleDataLoader,
         particle_set_loader: ParticleSetDataLoader,
         main_display: MainDisplay,
-        atlas_display: AtlasDisplay,
+        atlas_display: AtlasDisplayWrapper,
         refreshers: Optional[List[ComponentTab]] = None,
     ):
         super().__init__(refreshers=refreshers)
