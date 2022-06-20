@@ -27,7 +27,7 @@ from smartem.data_model.structure import (
     extract_keys_with_foil_hole_averages,
     extract_keys_with_grid_square_averages,
 )
-from smartem.gui.qt.component_tab import ComponentTab, TabWrapper
+from smartem.gui.qt.component_tab import ComponentTab
 from smartem.gui.qt.image_utils import ImageLabel, ParticleImageLabel
 
 
@@ -35,7 +35,7 @@ class MainDisplay(ComponentTab):
     def __init__(
         self,
         extractor: DataAPI,
-        atlas_view: Optional[AtlasDisplayWrapper] = None,
+        atlas_view: Optional[AtlasDisplay] = None,
         refreshers: Optional[List[ComponentTab]] = None,
     ):
         super().__init__(refreshers=refreshers)
@@ -745,15 +745,3 @@ class AtlasDisplay(ComponentTab):
             tile_lbl.setPixmap(tile_pixmap)
             return tile_lbl
         return None
-
-
-class AtlasDisplayWrapper(TabWrapper):
-    def __init__(self, *args, **kwargs):
-        super.__init__(AtlasDisplay, *args, **kwargs)
-
-    def _process_loop(self, *args, **kwargs):
-        args[0] = DataAPI()
-        super._process_loop(*args, **kwargs)
-
-    def load(self, *args, **kwargs):
-        self._tab_call("load", *args, **kwargs)
