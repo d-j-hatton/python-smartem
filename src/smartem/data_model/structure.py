@@ -2,6 +2,7 @@ import math
 from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
+from sqlalchemy.engine.row import LegacyRow
 
 from smartem.data_model import Base, Exposure, FoilHole, Particle
 
@@ -112,15 +113,15 @@ def extract_keys(
 
 
 def extract_keys_with_foil_hole_averages(
-    sql_result: list,
+    sql_result: List[LegacyRow],
     exposure_keys: List[str],
     particle_keys: List[str],
     particle_set_keys: List[str],
     limits: Optional[Dict[str, Tuple[float, float]]] = None,
 ) -> Dict[str, ExtractedData]:
     limits = limits or {}
-    particles = {sr[_particle_tab_index(sr)] for sr in sql_result}
-    exposures = {sr[_exposure_tab_index(sr)] for sr in sql_result}
+    particles = {sr.particle_id for sr in sql_result if hasattr(sr, "particle_id")}
+    exposures = {sr.exposure_name for sr in sql_result}
     keys = exposure_keys + particle_keys + particle_set_keys
     avg_particles = bool(exposure_keys) and (
         bool(particle_keys) or bool(particle_set_keys)
@@ -136,12 +137,12 @@ def extract_keys_with_foil_hole_averages(
     foil_hole_counts: Dict[str, Dict[str, int]] = {}
     if use_particles:
         for i, p in enumerate(particles):
-            unused_indices[p.particle_id] = [False for _ in keys]
-            indices[p.particle_id] = i
+            unused_indices[p] = [False for _ in keys]
+            indices[p] = i
     else:
         for i, exp in enumerate(exposures):
-            unused_indices[exp.exposure_name] = [False for _ in keys]
-            indices[exp.exposure_name] = i
+            unused_indices[exp] = [False for _ in keys]
+            indices[exp] = i
     for key in keys:
         foil_hole_sums[key] = {}
         foil_hole_counts[key] = {}
@@ -153,46 +154,32 @@ def extract_keys_with_foil_hole_averages(
         else:
             flat_results[key] = np.full(len(exposures), None)
     for sr in sql_result:
-        particle_tab_index = _particle_tab_index(sr)
-        exposure_tab_index = _exposure_tab_index(sr)
-        current_bound = limits.get(sr[0].key, (-np.inf, np.inf))
-        if sr[0].value > current_bound[0] and sr[0].value < current_bound[1]:
+        current_bound = limits.get(sr.key, (-np.inf, np.inf))
+        if sr.value > current_bound[0] and sr.value < current_bound[1]:
             if use_particles:
-                particle_index = indices[sr[particle_tab_index].particle_id]
-                if not math.isinf(sr[0].value):
-                    flat_results[sr[0].key][particle_index] = sr[0].value
-                    unused_indices[sr[particle_tab_index].particle_id][
-                        keys.index(sr[0].key)
-                    ] = True
+                particle_index = indices[sr.particle_id]
+                if not math.isinf(sr.value):
+                    flat_results[sr.key][particle_index] = sr.value
+                    unused_indices[sr.particle_id][keys.index(sr.key)] = True
             else:
-                exposure_index = indices[sr[-1].exposure_name]
+                exposure_index = indices[sr.exposure_name]
                 if avg_particles:
-                    if not math.isinf(sr[0].value):
-                        flat_results[sr[0].key][exposure_index] += sr[0].value
-                        flat_counts[sr[0].key][exposure_index] += 1
+                    if not math.isinf(sr.value):
+                        flat_results[sr.key][exposure_index] += sr.value
+                        flat_counts[sr.key][exposure_index] += 1
                 else:
-                    if not math.isinf(sr[0].value):
-                        flat_results[sr[0].key][exposure_index] = sr[0].value
-                if not math.isinf(sr[0].value):
-                    unused_indices[sr[exposure_tab_index].exposure_name][
-                        keys.index(sr[0].key)
-                    ] = True
+                    if not math.isinf(sr.value):
+                        flat_results[sr.key][exposure_index] = sr.value
+                if not math.isinf(sr.value):
+                    unused_indices[sr.exposure_name][keys.index(sr.key)] = True
             try:
-                if not math.isinf(sr[0].value):
-                    foil_hole_sums[sr[0].key][
-                        sr[exposure_tab_index].foil_hole_name
-                    ] += sr[0].value
-                    foil_hole_counts[sr[0].key][
-                        sr[exposure_tab_index].foil_hole_name
-                    ] += 1
+                if not math.isinf(sr.value):
+                    foil_hole_sums[sr.key][sr.foil_hole_name] += sr.value
+                    foil_hole_counts[sr.key][sr.foil_hole_name] += 1
             except KeyError:
-                if not math.isinf(sr[0].value):
-                    foil_hole_sums[sr[0].key][
-                        sr[exposure_tab_index].foil_hole_name
-                    ] = sr[0].value
-                    foil_hole_counts[sr[0].key][
-                        sr[exposure_tab_index].foil_hole_name
-                    ] = 1
+                if not math.isinf(sr.value):
+                    foil_hole_sums[sr.key][sr.foil_hole_name] = sr.value
+                    foil_hole_counts[sr.key][sr.foil_hole_name] = 1
     foil_hole_averages = {}
     for k in keys:
         foil_hole_averages[k] = {
@@ -220,13 +207,13 @@ def extract_keys_with_foil_hole_averages(
 
 
 def extract_keys_with_grid_square_averages(
-    sql_result: list,
+    sql_result: List[LegacyRow],
     exposure_keys: List[str],
     particle_keys: List[str],
     particle_set_keys: List[str],
 ) -> Dict[str, ExtractedData]:
-    particles = {sr[_particle_tab_index(sr)] for sr in sql_result}
-    exposures = {sr[_exposure_tab_index(sr)] for sr in sql_result}
+    particles = {sr.particle_id for sr in sql_result if hasattr(sr, "particle_id")}
+    exposures = {sr.exposure_name for sr in sql_result}
     keys = exposure_keys + particle_keys + particle_set_keys
     avg_particles = bool(exposure_keys) and (
         bool(particle_keys) or bool(particle_set_keys)
@@ -242,12 +229,12 @@ def extract_keys_with_grid_square_averages(
     grid_square_counts: Dict[str, Dict[str, int]] = {}
     if use_particles:
         for i, p in enumerate(particles):
-            unused_indices[p.particle_id] = [False for _ in keys]
-            indices[p.particle_id] = i
+            unused_indices[p] = [False for _ in keys]
+            indices[p] = i
     else:
         for i, exp in enumerate(exposures):
-            unused_indices[exp.exposure_name] = [False for _ in keys]
-            indices[exp.exposure_name] = i
+            unused_indices[exp] = [False for _ in keys]
+            indices[exp] = i
     for key in keys:
         grid_square_counts[key] = {}
         grid_square_sums[key] = {}
@@ -259,45 +246,30 @@ def extract_keys_with_grid_square_averages(
         else:
             flat_results[key] = np.full(len(exposures), None)
     for sr in sql_result:
-        particle_tab_index = _particle_tab_index(sr)
-        exposure_tab_index = _exposure_tab_index(sr)
-        foil_hole_tab_index = _foil_hole_tab_index(sr)
         if use_particles:
-            particle_index = indices[sr[particle_tab_index].particle_id]
-            if not math.isinf(sr[0].value):
-                flat_results[sr[0].key][particle_index] = sr[0].value
-                unused_indices[sr[particle_tab_index].particle_id][
-                    keys.index(sr[0].key)
-                ] = True
+            particle_index = indices[sr.particle_id]
+            if not math.isinf(sr.value):
+                flat_results[sr.key][particle_index] = sr.value
+                unused_indices[sr.particle_id][keys.index(sr.key)] = True
         else:
-            exposure_index = indices[sr[-1].exposure_name]
+            exposure_index = indices[sr.exposure_name]
             if avg_particles:
-                if not math.isinf(sr[0].value):
-                    flat_results[sr[0].key][exposure_index] += sr[0].value
-                    flat_counts[sr[0].key][exposure_index] += 1
+                if not math.isinf(sr.value):
+                    flat_results[sr.key][exposure_index] += sr.value
+                    flat_counts[sr.key][exposure_index] += 1
             else:
-                if not math.isinf(sr[0].value):
-                    flat_results[sr[0].key][exposure_index] = sr[0].value
-            if not math.isinf(sr[0].value):
-                unused_indices[sr[exposure_tab_index].exposure_name][
-                    keys.index(sr[0].key)
-                ] = True
+                if not math.isinf(sr.value):
+                    flat_results[sr.key][exposure_index] = sr.value
+            if not math.isinf(sr.value):
+                unused_indices[sr.exposure_name][keys.index(sr.key)] = True
         try:
-            if not math.isinf(sr[0].value):
-                grid_square_sums[sr[0].key][
-                    sr[foil_hole_tab_index].grid_square_name
-                ] += sr[0].value
-                grid_square_counts[sr[0].key][
-                    sr[foil_hole_tab_index].grid_square_name
-                ] += 1
+            if not math.isinf(sr.value):
+                grid_square_sums[sr.key][sr.grid_square_name] += sr.value
+                grid_square_counts[sr.key][sr.grid_square_name] += 1
         except KeyError:
-            if not math.isinf(sr[0].value):
-                grid_square_sums[sr[0].key][
-                    sr[foil_hole_tab_index].grid_square_name
-                ] = sr[0].value
-                grid_square_counts[sr[0].key][
-                    sr[foil_hole_tab_index].grid_square_name
-                ] = 1
+            if not math.isinf(sr.value):
+                grid_square_sums[sr.key][sr.grid_square_name] = sr.value
+                grid_square_counts[sr.key][sr.grid_square_name] = 1
     grid_square_averages = {}
     for k in keys:
         grid_square_averages[k] = {

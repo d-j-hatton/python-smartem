@@ -1,6 +1,7 @@
 from typing import Any, List, Optional, Sequence, Set, Tuple, Type, Union
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
+from sqlalchemy.engine.row import LegacyRow
 from sqlalchemy.orm import Load, load_only, sessionmaker
 
 from smartem.data_model import (
@@ -26,8 +27,8 @@ class DataAPI:
     def __init__(self, project: str = ""):
         _url = url()
         self._project = project
-        engine = create_engine(_url)
-        self.session = sessionmaker(bind=engine)()
+        self.engine = create_engine(_url)
+        self.session = sessionmaker(bind=self.engine)()
 
     def set_project(self, project: str) -> bool:
         self._project = project
@@ -556,65 +557,110 @@ class DataAPI:
         exposure_keys: List[str],
         particle_keys: List[str],
         particle_set_keys: List[str],
-    ) -> List[tuple]:
-        particle_batch_size = 500000
+    ) -> List[LegacyRow]:
         info: List[tuple] = []
         if not any((exposure_keys, particle_keys, particle_set_keys)):
             return info
         exposure_query = (
-            self.session.query(ExposureInfo, FoilHole, Exposure)
-            .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
-            .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
-            .filter(ExposureInfo.key.in_(exposure_keys))
-            .filter(FoilHole.grid_square_name == grid_square_name)
+            select(
+                (
+                    Exposure.exposure_name,
+                    FoilHole.foil_hole_name,
+                    ExposureInfo.key,
+                    ExposureInfo.value,
+                ),
+            )
+            .select_from(
+                ExposureInfo.__table__.join(
+                    Exposure.__table__,
+                    Exposure.exposure_name == ExposureInfo.exposure_name,
+                ).join(
+                    FoilHole.__table__,
+                    Exposure.foil_hole_name == FoilHole.foil_hole_name,
+                )
+            )
+            .where(
+                ExposureInfo.key.in_(exposure_keys),
+            )
+            .where(FoilHole.grid_square_name == grid_square_name)
             .order_by(Exposure.exposure_name)
         )
-        info.extend(exposure_query.all())
+        with self.engine.connect() as connection:
+            info.extend(connection.execute(exposure_query).fetchall())
+
         if particle_keys:
-            base_query = (
-                self.session.query(ParticleInfo, FoilHole, Particle, Exposure)
-                .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
-                .join(Particle, Particle.exposure_name == Exposure.exposure_name)
-                .join(ParticleInfo, ParticleInfo.particle_id == Particle.particle_id)
-                .filter(ParticleInfo.key.in_(particle_keys))
-                .filter(FoilHole.grid_square_name == grid_square_name)
-            )
-            particle_count = base_query.count()
-            num_full_batches = particle_count // particle_batch_size
-            for b in range(num_full_batches + 1):
-                particle_query = (
-                    base_query.order_by(Particle.particle_id)
-                    .limit(particle_batch_size)
-                    .offset(b * particle_batch_size)
+            particle_query = (
+                select(
+                    (
+                        Particle.particle_id,
+                        Particle.x,
+                        Particle.y,
+                        Exposure.exposure_name,
+                        FoilHole.foil_hole_name,
+                        ParticleInfo.key,
+                        ParticleInfo.value,
+                    ),
                 )
-                info.extend(particle_query.all())
+                .select_from(
+                    ParticleInfo.__table__.join(
+                        Particle.__table__,
+                        Particle.particle_id == ParticleInfo.particle_id,
+                    )
+                    .join(
+                        Exposure.__table__,
+                        Particle.exposure_name == Exposure.exposure_name,
+                    )
+                    .join(
+                        FoilHole.__table__,
+                        Exposure.foil_hole_name == FoilHole.foil_hole_name,
+                    )
+                )
+                .where(
+                    ParticleInfo.key.in_(particle_keys),
+                )
+                .where(FoilHole.grid_square_name == grid_square_name)
+                .order_by(Particle.particle_id)
+            )
+            with self.engine.connect() as connection:
+                info.extend(connection.execute(particle_query).fetchall())
+
         if particle_set_keys:
-            base_query = (
-                self.session.query(
-                    ParticleSetInfo, ParticleSetLinker, FoilHole, Particle, Exposure
+            particle_set_query = (
+                select(
+                    (
+                        Particle.particle_id,
+                        Particle.x,
+                        Particle.y,
+                        Exposure.exposure_name,
+                        FoilHole.foil_hole_name,
+                        ParticleSetInfo.key,
+                        ParticleSetInfo.value,
+                    ),
                 )
-                .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
-                .join(Particle, Particle.exposure_name == Exposure.exposure_name)
-                .join(
-                    ParticleSetLinker,
-                    ParticleSetLinker.particle_id == Particle.particle_id,
+                .select_from(
+                    ParticleSetInfo.__table__.join(
+                        ParticleSetLinker.__table__,
+                        ParticleSetLinker.set_name == ParticleSetInfo.set_name,
+                    )
+                    .join(
+                        Particle.__table__,
+                        Particle.particle_id == ParticleSetLinker.particle_id,
+                    )
+                    .join(
+                        Exposure.__table__,
+                        Particle.exposure_name == Exposure.exposure_name,
+                    )
+                    .join(
+                        FoilHole.__table__,
+                        Exposure.foil_hole_name == FoilHole.foil_hole_name,
+                    )
                 )
-                .join(
-                    ParticleSetInfo,
-                    ParticleSetInfo.set_name == ParticleSetLinker.set_name,
-                )
-                .filter(ParticleSetInfo.key.in_(particle_set_keys))
-                .filter(FoilHole.grid_square_name == grid_square_name)
+                .where(ParticleSetInfo.key.in_(particle_set_keys))
+                .where(FoilHole.grid_square_name == grid_square_name)
+                .order_by(Particle.particle_id)
             )
-            particle_count = base_query.count()
-            num_full_batches = particle_count // particle_batch_size
-            for b in range(num_full_batches + 1):
-                particle_set_query = (
-                    base_query.order_by(Particle.particle_id)
-                    .limit(particle_batch_size)
-                    .offset(b * particle_batch_size)
-                )
-                info.extend(particle_set_query.all())
+            with self.engine.connect() as connection:
+                info.extend(connection.execute(particle_set_query).fetchall())
         return info
 
     def get_atlas_info(
@@ -623,83 +669,128 @@ class DataAPI:
         exposure_keys: List[str],
         particle_keys: List[str],
         particle_set_keys: List[str],
-    ) -> List[tuple]:
-        particle_batch_size = 500000
+    ) -> List[LegacyRow]:
         info: List[tuple] = []
         if not any((exposure_keys, particle_keys, particle_set_keys)):
             return info
         exposure_query = (
-            self.session.query(ExposureInfo, FoilHole, GridSquare, Tile, Exposure)
-            .join(Exposure, Exposure.exposure_name == ExposureInfo.exposure_name)
-            .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
-            .join(GridSquare, GridSquare.grid_square_name == FoilHole.grid_square_name)
-            .join(Tile, Tile.tile_id == GridSquare.tile_id)
-            .filter(ExposureInfo.key.in_(exposure_keys))
-            .filter(Tile.atlas_id == atlas_id)
+            select(
+                (
+                    Exposure.exposure_name,
+                    FoilHole.foil_hole_name,
+                    GridSquare.grid_square_name,
+                    ExposureInfo.key,
+                    ExposureInfo.value,
+                ),
+            )
+            .select_from(
+                ExposureInfo.__table__.join(
+                    Exposure.__table__,
+                    Exposure.exposure_name == ExposureInfo.exposure_name,
+                )
+                .join(
+                    FoilHole.__table__,
+                    Exposure.foil_hole_name == FoilHole.foil_hole_name,
+                )
+                .join(
+                    GridSquare.__table__,
+                    FoilHole.grid_square_name == GridSquare.grid_square_name,
+                )
+                .join(Tile.__table__, GridSquare.tile_id == Tile.tile_id)
+            )
+            .where(ExposureInfo.key.in_(exposure_keys))
+            .where(Tile.atlas_id == atlas_id)
             .order_by(Exposure.exposure_name)
         )
-        info.extend(exposure_query.all())
+        with self.engine.connect() as connection:
+            info.extend(connection.execute(exposure_query).fetchall())
+
         if particle_keys:
-            base_query = (
-                self.session.query(
-                    ParticleInfo, FoilHole, Particle, GridSquare, Tile, Exposure
+            particle_query = (
+                select(
+                    (
+                        Particle.particle_id,
+                        Particle.x,
+                        Particle.y,
+                        Exposure.exposure_name,
+                        FoilHole.foil_hole_name,
+                        GridSquare.grid_square_name,
+                        ParticleInfo.key,
+                        ParticleInfo.value,
+                    ),
                 )
-                .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
-                .join(Particle, Particle.exposure_name == Exposure.exposure_name)
-                .join(
-                    GridSquare, GridSquare.grid_square_name == FoilHole.grid_square_name
+                .select_from(
+                    ParticleInfo.__table__.join(
+                        Particle.__table__,
+                        Particle.particle_id == ParticleInfo.particle_id,
+                    )
+                    .join(
+                        Exposure.__table__,
+                        Particle.exposure_name == Exposure.exposure_name,
+                    )
+                    .join(
+                        FoilHole.__table__,
+                        Exposure.foil_hole_name == FoilHole.foil_hole_name,
+                    )
+                    .join(
+                        GridSquare.__table__,
+                        FoilHole.grid_square_name == GridSquare.grid_square_name,
+                    )
+                    .join(Tile.__table__, GridSquare.tile_id == Tile.tile_id)
                 )
-                .join(Tile, Tile.tile_id == GridSquare.tile_id)
-                .join(ParticleInfo, ParticleInfo.particle_id == Particle.particle_id)
-                .filter(ParticleInfo.key.in_(particle_keys))
-                .filter(Tile.atlas_id == atlas_id)
+                .where(ParticleInfo.key.in_(particle_keys))
+                .where(Tile.atlas_id == atlas_id)
+                .order_by(Particle.particle_id)
             )
-            particle_count = base_query.count()
-            num_full_batches = particle_count // particle_batch_size
-            for b in range(num_full_batches + 1):
-                particle_query = (
-                    base_query.order_by(Particle.particle_id)
-                    .limit(particle_batch_size)
-                    .offset(b * particle_batch_size)
-                )
-                info.extend(particle_query.all())
+            with self.engine.connect() as connection:
+                info.extend(connection.execute(particle_query).fetchall())
+
         if particle_set_keys:
-            base_query = (
-                self.session.query(
-                    ParticleSetInfo,
-                    ParticleSetLinker,
-                    FoilHole,
-                    GridSquare,
-                    Particle,
-                    Tile,
-                    Exposure,
+            particle_set_query = (
+                select(
+                    (
+                        Particle.particle_id,
+                        Particle.x,
+                        Particle.y,
+                        Exposure.exposure_name,
+                        FoilHole.foil_hole_name,
+                        GridSquare.grid_square_name,
+                        ParticleSetInfo.key,
+                        ParticleSetInfo.value,
+                    ),
                 )
-                .join(FoilHole, FoilHole.foil_hole_name == Exposure.foil_hole_name)
-                .join(
-                    GridSquare, GridSquare.grid_square_name == FoilHole.grid_square_name
+                .select_from(
+                    ParticleSetInfo.__table__.join(
+                        ParticleSetLinker.__table__,
+                        ParticleSetLinker.set_name == ParticleSetInfo.set_name,
+                    )
+                    .join(
+                        Particle.__table__,
+                        Particle.particle_id == ParticleSetLinker.particle_id,
+                    )
+                    .join(
+                        Exposure.__table__,
+                        Particle.exposure_name == Exposure.exposure_name,
+                    )
+                    .join(
+                        FoilHole.__table__,
+                        Exposure.foil_hole_name == FoilHole.foil_hole_name,
+                    )
+                    .join(
+                        GridSquare.__table__,
+                        FoilHole.grid_square_name == GridSquare.grid_square_name,
+                    )
+                    .join(Tile.__table__, GridSquare.tile_id == Tile.tile_id)
                 )
-                .join(Tile, Tile.tile_id == GridSquare.tile_id)
-                .join(Particle, Particle.exposure_name == Exposure.exposure_name)
-                .join(
-                    ParticleSetLinker,
-                    ParticleSetLinker.particle_id == Particle.particle_id,
+                .where(
+                    ParticleSetInfo.key.in_(particle_set_keys),
                 )
-                .join(
-                    ParticleSetInfo,
-                    ParticleSetInfo.set_name == ParticleSetLinker.set_name,
-                )
-                .filter(ParticleSetInfo.key.in_(particle_set_keys))
-                .filter(Tile.atlas_id == atlas_id)
+                .where(Tile.atlas_id == atlas_id)
+                .order_by(Particle.particle_id)
             )
-            particle_count = base_query.count()
-            num_full_batches = particle_count // particle_batch_size
-            for b in range(num_full_batches + 1):
-                particle_set_query = (
-                    base_query.order_by(Particle.particle_id)
-                    .limit(particle_batch_size)
-                    .offset(b * particle_batch_size)
-                )
-                info.extend(particle_set_query.all())
+            with self.engine.connect() as connection:
+                result = connection.execute(particle_set_query).fetchall()
+                info.extend(result)
         return info
 
     def put(self, entries: Sequence[Base]):
