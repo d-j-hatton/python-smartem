@@ -196,7 +196,11 @@ class ExposureDataLoader(StarDataLoader):
                 star_file, [self._exposure_tag, self._column], "micrographs"
             )
             insert_exposure_data(
-                column_data, self._exposure_tag, str(star_file_path), self._extractor
+                column_data,
+                self._exposure_tag,
+                str(star_file_path),
+                self._extractor,
+                project=self.project,
             )
 
     def load(self):
@@ -299,6 +303,7 @@ class ParticleDataLoader(ExposureDataLoader):
                     self._y_tag,
                     str(star_file_path),
                     self._extractor,
+                    project=self.project,
                 )
                 source_set = ParticleSet(
                     group_name=str(star_file_path),
@@ -328,6 +333,7 @@ class ParticleDataLoader(ExposureDataLoader):
                     str(star_file_path),
                     self._extractor,
                     just_particles=True,
+                    project=self.project,
                 )
 
     def load(self):
@@ -562,6 +568,7 @@ class ParticleSetDataLoader(ParticleDataLoader):
                     self._extractor,
                     self.project,
                     add_source_to_id=True,
+                    project=self.project,
                 )
             else:
                 star_file = open_star_file(star_file_path)
@@ -587,6 +594,7 @@ class ParticleSetDataLoader(ParticleDataLoader):
                     self._extractor,
                     self.project,
                     add_source_to_id=True,
+                    project=self.project,
                 )
 
     def load(self):

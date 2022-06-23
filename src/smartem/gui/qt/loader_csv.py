@@ -109,6 +109,7 @@ class CSVDataLoader(ComponentTab):
                 str(csv_file_path),
                 self._extractor,
                 extra_suffix="_grouped",
+                project=self.project,
             )
 
     def _select_csv_file(

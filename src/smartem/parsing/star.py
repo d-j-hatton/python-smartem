@@ -47,9 +47,10 @@ def insert_exposure_data(
     extractor: DataAPI,
     validate: bool = True,
     extra_suffix: str = "",
+    project: str = "",
 ):
     if validate:
-        exposures = [e.exposure_name for e in extractor.get_exposures()]
+        exposures = [e.exposure_name for e in extractor.get_exposures(project=project)]
     exposure_info: List[ExposureInfo] = []
     for k, v in data.items():
         if k != exposure_tag:
@@ -71,7 +72,8 @@ def insert_exposure_data(
                         )
                         exposure_info.append(exinf)
                     else:
-                        print(f"exposure {exposure_name} not found")
+                        pass
+                        # print(f"exposure {exposure_name} not found")
                 else:
                     exinf = ExposureInfo(
                         exposure_name=exposure_name,
@@ -80,7 +82,6 @@ def insert_exposure_data(
                         value=value,
                     )
                     exposure_info.append(exinf)
-
     extractor.put(exposure_info)
 
 
@@ -121,8 +122,9 @@ def insert_particle_data(
     y_tag: str,
     star_file_path: str,
     extractor: DataAPI,
+    project: str = "",
 ) -> List[Particle]:
-    exposures = [e.exposure_name for e in extractor.get_exposures()]
+    exposures = [e.exposure_name for e in extractor.get_exposures(project=project)]
     particle_info: List[ParticleInfo] = []
     extra_keys = [k for k in data.keys() if k and k not in (exposure_tag, x_tag, y_tag)]
 
@@ -225,7 +227,7 @@ def insert_particle_set(
             for ps in _particle_sets:
                 if ps.identifier == set_id:
                     particle_sets.append(ps)
-    exposures = [e.exposure_name for e in extractor.get_exposures()]
+    exposures = [e.exposure_name for e in extractor.get_exposures(project=project)]
     structured_data = _structure_particle_data(
         data, exposures, exposure_tag, x_tag, y_tag
     )

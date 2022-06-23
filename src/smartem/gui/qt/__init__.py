@@ -216,6 +216,10 @@ class ProjectLoader(ComponentTab):
         self._csv_data_loader._set_project_directory(Path(self.project_dir))
         self._particle_loader._set_project_directory(Path(self.project_dir))
         self._particle_set_loader._set_project_directory(Path(self.project_dir))
+        self._data_loader.project = self._project_name
+        self._csv_data_loader.project = self._project_name
+        self._particle_loader.project = self._project_name
+        self._particle_set_loader.project = self._project_name
 
     def _create_project(self):
         self._project_name = self._name_input.text()
