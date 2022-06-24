@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Generator, List, Optional
@@ -519,7 +520,13 @@ class ParticleSetDataLoader(ParticleDataLoader):
         star_file_path: Path,
         just_particles: bool = False,
         cross_ref_file_path: Optional[Path] = None,
+        new_thread: bool = True,
     ):
+        print("insert from", star_file_path)
+        if new_thread:
+            data_api: Optional[DataAPI] = DataAPI()
+        else:
+            data_api = None
         if self._exposure_tag and self._column:
             if cross_ref_file_path:
                 star_file = open_star_file(star_file_path)
@@ -565,10 +572,9 @@ class ParticleSetDataLoader(ParticleDataLoader):
                     self._x_tag,
                     self._y_tag,
                     str(star_file_path),
-                    self._extractor,
+                    data_api or self._extractor,
                     self.project,
                     add_source_to_id=True,
-                    project=self.project,
                 )
             else:
                 star_file = open_star_file(star_file_path)
@@ -591,22 +597,32 @@ class ParticleSetDataLoader(ParticleDataLoader):
                     self._x_tag,
                     self._y_tag,
                     str(star_file_path),
-                    self._extractor,
+                    data_api or self._extractor,
                     self.project,
                     add_source_to_id=True,
-                    project=self.project,
                 )
 
+    def _set_tags(self):
+        self._exposure_tag = self._exposure_tag_combo.currentText()
+        self._x_tag = self._x_tag_combo.currentText()
+        self._y_tag = self._y_tag_combo.currentText()
+        self._column = self._column_combo.currentText()
+        self._set_id_tag = self._set_id_combo.currentText()
+
     def load(self):
+        self._set_tags()
         if (
-            self._exposure_tag
-            and self._x_tag
-            and self._y_tag
-            and self._column
-            and self._set_id_tag
+            self._exposure_tag_combo.currentText()
+            and self._x_tag_combo.currentText()
+            and self._y_tag_combo.currentText()
+            and self._column_combo.currentText()
+            and self._set_id_combo.currentText()
             and self._group_name_box.text()
         ):
+
             if "*" in self._file_combo.currentText():
+                thread_pool = ThreadPoolExecutor(max_workers=10)
+                futures = []
                 if "*" in self._cross_ref_file_combo.currentText():
                     split_file_name = self._file_combo.currentText().split("*")
                     for sfp in _string_to_glob(self._file_combo.currentText()):
@@ -616,13 +632,17 @@ class ParticleSetDataLoader(ParticleDataLoader):
                                 .replace(split_file_name[0], "")
                                 .replace(split_file_name[-1], "")
                             )
-                            self._insert_from_star_file(
-                                sfp,
-                                cross_ref_file_path=Path(
-                                    self._cross_ref_file_combo.currentText().replace(
-                                        "*", wildcard
-                                    )
-                                ),
+                            futures.append(
+                                thread_pool.submit(
+                                    self._insert_from_star_file,
+                                    sfp,
+                                    cross_ref_file_path=Path(
+                                        self._cross_ref_file_combo.currentText().replace(
+                                            "*", wildcard
+                                        )
+                                    ),
+                                    new_thread=True,
+                                )
                             )
                 elif self._cross_ref_file_combo.currentText():
                     for sfp in _string_to_glob(self._file_combo.currentText()):
@@ -636,7 +656,13 @@ class ParticleSetDataLoader(ParticleDataLoader):
                 else:
                     for sfp in _string_to_glob(self._file_combo.currentText()):
                         if not sfp.parent.is_symlink():
-                            self._insert_from_star_file(Path(sfp))
+                            futures.append(
+                                thread_pool.submit(
+                                    self._insert_from_star_file, Path(sfp)
+                                )
+                            )
+                for t in futures:
+                    t.result()
             elif self._cross_ref_file_combo.currentText():
                 self._insert_from_star_file(
                     Path(self._file_combo.currentText()),
