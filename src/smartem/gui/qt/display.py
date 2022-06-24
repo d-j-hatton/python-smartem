@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import matplotlib
+import matplotlib.ticker as mticker
 import mrcfile
 
 matplotlib.use("Qt5Agg")
@@ -29,6 +30,7 @@ from smartem.data_model.structure import (
 )
 from smartem.gui.qt.component_tab import ComponentTab
 from smartem.gui.qt.image_utils import ImageLabel, ParticleImageLabel
+from smartem.gui.qt.plotting_utils import InteractivePlot
 
 
 class MainDisplay(ComponentTab):
@@ -283,7 +285,7 @@ class MainDisplay(ComponentTab):
         gs_fig.set_facecolor("gray")
         self._grid_square_stats_fig = gs_fig.add_subplot(111)
         self._grid_square_stats_fig.set_facecolor("silver")
-        self._grid_square_stats = FigureCanvasQTAgg(gs_fig)
+        self._grid_square_stats = InteractivePlot(gs_fig)
         self.grid.addWidget(self._grid_square_stats, 4, 1)
         try:
             if self._colour_bar:
@@ -291,15 +293,18 @@ class MainDisplay(ComponentTab):
         except (AttributeError, ValueError):
             pass
         if len(stats.keys()) == 1:
+            self._grid_square_stats.set_data(list(stats.values())[0])
             self._grid_square_stats_fig.hist(
                 list(stats.values())[0], color="darkturquoise"
             )
+            self._grid_square_stats_fig.axes.set_xlabel(list(stats.keys())[0])
         if len(stats.keys()) == 2:
             labels = []
             data = []
             for k, v in stats.items():
                 labels.append(k)
                 data.append(v)
+            self._grid_square_stats.set_data(data)
             self._grid_square_stats_fig.scatter(
                 data[0],
                 data[1],
@@ -308,11 +313,28 @@ class MainDisplay(ComponentTab):
             self._grid_square_stats_fig.axes.set_xlabel(labels[0])
             self._grid_square_stats_fig.axes.set_ylabel(labels[1])
         if len(stats.keys()) > 2:
-            data = [list(v) for v in list(stats.values())]
+            labels = []
+            data = []
+            for k, v in stats.items():
+                labels.append(k)
+                data.append(list(v))
             for i, _ in enumerate(data):
                 data[i] = np.nan_to_num(_)
             corr = np.corrcoef(data)
             mat = self._grid_square_stats_fig.matshow(corr)
+            ticks_loc = (
+                self._grid_square_stats_fig.axes.get_xticks(),
+                self._grid_square_stats_fig.axes.get_yticks(),
+            )
+            self._grid_square_stats.set_data(corr)
+            self._grid_square_stats_fig.xaxis.set_major_locator(
+                mticker.FixedLocator(ticks_loc[0][1:-1])
+            )
+            self._grid_square_stats_fig.yaxis.set_major_locator(
+                mticker.FixedLocator(ticks_loc[1][1:-1])
+            )
+            self._grid_square_stats_fig.axes.set_xticklabels(labels, rotation=45)
+            self._grid_square_stats_fig.axes.set_yticklabels(labels)
             self._colour_bar = self._grid_square_stats_fig.figure.colorbar(mat)
         self._grid_square_stats.draw()
 
@@ -321,7 +343,7 @@ class MainDisplay(ComponentTab):
         fh_fig.set_facecolor("gray")
         self._foil_hole_stats_fig = fh_fig.add_subplot(111)
         self._foil_hole_stats_fig.set_facecolor("silver")
-        self._foil_hole_stats = FigureCanvasQTAgg(fh_fig)
+        self._foil_hole_stats = InteractivePlot(fh_fig)
         self.grid.addWidget(self._foil_hole_stats, 4, 2)
         try:
             if self._fh_colour_bar:
@@ -329,22 +351,42 @@ class MainDisplay(ComponentTab):
         except (AttributeError, ValueError):
             pass
         if len(stats.keys()) == 1:
+            self._foil_hole_stats.set_data(list(stats.values())[0])
             self._foil_hole_stats_fig.hist(
                 list(stats.values())[0], color="darkturquoise"
             )
+            self._foil_hole_stats_fig.axes.set_xlabel(list(stats.keys())[0])
         if len(stats.keys()) == 2:
             labels = []
             data = []
             for k, v in stats.items():
                 labels.append(k)
                 data.append(v)
+            self._foil_hole_stats.set_data(data)
             self._foil_hole_stats_fig.scatter(data[0], data[1], color="darkturquoise")
             self._foil_hole_stats_fig.axes.set_xlabel(labels[0])
             self._foil_hole_stats_fig.axes.set_ylabel(labels[1])
         if len(stats.keys()) > 2:
-            data = [list(v) for v in list(stats.values())]
+            labels = []
+            data = []
+            for k, v in stats.items():
+                labels.append(k)
+                data.append(list(v))
             corr = np.corrcoef(data)
             mat = self._foil_hole_stats_fig.matshow(corr)
+            ticks_loc = (
+                self._foil_hole_stats_fig.axes.get_xticks(),
+                self._foil_hole_stats_fig.axes.get_yticks(),
+            )
+            self._foil_hole_stats.set_data(corr)
+            self._foil_hole_stats_fig.xaxis.set_major_locator(
+                mticker.FixedLocator(ticks_loc[0][1:-1])
+            )
+            self._foil_hole_stats_fig.yaxis.set_major_locator(
+                mticker.FixedLocator(ticks_loc[1][1:-1])
+            )
+            self._foil_hole_stats_fig.axes.set_xticklabels(labels, rotation=45)
+            self._foil_hole_stats_fig.axes.set_yticklabels(labels)
             self._fh_colour_bar = self._foil_hole_stats_fig.figure.colorbar(mat)
         self._foil_hole_stats.draw()
 
@@ -360,7 +402,7 @@ class MainDisplay(ComponentTab):
         ex_fig.set_facecolor("gray")
         self._exposure_stats_fig = ex_fig.add_subplot(111)
         self._exposure_stats_fig.set_facecolor("silver")
-        self._exposure_stats = FigureCanvasQTAgg(ex_fig)
+        self._exposure_stats = InteractivePlot(ex_fig)
         self.grid.addWidget(self._exposure_stats, 4, 3)
         try:
             if self._exp_colour_bar:
@@ -368,21 +410,42 @@ class MainDisplay(ComponentTab):
         except (AttributeError, ValueError):
             pass
         if len(stats.keys()) == 1:
+            self._exposure_stats.set_data(list(stats.values())[0])
             self._exposure_stats_fig.hist(
                 list(stats.values())[0], color="darkturquoise"
             )
+            self._exposure_stats_fig.axes.set_xlabel(list(stats.keys())[0])
         if len(stats.keys()) == 2:
             labels = []
             data = []
             for k, v in stats.items():
                 labels.append(k)
                 data.append(v)
+            self._exposure_stats.set_data(data)
             self._exposure_stats_fig.scatter(data[0], data[1], color="darkturquoise")
             self._exposure_stats_fig.axes.set_xlabel(labels[0])
             self._exposure_stats_fig.axes.set_ylabel(labels[1])
         if len(stats.keys()) > 2:
-            corr = np.corrcoef(list(stats.values()))
+            labels = []
+            data = []
+            for k, v in stats.items():
+                labels.append(k)
+                data.append(list(v))
+            corr = np.corrcoef(data)
             mat = self._exposure_stats_fig.matshow(corr)
+            ticks_loc = (
+                self._exposure_stats_fig.axes.get_xticks(),
+                self._exposure_stats_fig.axes.get_yticks(),
+            )
+            self._exposure_stats.set_data(corr)
+            self._exposure_stats_fig.xaxis.set_major_locator(
+                mticker.FixedLocator(ticks_loc[0][1:-1])
+            )
+            self._exposure_stats_fig.yaxis.set_major_locator(
+                mticker.FixedLocator(ticks_loc[1][1:-1])
+            )
+            self._exposure_stats_fig.axes.set_xticklabels(labels, rotation=45)
+            self._exposure_stats_fig.axes.set_yticklabels(labels)
             self._exp_colour_bar = self._exposure_stats_fig.figure.colorbar(mat)
 
         self._exposure_stats.draw()
@@ -639,29 +702,49 @@ class AtlasDisplay(ComponentTab):
         atlas_fig.set_facecolor("gray")
         self._atlas_stats_fig = atlas_fig.add_subplot(111)
         self._atlas_stats_fig.set_facecolor("silver")
-        self._atlas_stats = FigureCanvasQTAgg(atlas_fig)
+        self._atlas_stats = InteractivePlot(atlas_fig)
         try:
             if self._colour_bar:
                 self._colour_bar.remove()
         except (AttributeError, ValueError):
             pass
         if len(self._data.keys()) == 1:
+            self._atlas_stats.set_data(list(self._data.values())[0])
             self._atlas_stats_fig.hist(
                 list(self._data.values())[0], color="darkturquoise"
             )
+            self._atlas_stats_fig.axes.set_xlabel(list(self._data.keys())[0])
         if len(self._data.keys()) == 2:
             labels = []
             data = []
             for k, v in self._data.items():
                 labels.append(k)
                 data.append(v)
+            self._atlas_stats.set_data(data)
             self._atlas_stats_fig.scatter(data[0], data[1], color="darkturquoise")
             self._atlas_stats_fig.axes.set_xlabel(labels[0])
             self._atlas_stats_fig.axes.set_ylabel(labels[1])
         if len(self._data.keys()) > 2:
-            data = [list(v) for v in list(self._data.values())]
+            labels = []
+            data = []
+            for k, v in self._data.items():
+                labels.append(k)
+                data.append(list(v))
             corr = np.corrcoef(data)
             mat = self._atlas_stats_fig.matshow(corr)
+            ticks_loc = (
+                self._atlas_stats_fig.axes.get_xticks(),
+                self._atlas_stats_fig.axes.get_yticks(),
+            )
+            self._atlas_stats.set_data(corr)
+            self._atlas_stats_fig.xaxis.set_major_locator(
+                mticker.FixedLocator(ticks_loc[0][1:-1])
+            )
+            self._atlas_stats_fig.yaxis.set_major_locator(
+                mticker.FixedLocator(ticks_loc[1][1:-1])
+            )
+            self._atlas_stats_fig.axes.set_xticklabels(labels, rotation=45)
+            self._atlas_stats_fig.axes.set_yticklabels(labels)
             self._colour_bar = self._atlas_stats_fig.figure.colorbar(mat)
         self._atlas_stats.draw()
 

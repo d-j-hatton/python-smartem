@@ -46,6 +46,7 @@ class App:
         )
 
     def start(self):
+        self.window.resize(1600, 900)
         self.window.show()
         self.app.exec()
 
