@@ -1,6 +1,7 @@
 from typing import Any, List, Optional, Sequence, Set, Tuple, Type, Union
 
 from sqlalchemy import create_engine, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine.row import LegacyRow
 from sqlalchemy.orm import Load, load_only, sessionmaker
 
@@ -793,7 +794,19 @@ class DataAPI:
                 info.extend(result)
         return info
 
-    def put(self, entries: Sequence[Base]):
-        for entry in entries:
-            self.session.add(entry)
-        self.session.commit()
+    def put(self, entries: Sequence[Base], allow_duplicates: bool = True):
+        if not entries:
+            return
+        table = entries[0].__table__  # type: ignore
+        rows = [
+            {k: v for k, v in e.__dict__.items() if k != "_sa_instance_state"}
+            for e in entries
+        ]
+        with self.engine.connect() as connection:
+            with connection.begin():
+                insert_stmt = insert(table).values(rows)
+                if allow_duplicates:
+                    insert_stmt = insert_stmt.on_conflict_do_update(
+                        constraint=table.primary_key, set_=table.columns
+                    )
+                connection.execute(insert_stmt)
