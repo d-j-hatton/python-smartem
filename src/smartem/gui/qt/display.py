@@ -544,11 +544,12 @@ class MainDisplay(ComponentTab):
         except IndexError:
             return
         self.grid.addWidget(exposure_lbl, 1, 3)
-        self._draw_foil_hole(
-            self._foil_holes[self._foil_hole_combo.currentIndex()],
-            exposure=self._exposures[index],
-            flip=(-1, -1),
-        )
+        if self._foil_holes:
+            self._draw_foil_hole(
+                self._foil_holes[self._foil_hole_combo.currentIndex()],
+                exposure=self._exposures[index],
+                flip=(-1, -1),
+            )
         if (
             any([self._particle_keys, self._particle_set_keys])
             and self._exposure_combo.currentText()
