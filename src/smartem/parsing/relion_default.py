@@ -1,34 +1,87 @@
 from pathlib import Path
 
+from numpy import argmin
+
 from smartem.data_model.extract import DataAPI
 from smartem.parsing.star import (
     get_column_data,
     insert_exposure_data,
+    insert_particle_data,
     insert_particle_set,
     open_star_file,
 )
 
 
-def _motion_corr(relion_dir: Path, data_handler: DataAPI):
-    mc_file_path = relion_dir / "MotionCorr" / "job002" / "corrected_micrographs.star"
+def _motion_corr(relion_dir: Path, data_handler: DataAPI, project: str):
+    mc_base_path = relion_dir / "MotionCorr"
+    mc_file_job_paths = mc_base_path.glob("job*")
+    job_numbers = [str(j.name).replace("job", "") for j in mc_file_job_paths]
+    first_job_idx = argmin([int(jn) for jn in job_numbers])
+    mc_file_path = (
+        relion_dir
+        / "MotionCorr"
+        / f"job{job_numbers[first_job_idx]}"
+        / "corrected_micrographs.star"
+    )
     star_file = open_star_file(mc_file_path)
     column_data = get_column_data(
         star_file, ["_rlnmicrographname", "_rlnaccummotiontotal"], "micrographs"
     )
     insert_exposure_data(
-        column_data, "_rlnmicrographname", str(mc_file_path), data_handler
+        column_data,
+        "_rlnmicrographname",
+        str(mc_file_path),
+        data_handler,
+        project=project,
     )
 
 
-def _ctf(relion_dir: Path, data_handler: DataAPI):
-    ctf_file_path = relion_dir / "CtfFind" / "job006" / "micrographs_ctf.star"
+def _ctf(relion_dir: Path, data_handler: DataAPI, project: str):
+    ctf_base_path = relion_dir / "CtfFind"
+    ctf_file_job_paths = ctf_base_path.glob("job*")
+    job_numbers = [str(j.name).replace("job", "") for j in ctf_file_job_paths]
+    first_job_idx = argmin([int(jn) for jn in job_numbers])
+    ctf_file_path = (
+        relion_dir
+        / "CtfFind"
+        / f"job{job_numbers[first_job_idx]}"
+        / "micrographs_ctf.star"
+    )
     star_file = open_star_file(ctf_file_path)
     column_data = get_column_data(
         star_file, ["_rlnmicrographname", "_rlnctfmaxresolution"], "micrographs"
     )
     insert_exposure_data(
-        column_data, "_rlnmicrographname", str(ctf_file_path), data_handler
+        column_data,
+        "_rlnmicrographname",
+        str(ctf_file_path),
+        data_handler,
+        project=project,
     )
+
+
+def _prob_dist_max_class2d(relion_dir: Path, data_handler: DataAPI, project: str):
+    for class_file_path in (relion_dir / "Class2D").glob("job*"):
+        star_file = open_star_file(class_file_path / "run_it020_data.star")
+        column_data = get_column_data(
+            star_file,
+            [
+                "_rlnmicrographname",
+                "_rlncoordinatex",
+                "_rlncoordinatey",
+                "_rlnmaxvalueprobdistribution",
+            ],
+            "particles",
+        )
+        insert_particle_data(
+            column_data,
+            "_rlnmicrographname",
+            "_rlncoordinatex",
+            "_rlncoordinatey",
+            str(class_file_path / "run_it020_data.star"),
+            data_handler,
+            project=project,
+        )
 
 
 def _class2d(relion_dir: Path, data_handler: DataAPI, project: str):
@@ -82,6 +135,7 @@ def _class2d(relion_dir: Path, data_handler: DataAPI, project: str):
 
 
 def gather_relion_defaults(relion_dir: Path, data_handler: DataAPI, project: str):
-    _motion_corr(relion_dir, data_handler)
-    _ctf(relion_dir, data_handler)
+    _motion_corr(relion_dir, data_handler, project)
+    _ctf(relion_dir, data_handler, project)
+    _prob_dist_max_class2d(relion_dir, data_handler, project)
     _class2d(relion_dir, data_handler, project)
