@@ -333,7 +333,6 @@ class ParticleDataLoader(ExposureDataLoader):
                     self._y_tag,
                     str(star_file_path),
                     self._extractor,
-                    just_particles=True,
                     project=self.project,
                 )
 
