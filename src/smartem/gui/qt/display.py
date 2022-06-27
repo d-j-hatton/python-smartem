@@ -639,9 +639,9 @@ class MainDisplay(ComponentTab):
             for k in keys:
                 self._data_list.addItem(k)
 
-        self._pick_keys["source"] = self._extractor.get_particle_info_sources(
-            self.project
-        )
+        # self._pick_keys["source"] = self._extractor.get_particle_info_sources(
+        #     self.project
+        # )
         self._pick_keys["set_group"] = self._extractor.get_particle_set_group_names(
             self.project
         )
