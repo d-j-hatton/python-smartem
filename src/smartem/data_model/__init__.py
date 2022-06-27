@@ -5,7 +5,7 @@ from typing import Any, List, Optional, Type, Union, cast
 import yaml
 from sqlalchemy import Column
 from sqlalchemy import Float as Float_org
-from sqlalchemy import ForeignKey, Integer, String, create_engine, inspect
+from sqlalchemy import ForeignKey, Integer, Text, create_engine, inspect
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -31,7 +31,7 @@ class EPUImage:
     )
 
     thumbnail = Column(
-        String(250),
+        Text,
         nullable=True,
         comment="Full path to EPU jpeg image of EPU image",
     )
@@ -59,27 +59,27 @@ class Project(Base):
     __tablename__ = "Project"
 
     project_name = Column(
-        String,
+        Text,
         primary_key=True,
         nullable=False,
     )
 
     acquisition_directory = Column(
-        String,
+        Text,
         nullable=False,
     )
 
     acquisition_software = Column(
-        String,
+        Text,
         nullable=False,
     )
 
     acquisition_software_version = Column(
-        String,
+        Text,
         nullable=False,
     )
 
-    processing_directory = Column(String)
+    processing_directory = Column(Text)
 
     atlas_id: Column = Column(ForeignKey("Atlas.atlas_id"), index=True)
     Atlas = relationship("Atlas")
@@ -114,7 +114,7 @@ class GridSquare(EPUImage, Base):
     __tablename__ = "GridSquare"
 
     grid_square_name = Column(
-        String,
+        Text,
         primary_key=True,
         nullable=False,
     )
@@ -127,7 +127,7 @@ class FoilHole(EPUImage, Base):
     __tablename__ = "FoilHole"
 
     foil_hole_name = Column(
-        String,
+        Text,
         primary_key=True,
         nullable=False,
     )
@@ -142,7 +142,7 @@ class Exposure(EPUImage, Base):
     __tablename__ = "Exposure"
 
     exposure_name = Column(
-        String,
+        Text,
         primary_key=True,
         nullable=False,
     )
@@ -177,13 +177,13 @@ class Particle(Base):
 
 class InfoStore:
     source = Column(
-        String,
+        Text,
         primary_key=True,
         nullable=False,
     )
 
     key = Column(
-        String,
+        Text,
         primary_key=True,
         nullable=False,
     )
@@ -217,13 +217,13 @@ class ParticleSet(Base):
     __tablename__ = "ParticleSet"
 
     group_name = Column(
-        String,
+        Text,
         primary_key=True,
         nullable=False,
     )
 
     identifier = Column(
-        String,
+        Text,
         primary_key=True,
         nullable=False,
         unique=True,
