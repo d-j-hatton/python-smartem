@@ -50,9 +50,10 @@ def create_atlas_and_tiles(atlas_image: Path, extractor: DataAPI) -> int:
             readout_area_y=atlas_data["readout_area"][1],
         )
     ]
-    extractor.put(atlas)
-    atlas_id = atlas[0].atlas_id
-    if not atlas_id:
+    pid = extractor.put(atlas)
+    print(pid)
+    atlas_id = pid[0].atlas_id  # atlas[0].atlas_id
+    if atlas_id is None:
         raise RuntimeError(f"Atlas record was not correctly inserted: {atlas_image}")
     tiles = []
     for tile in atlas_image.parent.glob("Tile_*.jpg"):
@@ -78,7 +79,7 @@ def parse_epu_version(epu_path: Path) -> Tuple[str, str]:
     return (res["software"], res["version"])
 
 
-def parse_epu_dir(epu_path: Path, extractor: DataAPI):
+def parse_epu_dir(epu_path: Path, extractor: DataAPI, project: str):
     exposures = {}
     for grid_square_dir in epu_path.glob("GridSquare*"):
         if grid_square_dir.is_dir():
@@ -86,7 +87,7 @@ def parse_epu_dir(epu_path: Path, extractor: DataAPI):
             afis_foil_holes: Dict[str, FoilHole] = {}
             grid_square_jpeg = next(grid_square_dir.glob("*.jpg"))
             grid_square_data = parse_epu_xml(grid_square_jpeg.with_suffix(".xml"))
-            tile_id = extractor.get_tile_id(grid_square_data["stage_position"])
+            tile_id = extractor.get_tile_id(grid_square_data["stage_position"], project)
             if tile_id is not None:
                 extractor.put(
                     [
