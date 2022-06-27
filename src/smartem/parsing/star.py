@@ -123,7 +123,7 @@ def insert_particle_data(
     star_file_path: str,
     extractor: DataAPI,
     project: str = "",
-) -> List[Particle]:
+):
     exposures = [e.exposure_name for e in extractor.get_exposures(project=project)]
     particle_info: List[ParticleInfo] = []
     extra_keys = [k for k in data.keys() if k and k not in (exposure_tag, x_tag, y_tag)]
@@ -132,20 +132,16 @@ def insert_particle_data(
         data, exposures, exposure_tag, x_tag, y_tag
     )
 
-    all_particles = []
     new_particles = []
     particle_info = []
-    new_particle_indices: List[int] = []
     for exposure in exposures:
-        existing_particles = extractor.get_particles(exposure_name=exposure)
-        all_particles.extend(existing_particles)
-        existing_particle_coords = {
-            (ep.x, ep.y): ep.particle_id for ep in existing_particles
-        }
-        found_particles: Dict[int, int] = {}
         if structured_data.get(exposure):
+            existing_particles = extractor.get_particles(exposure_name=exposure)
+            existing_particle_coords = {
+                (ep.x, ep.y): ep.particle_id for ep in existing_particles
+            }
             for i, particle in enumerate(structured_data[exposure]["coordinates"]):
-                if particle in existing_particle_coords.keys():
+                if existing_particle_coords.get(particle):
                     for k in extra_keys:
                         particle_info.append(
                             ParticleInfo(
@@ -155,29 +151,36 @@ def insert_particle_data(
                                 value=data[k][structured_data[exposure]["indices"][i]],
                             )
                         )
-                    found_particles[
-                        structured_data[exposure]["indices"][i]
-                    ] = existing_particle_coords[particle]
                 else:
                     new_particles.append(
                         Particle(x=particle[0], y=particle[1], exposure_name=exposure)
                     )
-                    new_particle_indices.append(structured_data[exposure]["indices"][i])
-    extractor.put(new_particles)
-    all_particles.extend(new_particles)
-    for k in extra_keys:
-        for p, pind in zip(new_particles, new_particle_indices):
-            particle_info.append(
-                ParticleInfo(
-                    particle_id=p.particle_id,
-                    source=star_file_path,
-                    key=k,
-                    value=data[k][pind],
-                )
-            )
+
+    if new_particles:
+        new_particle_ids = extractor.put(new_particles)
+        for exposure in exposures:
+            if structured_data.get(exposure):
+                existing_particle_coords = {
+                    (p.x, p.y): pid.particle_id
+                    for p, pid in zip(new_particles, new_particle_ids)
+                    if p.exposure_name == exposure
+                }
+                for i, particle in enumerate(structured_data[exposure]["coordinates"]):
+                    if existing_particle_coords.get(particle):
+                        for k in extra_keys:
+                            particle_info.append(
+                                ParticleInfo(
+                                    particle_id=existing_particle_coords[particle],
+                                    source=star_file_path,
+                                    key=k,
+                                    value=data[k][
+                                        structured_data[exposure]["indices"][i]
+                                    ],
+                                )
+                            )
+
     if particle_info:
         extractor.put(particle_info)
-    return all_particles
 
 
 def insert_particle_set(
@@ -207,7 +210,7 @@ def insert_particle_set(
                 ParticleSet(
                     group_name=set_name,
                     identifier=star_file_path + ":" + str(set_id),
-                    project_name=extractor._project,
+                    project_name=project,
                 )
                 for set_id in set_ids
             ]
@@ -216,7 +219,7 @@ def insert_particle_set(
                 ParticleSet(
                     group_name=set_name,
                     identifier=str(set_id),
-                    project_name=extractor._project,
+                    project_name=project,
                 )
                 for set_id in set_ids
             ]
@@ -283,13 +286,13 @@ def insert_particle_set(
         extractor.put(linkers)
 
     if new_particles:
-        extractor.put(new_particles)
+        new_particle_ids = extractor.put(new_particles)
 
         for exposure in exposures:
             if structured_data.get(exposure):
                 particle_coords = {
-                    (p.x, p.y): p.particle_id
-                    for p in new_particles
+                    (p.x, p.y): pid.particle_id
+                    for p, pid in zip(new_particles, new_particle_ids)
                     if p.exposure_name == exposure
                 }
                 for i, particle in enumerate(structured_data[exposure]["coordinates"]):
