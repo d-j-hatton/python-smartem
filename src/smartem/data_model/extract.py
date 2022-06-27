@@ -134,8 +134,10 @@ class DataAPI:
                     return tile
         return None
 
-    def get_tile_id(self, stage_position: Tuple[float, float]) -> Optional[int]:
-        tile = self.get_tile(stage_position)
+    def get_tile_id(
+        self, stage_position: Tuple[float, float], project: str
+    ) -> Optional[int]:
+        tile = self.get_tile(stage_position, project=project)
         if tile:
             return tile.tile_id
         return None
@@ -794,9 +796,9 @@ class DataAPI:
                 info.extend(result)
         return info
 
-    def put(self, entries: Sequence[Base], allow_duplicates: bool = True):
+    def put(self, entries: Sequence[Base], allow_duplicates: bool = True) -> list:
         if not entries:
-            return
+            return []
         table = entries[0].__table__  # type: ignore
         rows = [
             {k: v for k, v in e.__dict__.items() if k != "_sa_instance_state"}
@@ -806,7 +808,10 @@ class DataAPI:
             with connection.begin():
                 insert_stmt = insert(table).values(rows)
                 if allow_duplicates:
-                    insert_stmt = insert_stmt.on_conflict_do_update(
+                    insert_stmt = insert_stmt.returning(
+                        table.primary_key.columns.values()[0]
+                    ).on_conflict_do_update(
                         constraint=table.primary_key, set_=table.columns
                     )
-                connection.execute(insert_stmt)
+                result = connection.execute(insert_stmt)
+        return result.fetchall()
