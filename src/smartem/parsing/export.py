@@ -74,15 +74,16 @@ def export_foil_holes(
             if gs.thumbnail:
                 gs_dir = out_dir / gs.grid_square_name
                 gs_dir.mkdir()
-                thumbnail_path = epu_dir / gs.thumbnail
-                shutil.copy(thumbnail_path, gs_dir / thumbnail_path.name)
-                shutil.copy(
-                    thumbnail_path.with_suffix(".mrc"),
-                    gs_dir / thumbnail_path.with_suffix(".mrc").name,
-                )
-                out_gs_paths[gs.grid_square_name] = (
-                    gs_dir / thumbnail_path.name
-                ).relative_to(out_dir)
+                thumbnail_path: Optional[Path] = epu_dir / gs.thumbnail
+                if thumbnail_path:
+                    shutil.copy(thumbnail_path, gs_dir / thumbnail_path.name)
+                    shutil.copy(
+                        thumbnail_path.with_suffix(".mrc"),
+                        gs_dir / thumbnail_path.with_suffix(".mrc").name,
+                    )
+                    out_gs_paths[gs.grid_square_name] = (
+                        gs_dir / thumbnail_path.name
+                    ).relative_to(out_dir)
                 gs_coordinates[gs.grid_square_name] = (
                     gs.stage_position_x,
                     gs.stage_position_y,
@@ -97,16 +98,18 @@ def export_foil_holes(
                         fh_extracted[dl].averages.get(fh.foil_hole_name)  # type: ignore
                         for dl in data_labels
                     )
-                    and fh.thumbnail
+                    # and fh.thumbnail
                 ):
-                    fh_dir = out_dir / fh.grid_square_name / fh.foil_hole_name
-                    fh_dir.mkdir()
-                    thumbnail_path = epu_dir / fh.thumbnail
-                    shutil.copy(thumbnail_path, fh_dir / thumbnail_path.name)
-                    shutil.copy(
-                        thumbnail_path.with_suffix(".mrc"),
-                        fh_dir / thumbnail_path.with_suffix(".mrc").name,
-                    )
+                    thumbnail_path = None
+                    if fh.thumbnail:
+                        fh_dir = out_dir / fh.grid_square_name / fh.foil_hole_name
+                        fh_dir.mkdir()
+                        thumbnail_path = epu_dir / fh.thumbnail
+                        shutil.copy(thumbnail_path, fh_dir / thumbnail_path.name)
+                        shutil.copy(
+                            thumbnail_path.with_suffix(".mrc"),
+                            fh_dir / thumbnail_path.with_suffix(".mrc").name,
+                        )
                     data["grid_square"].append(str(out_gs_paths[fh.grid_square_name]))
                     data["grid_square_pixel_size"].append(
                         gs_pixel_sizes[fh.grid_square_name]
@@ -115,6 +118,8 @@ def export_foil_holes(
                     data["grid_square_y"].append(gs_coordinates[fh.grid_square_name][1])
                     data["foil_hole"].append(
                         str((fh_dir / thumbnail_path.name).relative_to(out_dir))
+                        if thumbnail_path
+                        else None
                     )
                     data["foil_hole_pixel_size"].append(fh.pixel_size)
                     data["foil_hole_x"].append(fh.stage_position_x)
