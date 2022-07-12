@@ -16,7 +16,13 @@ def export_foil_holes(
     out_gs_paths = {}
     data: Dict[str, list] = {
         "grid_square": [],
+        "grid_square_pixel_size": [],
+        "grid_square_x": [],
+        "grid_square_y": [],
         "foil_hole": [],
+        "foil_hole_pixel_size": [],
+        "foil_hole_x": [],
+        "foil_hole_y": [],
         "accummotiontotal": [],
         "ctfmaxresolution": [],
         "estimatedresolution": [],
@@ -61,6 +67,9 @@ def export_foil_holes(
             atlas_image_path, out_dir / atlas_image_path.with_suffix(".mrc").name
         )
 
+        gs_coordinates = {}
+        gs_pixel_sizes = {}
+
         for gs in grid_squares:
             if gs.thumbnail:
                 gs_dir = out_dir / gs.grid_square_name
@@ -74,6 +83,11 @@ def export_foil_holes(
                 out_gs_paths[gs.grid_square_name] = (
                     gs_dir / thumbnail_path.name
                 ).relative_to(out_dir)
+                gs_coordinates[gs.grid_square_name] = (
+                    gs.stage_position_x,
+                    gs.stage_position_y,
+                )
+                gs_pixel_sizes[gs.grid_square_name] = gs.pixel_size
         for fh in foil_holes:
             if all(
                 fh_extracted[dl].averages is not None for dl in data_labels
@@ -94,9 +108,17 @@ def export_foil_holes(
                         fh_dir / thumbnail_path.with_suffix(".mrc").name,
                     )
                     data["grid_square"].append(str(out_gs_paths[fh.grid_square_name]))
+                    data["grid_square_pixel_size"].append(
+                        gs_pixel_sizes[fh.grid_square_name]
+                    )
+                    data["grid_square_x"].append(gs_coordinates[fh.grid_square_name][0])
+                    data["grid_square_y"].append(gs_coordinates[fh.grid_square_name][1])
                     data["foil_hole"].append(
                         str((fh_dir / thumbnail_path.name).relative_to(out_dir))
                     )
+                    data["foil_fole_pixel_size"].append(fh.pixel_size)
+                    data["foil_hole_x"].append(fh.stage_position_x)
+                    data["foil_hole_y"].append(fh.stage_position_y)
                     data["accummotiontotal"].append(
                         fh_extracted["_rlnaccummotiontotal"].averages[fh.foil_hole_name]  # type: ignore
                     )
