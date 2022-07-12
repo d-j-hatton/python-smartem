@@ -116,7 +116,7 @@ def export_foil_holes(
                     data["foil_hole"].append(
                         str((fh_dir / thumbnail_path.name).relative_to(out_dir))
                     )
-                    data["foil_fole_pixel_size"].append(fh.pixel_size)
+                    data["foil_hole_pixel_size"].append(fh.pixel_size)
                     data["foil_hole_x"].append(fh.stage_position_x)
                     data["foil_hole_y"].append(fh.stage_position_y)
                     data["accummotiontotal"].append(
