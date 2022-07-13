@@ -128,7 +128,9 @@ class SmartEMDiskDataLoader(DataLoader):
         num_samples: int = 0,
         sub_sample_size: Optional[Tuple[int, int]] = None,
         allowed_labels: Optional[Dict[str, bool]] = None,
+        seed: int = 0,
     ):
+        np.random.seed(seed)
         self._level = level
         self._data_dir = data_dir
         self._mrc = mrc
