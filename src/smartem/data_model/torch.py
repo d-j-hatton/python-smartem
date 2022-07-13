@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import mrcfile
 import numpy as np
@@ -15,6 +15,7 @@ from smartem.data_model.structure import (
     extract_keys_with_foil_hole_averages,
     extract_keys_with_grid_square_averages,
 )
+from smartem.stage_model import find_point_pixel
 
 
 def mrc_to_tensor(mrc_file: Path) -> Tensor:
@@ -109,6 +110,14 @@ class SmartEMDataLoader(DataLoader):
         return image, labels
 
 
+_standard_labels = {
+    "accummotiontotal": True,
+    "ctfmaxresolution": True,
+    "estimatedresolution": True,
+    "maxvalueprobdistribution": False,
+}
+
+
 class SmartEMDiskDataLoader(DataLoader):
     def __init__(
         self,
@@ -118,12 +127,19 @@ class SmartEMDiskDataLoader(DataLoader):
         labels_csv: str = "labels.csv",
         num_samples: int = 0,
         sub_sample_size: Optional[Tuple[int, int]] = None,
+        allowed_labels: Optional[Dict[str, bool]] = None,
     ):
         self._level = level
         self._data_dir = data_dir
         self._mrc = mrc
         self._num_samples = num_samples
         self._sub_sample_size = sub_sample_size or (256, 256)
+        self._allowed_labels = allowed_labels or list(_standard_labels.keys())
+        self._lower_better_label = (
+            [allowed_labels[k] for k in self._allowed_labels]
+            if allowed_labels
+            else [_standard_labels[k] for k in self._allowed_labels]
+        )
         if self._level not in ("grid_square", "foil_hole"):
             raise ValueError(
                 f"Unrecognised SmartEMDataLoader level {self._level}: accepted values are grid_sqaure or foil_hole"
@@ -135,12 +151,17 @@ class SmartEMDiskDataLoader(DataLoader):
             self._gs_mrc_size = _mrc.data.shape
         with Image.open(self._data_dir / self._df.iloc[0]["grid_square"]) as im:
             self._gs_jpeg_size = im.size
-        with mrcfile.open(
-            (self._data_dir / self._df.iloc[0]["foil_hole"]).with_suffix(".mrc")
-        ) as _mrc:
-            self._fh_mrc_size = _mrc.data.shape
-        with Image.open(self._data_dir / self._df.iloc[0]["foil_hole"]) as im:
-            self._fh_jpeg_size = im.size
+        for row in self._df:
+            try:
+                with mrcfile.open(
+                    (self._data_dir / self._df.iloc[0]["foil_hole"]).with_suffix(".mrc")
+                ) as _mrc:
+                    self._fh_mrc_size = _mrc.data.shape
+                with Image.open(self._data_dir / self._df.iloc[0]["foil_hole"]) as im:
+                    self._fh_jpeg_size = im.size
+                break
+            except TypeError:
+                continue
 
     def __len__(self) -> int:
         if self._level == "grid_square" and self._num_samples:
@@ -148,12 +169,12 @@ class SmartEMDiskDataLoader(DataLoader):
         return self._df[self._level].nunique()
 
     def __getitem__(self, idx: int) -> Tuple[Tensor, List[float]]:
+        sub_sample_boundaries = (-1, -1)
         if self._level == "grid_square" and self._num_samples:
-            # averaged_df = self._df.groupby("grid_square").mean()
             if self._mrc:
                 sub_sample_boundaries = (
-                    np.random.randint(self._gs_mrc_size[0] - self._sub_sample_size[0]),
-                    np.random.randint(self._gs_mrc_size[1] - self._sub_sample_size[1]),
+                    np.random.randint(self._gs_mrc_size[1] - self._sub_sample_size[0]),
+                    np.random.randint(self._gs_mrc_size[0] - self._sub_sample_size[1]),
                 )
             else:
                 sub_sample_boundaries = (
@@ -161,52 +182,66 @@ class SmartEMDiskDataLoader(DataLoader):
                     np.random.randint(self._gs_jpeg_size[1] - self._sub_sample_size[1]),
                 )
             grid_square_idx = idx // self._num_samples
-            # sub_sample_idx = idx % self._num_samples
             _grid_squares = self._df["grid_square"].unique()
-            xl_con = (
-                self._df["foil_hole_x"]
-                < (
-                    self._df["grid_square_x"]
-                    - 0.5 * self._df["grid_square_pixel_size"] * self._gs_mrc_size[0]
-                )
-                + (sub_sample_boundaries[0] + self._sub_sample_size[0])
-                * self._df["grid_square_pixel_size"]
-            )
-            xr_con = (
-                self._df["foil_hole_x"]
-                > (
-                    self._df["grid_square_x"]
-                    - 0.5 * self._df["grid_square_pixel_size"] * self._gs_mrc_size[0]
-                )
-                + (sub_sample_boundaries[0]) * self._df["grid_square_pixel_size"]
-            )
-            yu_con = (
-                self._df["foil_hole_y"]
-                < (
-                    self._df["grid_square_y"]
-                    - 0.5 * self._df["grid_square_pixel_size"] * self._gs_mrc_size[1]
-                )
-                + (sub_sample_boundaries[1] + self._sub_sample_size[1])
-                * self._df["grid_square_pixel_size"]
-            )
-            yd_con = (
-                self._df["foil_hole_y"]
-                > (
-                    self._df["grid_square_y"]
-                    - 0.5 * self._df["grid_square_pixel_size"] * self._gs_mrc_size[1]
-                )
-                + (sub_sample_boundaries[1]) * self._df["grid_square_pixel_size"]
-            )
             selected_df = self._df[
-                (self._df["grid_square"] == _grid_squares[grid_square_idx])
-                & xl_con
-                & xr_con
-                & yu_con
-                & yd_con
+                self._df["grid_square"] == _grid_squares[grid_square_idx]
             ]
-            # print(sub_sample_boundaries)
-            print(selected_df["foil_hole"])
-            labels = []
+            drop_indices = []
+            if self._mrc:
+                for ri, row in selected_df.iterrows():
+                    fh_centre = find_point_pixel(
+                        (
+                            row["foil_hole_x"],
+                            row["foil_hole_y"],
+                        ),
+                        (row["grid_square_x"], row["grid_square_y"]),
+                        row["grid_square_pixel_size"],
+                        (self._gs_mrc_size[1], self._gs_mrc_size[0]),
+                        xfactor=1,
+                        yfactor=-1,
+                    )
+                    if (
+                        fh_centre[0] < sub_sample_boundaries[0]
+                        or fh_centre[1] < sub_sample_boundaries[1]
+                        or fh_centre[0]
+                        > sub_sample_boundaries[0] + self._sub_sample_size[0]
+                        or fh_centre[1]
+                        > sub_sample_boundaries[1] + self._sub_sample_size[1]
+                    ):
+                        drop_indices.append(selected_df.index[ri])
+            else:
+                for ri, row in selected_df.iterrows():
+                    fh_centre = find_point_pixel(
+                        (
+                            row["foil_hole_x"],
+                            row["foil_hole_y"],
+                        ),
+                        (row["grid_square_x"], row["grid_square_y"]),
+                        row["grid_square_pixel_size"]
+                        * (self._gs_mrc_size[1] / self._gs_jpeg_size[0]),
+                        self._gs_jpeg_size,
+                        xfactor=1,
+                        yfactor=-1,
+                    )
+                    if (
+                        fh_centre[0] < sub_sample_boundaries[0]
+                        or fh_centre[1] < sub_sample_boundaries[1]
+                        or fh_centre[0]
+                        > sub_sample_boundaries[0] + self._sub_sample_size[0]
+                        or fh_centre[1]
+                        > sub_sample_boundaries[1] + self._sub_sample_size[1]
+                    ):
+                        drop_indices.append(selected_df.index[ri])
+            selected_df.drop(drop_indices, inplace=True)
+            averaged_df = selected_df.groupby("grid_square").mean()
+            if len(averaged_df):
+                labels = [
+                    v
+                    for k, v in averaged_df.iloc[0].to_dict().items()
+                    if k in self._allowed_labels
+                ]
+            else:
+                labels = [np.inf if b else -np.inf for b in self._lower_better_label]
             if self._mrc:
                 image = mrc_to_tensor(
                     (self._data_dir / _grid_squares[grid_square_idx]).with_suffix(
@@ -214,24 +249,28 @@ class SmartEMDiskDataLoader(DataLoader):
                     )
                 )[
                     :,
-                    sub_sample_boundaries[0] : sub_sample_boundaries[0]
-                    + self._sub_sample_size[0],
                     sub_sample_boundaries[1] : sub_sample_boundaries[1]
                     + self._sub_sample_size[1],
+                    sub_sample_boundaries[0] : sub_sample_boundaries[0]
+                    + self._sub_sample_size[0],
                 ]
             else:
                 image = read_image(
                     str(self._data_dir / _grid_squares[grid_square_idx])
                 )[
                     :,
-                    sub_sample_boundaries[0] : sub_sample_boundaries[0]
-                    + self._sub_sample_size[0],
                     sub_sample_boundaries[1] : sub_sample_boundaries[1]
                     + self._sub_sample_size[1],
+                    sub_sample_boundaries[0] : sub_sample_boundaries[0]
+                    + self._sub_sample_size[0],
                 ]
         elif self._level == "grid_square":
             averaged_df = self._df.groupby("grid_square").mean()
-            labels = averaged_df.iloc[idx].to_list()
+            labels = [
+                v
+                for k, v in averaged_df.iloc[idx].to_dict().items()
+                if k in self._allowed_labels
+            ]
             if self._mrc:
                 image = mrc_to_tensor(
                     (self._data_dir / averaged_df.iloc[idx].name).with_suffix(".mrc")
@@ -239,7 +278,11 @@ class SmartEMDiskDataLoader(DataLoader):
             else:
                 image = read_image(str(self._data_dir / averaged_df.iloc[idx].name))
         else:
-            labels = self._df.iloc[idx, 8:].to_list()
+            labels = [
+                v
+                for k, v in self._df.iloc[idx].to_dict().items()
+                if k in self._allowed_labels
+            ]
             if self._mrc:
                 image = mrc_to_tensor(
                     (self._data_dir / self._df.iloc[idx][self._level]).with_suffix(
