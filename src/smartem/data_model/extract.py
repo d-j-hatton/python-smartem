@@ -1,6 +1,6 @@
 from typing import Any, List, Optional, Sequence, Set, Tuple, Type, Union
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine.row import LegacyRow
 from sqlalchemy.orm import Load, load_only, sessionmaker
@@ -353,16 +353,27 @@ class DataAPI:
     def get_particle_sets(
         self,
         project: str,
-        group_name: str,
-        set_ids: Union[Set[str], List[str]],
-        source_name: str,
+        group_name: str = "",
+        set_ids: Optional[Union[Set[str], List[str]]] = None,
+        source_name: str = "",
     ) -> List[ParticleSet]:
-        query = (
-            self.session.query(ParticleSet)
-            .filter(ParticleSet.project_name == project)
-            .filter(ParticleSet.group_name == group_name)
-            .filter(ParticleSet.identifier.in_([f"{source_name}:{s}" for s in set_ids]))
-        )
+        if not any([group_name, set_ids, source_name]):
+            query = self.session.query(ParticleSet).filter(
+                ParticleSet.project_name == project
+            )
+        elif set_ids:
+            query = (
+                self.session.query(ParticleSet)
+                .filter(ParticleSet.project_name == project)
+                .filter(ParticleSet.group_name == group_name)
+                .filter(
+                    ParticleSet.identifier.in_([f"{source_name}:{s}" for s in set_ids])
+                )
+            )
+        else:
+            raise ValueError(
+                "If group_name or source_name are specified then set_ids must also be specified"
+            )
         q = query.all()
         return q
 
@@ -815,3 +826,71 @@ class DataAPI:
                     )
                 result = connection.execute(insert_stmt)
         return result.fetchall()
+
+    def delete_project(self, project: str):
+        stmts = []
+        particle_sets = self.get_particle_sets(project=project)
+        psids = [p.identifier for p in particle_sets]
+        psi_table = ParticleSetInfo.__table__
+        psi_delete_stmt = delete(psi_table).where(psi_table.c.set_name.in_(psids))
+        stmts.append(psi_delete_stmt)
+        linker_table = ParticleSetLinker.__table__
+        linker_delete_stmt = delete(linker_table).where(
+            linker_table.c.set_name.in_(psids)
+        )
+        stmts.append(linker_delete_stmt)
+        ps_table = ParticleSet.__table__
+        ps_delete_stmt = delete(ps_table).where(ps_table.c.project_name == project)
+        stmts.append(ps_delete_stmt)
+        particles = self.get_particles(project=project)
+        pids = [p.particle_id for p in particles]
+        pi_table = ParticleInfo.__table__
+        pi_delete_stmt = delete(pi_table).where(pi_table.c.particle_id.in_(pids))
+        stmts.append(pi_delete_stmt)
+        par_table = Particle.__table__
+        par_delete_stmt = delete(par_table).where(par_table.c.particle_id.in_(pids))
+        stmts.append(par_delete_stmt)
+        exposures = self.get_exposures(project=project)
+        enames = [e.exposure_name for e in exposures]
+        ei_table = ExposureInfo.__table__
+        ei_delete_stmt = delete(ei_table).where(ei_table.c.exposure_name.in_(enames))
+        stmts.append(ei_delete_stmt)
+        exp_table = Exposure.__table__
+        exp_delete_stmt = delete(exp_table).where(exp_table.c.exposure_name.in_(enames))
+        stmts.append(exp_delete_stmt)
+        foil_holes = self.get_foil_holes(project=project)
+        fh_names = [fh.foil_hole_name for fh in foil_holes]
+        fh_table = FoilHole.__table__
+        fh_delete_stmt = delete(fh_table).where(fh_table.c.foil_hole_name.in_(fh_names))
+        stmts.append(fh_delete_stmt)
+        grid_squares = self.get_grid_squares(project=project)
+        gs_names = [gs.grid_square_name for gs in grid_squares]
+        gs_table = GridSquare.__table__
+        gs_delete_stmt = delete(gs_table).where(
+            gs_table.c.grid_square_name.in_(gs_names)
+        )
+        stmts.append(gs_delete_stmt)
+        atlases = self.get_atlases(project=project)
+        if isinstance(atlases, Atlas):
+            atlas_ids = [atlases.atlas_id]
+        else:
+            atlas_ids = [a.atlas_id for a in atlases]
+        tile_table = Tile.__table__
+        tile_delete_stmt = delete(tile_table).where(
+            tile_table.c.atlas_id.in_(atlas_ids)
+        )
+        stmts.append(tile_delete_stmt)
+        proj_table = Project.__table__
+        proj_delete_stmt = delete(proj_table).where(
+            proj_table.c.project_name == project
+        )
+        stmts.append(proj_delete_stmt)
+        atlas_table = Atlas.__table__
+        atlas_delete_stmt = delete(atlas_table).where(
+            atlas_table.c.atlas_id.in_(atlas_ids)
+        )
+        stmts.append(atlas_delete_stmt)
+        with self.engine.connect() as connection:
+            with connection.begin():
+                for st in stmts[1:3]:
+                    connection.execute(st)

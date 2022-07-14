@@ -229,7 +229,9 @@ class ParticleSet(Base):
         unique=True,
     )
 
-    project_name: Column = Column(ForeignKey("Project.project_name"), nullable=False)
+    project_name: Column = Column(
+        ForeignKey("Project.project_name"), nullable=False, index=True
+    )
     Project = relationship("Project")
 
 
