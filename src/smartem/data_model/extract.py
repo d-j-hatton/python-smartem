@@ -892,5 +892,5 @@ class DataAPI:
         stmts.append(atlas_delete_stmt)
         with self.engine.connect() as connection:
             with connection.begin():
-                for st in stmts[1:3]:
+                for st in stmts:
                     connection.execute(st)
