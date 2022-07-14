@@ -252,7 +252,9 @@ class ParticleSetLinker(Base):
     )
     Particle = relationship("Particle")
 
-    set_name: Column = Column(ForeignKey("ParticleSet.identifier"), primary_key=True)
+    set_name: Column = Column(
+        ForeignKey("ParticleSet.identifier"), primary_key=True, index=True
+    )
     ParticleSet = relationship("ParticleSet")
 
 
