@@ -191,6 +191,7 @@ class SmartEMDiskDataLoader(DataLoader):
             drop_indices = []
             if self._mrc:
                 for ri, row in selected_df.iterrows():
+                    # print(ri, len(selected_df))
                     fh_centre = find_point_pixel(
                         (
                             row["foil_hole_x"],
@@ -210,7 +211,7 @@ class SmartEMDiskDataLoader(DataLoader):
                         or fh_centre[1]
                         > sub_sample_boundaries[1] + self._sub_sample_size[1]
                     ):
-                        drop_indices.append(selected_df.index[ri])
+                        drop_indices.append(ri)  # selected_df.index[ri])
             else:
                 for ri, row in selected_df.iterrows():
                     fh_centre = find_point_pixel(
@@ -233,8 +234,9 @@ class SmartEMDiskDataLoader(DataLoader):
                         or fh_centre[1]
                         > sub_sample_boundaries[1] + self._sub_sample_size[1]
                     ):
-                        drop_indices.append(selected_df.index[ri])
-            selected_df.drop(drop_indices, inplace=True)
+                        drop_indices.append(ri)  # selected_df.index[ri])
+            selected_df = selected_df.drop(drop_indices)
+            print(selected_df)
             averaged_df = selected_df.groupby("grid_square").mean()
             if len(averaged_df):
                 labels = [
