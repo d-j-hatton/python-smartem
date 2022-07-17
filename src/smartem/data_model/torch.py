@@ -164,6 +164,20 @@ class SmartEMDiskDataLoader(DataLoader):
                 break
             except TypeError:
                 continue
+        if self._mrc:
+            self._boundary_points_x = np.random.randint(
+                self._gs_mrc_size[1] - self._sub_sample_size[0], size=len(self)
+            )
+            self._boundary_points_y = np.random.randint(
+                self._gs_mrc_size[0] - self._sub_sample_size[1], size=len(self)
+            )
+        else:
+            self._boundary_points_x = np.random.randint(
+                self._gs_jpeg_size[0] - self._sub_sample_size[0], size=len(self)
+            )
+            self._boundary_points_y = np.random.randint(
+                self._gs_jpeg_size[1] - self._sub_sample_size[1], size=len(self)
+            )
 
     def __len__(self) -> int:
         if self._level == "grid_square" and self._num_samples:
@@ -173,16 +187,10 @@ class SmartEMDiskDataLoader(DataLoader):
     def __getitem__(self, idx: int) -> Tuple[Tensor, List[float]]:
         sub_sample_boundaries = (-1, -1)
         if self._level == "grid_square" and self._num_samples:
-            if self._mrc:
-                sub_sample_boundaries = (
-                    np.random.randint(self._gs_mrc_size[1] - self._sub_sample_size[0]),
-                    np.random.randint(self._gs_mrc_size[0] - self._sub_sample_size[1]),
-                )
-            else:
-                sub_sample_boundaries = (
-                    np.random.randint(self._gs_jpeg_size[0] - self._sub_sample_size[0]),
-                    np.random.randint(self._gs_jpeg_size[1] - self._sub_sample_size[1]),
-                )
+            sub_sample_boundaries = (
+                self._boundary_points_x[idx],
+                self._boundary_points_y[idx],
+            )
             grid_square_idx = idx // self._num_samples
             _grid_squares = self._df["grid_square"].unique()
             selected_df = self._df[
