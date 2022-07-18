@@ -147,6 +147,8 @@ class SmartEMDiskDataLoader(DataLoader):
                 f"Unrecognised SmartEMDataLoader level {self._level}: accepted values are grid_sqaure or foil_hole"
             )
         self._df = pd.read_csv(self._data_dir / labels_csv)
+        if level == "foil_hole":
+            self._df = self._df[self._df["foil_hole"].notna()]
         with mrcfile.open(
             (self._data_dir / self._df.iloc[0]["grid_square"]).with_suffix(".mrc")
         ) as _mrc:
