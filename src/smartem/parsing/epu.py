@@ -5,6 +5,7 @@ import xmltodict
 
 from smartem.data_model import Atlas, Exposure, FoilHole, GridSquare, Tile
 from smartem.data_model.extract import DataAPI
+from smartem.stage_model import stage_position
 
 
 def parse_epu_xml(xml_path: Path) -> Dict[str, Any]:
@@ -108,6 +109,10 @@ def parse_epu_dir(epu_path: Path, extractor: DataAPI, project: str):
             afis_foil_holes: Dict[str, FoilHole] = {}
             grid_square_jpeg = next(grid_square_dir.glob("*.jpg"))
             grid_square_data = parse_epu_xml(grid_square_jpeg.with_suffix(".xml"))
+            metadata_path = epu_path.parent / "Metadata"
+            foil_hole_metadata = metadata_foil_hole_positions(
+                metadata_path / grid_square_jpeg.with_suffix(".dm").name
+            )
             tile_id = extractor.get_tile_id(grid_square_data["stage_position"], project)
             if tile_id is not None:
                 extractor.put(
@@ -153,6 +158,13 @@ def parse_epu_dir(epu_path: Path, extractor: DataAPI, project: str):
                         break
                 else:
                     foil_hole_name = exposure_jpeg.name.split("_Data")[0]
+                    foil_hole_label = foil_hole_name.split("_")[1]
+                    adjusted_stage_position = stage_position(
+                        foil_hole_metadata[foil_hole_label],
+                        grid_square_data["pixel_size"],
+                        grid_square_data["stage_position"],
+                        grid_square_data["readout_area"],
+                    )
                     afis_foil_holes[foil_hole_name] = FoilHole(
                         grid_square_name=grid_square_dir.name,
                         stage_position_x=exposure_data["stage_position"][0],
@@ -162,6 +174,8 @@ def parse_epu_dir(epu_path: Path, extractor: DataAPI, project: str):
                         readout_area_x=None,
                         readout_area_y=None,
                         foil_hole_name=foil_hole_name,
+                        adjusted_stage_position_x=adjusted_stage_position[0],
+                        adjusted_stage_position_y=adjusted_stage_position[1],
                     )
                 exposures[exposure_jpeg] = Exposure(
                     exposure_name=exposure_jpeg.name,

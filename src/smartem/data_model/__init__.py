@@ -132,14 +132,14 @@ class FoilHole(EPUImage, Base):
         nullable=False,
     )
 
-    corrected_stage_position_x: Column = Column(
+    adjusted_stage_position_x: Column = Column(
         Float,
-        comment="x postion of the microscope stage corrected for beam shift [nm]",
+        comment="x postion of the microscope stage adjusted to account for beam shift [nm]",
         nullable=True,
     )
-    corrected_stage_position_y: Column = Column(
+    adjusted_stage_position_y: Column = Column(
         Float,
-        comment="y postion of the microscope stage corrected for beam shift [nm]",
+        comment="y postion of the microscope stage adjusted to account for beam shift [nm]",
         nullable=True,
     )
 
