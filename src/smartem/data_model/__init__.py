@@ -132,6 +132,17 @@ class FoilHole(EPUImage, Base):
         nullable=False,
     )
 
+    corrected_stage_position_x: Column = Column(
+        Float,
+        comment="x postion of the microscope stage corrected for beam shift [nm]",
+        nullable=True,
+    )
+    corrected_stage_position_y: Column = Column(
+        Float,
+        comment="y postion of the microscope stage corrected for beam shift [nm]",
+        nullable=True,
+    )
+
     grid_square_name: Column = Column(
         ForeignKey("GridSquare.grid_square_name"), index=True
     )
