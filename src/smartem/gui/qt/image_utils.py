@@ -143,39 +143,77 @@ class ImageLabel(QLabel):
         else:
             brush = QBrush()
             painter.setBrush(brush)
-        if inner_image.thumbnail:
-            rect_centre = find_point_pixel(
-                (
-                    inner_image.stage_position_x,
-                    inner_image.stage_position_y,
-                ),
-                (self._image.stage_position_x, self._image.stage_position_y),
-                scaled_pixel_size,
-                (
-                    int(readout_area[0] / (scaled_pixel_size / self._image.pixel_size)),
-                    int(readout_area[1] / (scaled_pixel_size / self._image.pixel_size)),
-                ),
-                xfactor=1,
-                yfactor=-1,
-            )
-            edge_lengths = (
-                int(
-                    inner_image.readout_area_x
-                    * inner_image.pixel_size
-                    / scaled_pixel_size
-                ),
-                int(
-                    inner_image.readout_area_y
-                    * inner_image.pixel_size
-                    / scaled_pixel_size
-                ),
-            )
-            painter.drawRect(
-                int(rect_centre[0] - 0.5 * edge_lengths[0]),
-                int(rect_centre[1] - 0.5 * edge_lengths[1]),
-                edge_lengths[0],
-                edge_lengths[1],
-            )
+        if inner_image.thumbnail or hasattr(inner_image, "adjusted_stage_position_x"):
+            if (
+                isinstance(inner_image, FoilHole)
+                and inner_image.adjusted_stage_position_x is not None
+            ):
+                rect_centre = find_point_pixel(
+                    (
+                        inner_image.adjusted_stage_position_x,
+                        inner_image.adjusted_stage_position_y,
+                    ),
+                    (self._image.stage_position_x, self._image.stage_position_y),
+                    scaled_pixel_size,
+                    (
+                        int(
+                            readout_area[0]
+                            / (scaled_pixel_size / self._image.pixel_size)
+                        ),
+                        int(
+                            readout_area[1]
+                            / (scaled_pixel_size / self._image.pixel_size)
+                        ),
+                    ),
+                    xfactor=1,
+                    yfactor=-1,
+                )
+                edge_lengths = (20, 20)
+                painter.drawEllipse(
+                    int(rect_centre[0] - 0.5 * edge_lengths[0]),
+                    int(rect_centre[1] - 0.5 * edge_lengths[1]),
+                    edge_lengths[0],
+                    edge_lengths[1],
+                )
+            else:
+                rect_centre = find_point_pixel(
+                    (
+                        inner_image.stage_position_x,
+                        inner_image.stage_position_y,
+                    ),
+                    (self._image.stage_position_x, self._image.stage_position_y),
+                    scaled_pixel_size,
+                    (
+                        int(
+                            readout_area[0]
+                            / (scaled_pixel_size / self._image.pixel_size)
+                        ),
+                        int(
+                            readout_area[1]
+                            / (scaled_pixel_size / self._image.pixel_size)
+                        ),
+                    ),
+                    xfactor=1,
+                    yfactor=-1,
+                )
+                edge_lengths = (
+                    int(
+                        inner_image.readout_area_x
+                        * inner_image.pixel_size
+                        / scaled_pixel_size
+                    ),
+                    int(
+                        inner_image.readout_area_y
+                        * inner_image.pixel_size
+                        / scaled_pixel_size
+                    ),
+                )
+                painter.drawRect(
+                    int(rect_centre[0] - 0.5 * edge_lengths[0]),
+                    int(rect_centre[1] - 0.5 * edge_lengths[1]),
+                    edge_lengths[0],
+                    edge_lengths[1],
+                )
 
     def paintEvent(self, e):
         super().paintEvent(e)
