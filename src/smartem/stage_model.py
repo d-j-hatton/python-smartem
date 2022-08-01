@@ -18,3 +18,17 @@ def find_point_pixel(
         outer_centre_pix[0] + xfactor * int(delta[0]),
         outer_centre_pix[1] + yfactor * int(delta[1]),
     )
+
+
+def stage_position(
+    pix_pos: Tuple[int, int],
+    spacing: float,
+    physical_centre: Tuple[float, float],
+    image_size: Tuple[int, int],
+) -> Tuple[float, float]:
+    pix_centre = (image_size[0] // 2, image_size[1] // 2)
+    delta = (
+        (pix_pos[0] - pix_centre[0]) * spacing,
+        (pix_pos[1] - pix_centre[1]) * spacing,
+    )
+    return (physical_centre[0] + delta[0], physical_centre[1] + delta[1])
