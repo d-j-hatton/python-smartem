@@ -53,10 +53,13 @@ class MainDisplay(ComponentTab):
         self.grid = QGridLayout()
         self.setLayout(self.grid)
         self._square_combo = QComboBox()
+        self._square_combo.setEditable(True)
         self._square_combo.currentIndexChanged.connect(self._select_square)
         self._foil_hole_combo = QComboBox()
+        self._foil_hole_combo.setEditable(True)
         self._foil_hole_combo.currentIndexChanged.connect(self._select_foil_hole)
         self._exposure_combo = QComboBox()
+        self._exposure_combo.setEditable(True)
         self._exposure_combo.currentIndexChanged.connect(self._select_exposure)
         self._data_combo = QComboBox()
         self._data_list = QListWidget()
@@ -484,7 +487,11 @@ class MainDisplay(ComponentTab):
                 if _key
                 else None,
                 extra_images=[
-                    fh for fh in self._foil_holes if fh != foil_hole and fh.thumbnail
+                    fh
+                    for fh in self._foil_holes
+                    if fh != foil_hole
+                    and fh.thumbnail
+                    or fh.adjusted_stage_position_x is not None
                 ],
                 image_values=imvs,
                 selection_box=self._square_combo,
