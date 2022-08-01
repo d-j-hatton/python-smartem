@@ -57,7 +57,10 @@ def metadata_foil_hole_positions(xml_path: Path) -> Dict[str, Tuple[int, int]]:
     fh_pix_positions = {}
     for fh_block in serialization_array[required_key]:
         pix_center = fh_block["b:value"]["PixelCenter"]
-        fh_pix_positions[fh_block["b:key"]] = (pix_center["c:x"], pix_center["c:y"])
+        fh_pix_positions[fh_block["b:key"]] = (
+            int(float(pix_center["c:x"])),
+            int(float(pix_center["c:y"])),
+        )
     return fh_pix_positions
 
 
@@ -111,7 +114,7 @@ def parse_epu_dir(epu_path: Path, extractor: DataAPI, project: str):
             grid_square_data = parse_epu_xml(grid_square_jpeg.with_suffix(".xml"))
             metadata_path = epu_path.parent / "Metadata"
             foil_hole_metadata = metadata_foil_hole_positions(
-                metadata_path / grid_square_jpeg.with_suffix(".dm").name
+                metadata_path / f"{grid_square_dir.name}.dm"
             )
             tile_id = extractor.get_tile_id(grid_square_data["stage_position"], project)
             if tile_id is not None:
