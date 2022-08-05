@@ -21,7 +21,17 @@ def run():
         help="Names of smartEM projects to export",
         dest="projects",
     )
+    parser.add_argument(
+        "--use_adjusted_stage",
+        action="store_true",
+        dest="use_adjusted_stage",
+    )
     args = parser.parse_args()
 
     data_api = DataAPI()
-    export_foil_holes(data_api, out_dir=Path(args.out_dir), projects=args.projects)
+    export_foil_holes(
+        data_api,
+        out_dir=Path(args.out_dir),
+        projects=args.projects,
+        use_adjusted_stage=args.use_adjusted_stage,
+    )

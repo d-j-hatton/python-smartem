@@ -2,14 +2,19 @@ import shutil
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import yaml
 from pandas import DataFrame
 
 from smartem.data_model.extract import DataAPI
 from smartem.data_model.structure import extract_keys_with_foil_hole_averages
+from smartem.parsing.epu import calibrate_coordinate_system
 
 
 def export_foil_holes(
-    data_api: DataAPI, out_dir: Path = Path("."), projects: Optional[List[str]] = None
+    data_api: DataAPI,
+    out_dir: Path = Path("."),
+    projects: Optional[List[str]] = None,
+    use_adjusted_stage: bool = False,
 ):
     if not projects:
         projects = [data_api._project]
@@ -122,8 +127,20 @@ def export_foil_holes(
                         else None
                     )
                     data["foil_hole_pixel_size"].append(fh.pixel_size)
-                    data["foil_hole_x"].append(fh.stage_position_x)
-                    data["foil_hole_y"].append(fh.stage_position_y)
+                    if use_adjusted_stage:
+                        data["foil_hole_x"].append(
+                            fh.stage_position_x
+                            if fh.adjusted_stage_position_x is None
+                            else fh.adjusted_stage_position_x
+                        )
+                        data["foil_hole_y"].append(
+                            fh.stage_position_y
+                            if fh.adjusted_stage_position_y is None
+                            else fh.adjusted_stage_position_y
+                        )
+                    else:
+                        data["foil_hole_x"].append(fh.stage_position_x)
+                        data["foil_hole_y"].append(fh.stage_position_y)
                     data["accummotiontotal"].append(
                         fh_extracted["_rlnaccummotiontotal"].averages[fh.foil_hole_name]  # type: ignore
                     )
@@ -143,3 +160,14 @@ def export_foil_holes(
 
     df = DataFrame.from_dict(data)
     df.to_csv(out_dir / "labels.csv", index=False)
+
+    if projects:
+        _project = data_api.get_project(project_name=projects[0])
+        for dm in (Path(_project.acquisition_directory).parent / "Metadata").glob(
+            "*.dm"
+        ):
+            stage_calibration = calibrate_coordinate_system(dm)
+            if stage_calibration:
+                with open(out_dir / "coordinate_calibration.yaml", "w") as outfile:
+                    yaml.dump(stage_calibration._asdict(), outfile)
+                break
