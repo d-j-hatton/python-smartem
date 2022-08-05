@@ -1,7 +1,9 @@
+import json
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import xmltodict
+from rich.pretty import pprint
 
 from smartem.data_model import Atlas, Exposure, FoilHole, GridSquare, Tile
 from smartem.data_model.extract import DataAPI
@@ -79,58 +81,119 @@ def calibrate_coordinate_system(xml_path: Path):
             break
     if not required_key:
         return
-    pix_positions = (
-        (
-            int(
+    for i in range(len(serialization_array[required_key]) - 1):
+        pix_positions = (
+            (
+                int(
+                    float(
+                        serialization_array[required_key][i]["b:value"]["PixelCenter"][
+                            "c:x"
+                        ]
+                    )
+                ),
+                int(
+                    float(
+                        serialization_array[required_key][i]["b:value"]["PixelCenter"][
+                            "c:y"
+                        ]
+                    )
+                ),
+            ),
+            (
+                int(
+                    float(
+                        serialization_array[required_key][
+                            (i + 10) % len(serialization_array[required_key])
+                        ]["b:value"]["PixelCenter"]["c:x"]
+                    )
+                ),
+                int(
+                    float(
+                        serialization_array[required_key][
+                            (i + 10) % len(serialization_array[required_key])
+                        ]["b:value"]["PixelCenter"]["c:y"]
+                    )
+                ),
+            ),
+        )
+        if (
+            serialization_array[required_key][i]["b:value"]["IsPositionCorrected"]
+            == "true"
+        ):
+            phys_01 = (
                 float(
-                    serialization_array[required_key][0]["b:value"]["PixelCenter"][
-                        "c:x"
-                    ]
-                )
-            ),
-            int(
+                    serialization_array[required_key][i]["b:value"][
+                        "CorrectedStagePosition"
+                    ]["c:X"]
+                ),
                 float(
-                    serialization_array[required_key][0]["b:value"]["PixelCenter"][
-                        "c:y"
-                    ]
-                )
-            ),
-        ),
-        (
-            int(
+                    serialization_array[required_key][i]["b:value"][
+                        "CorrectedStagePosition"
+                    ]["c:Y"]
+                ),
+            )
+        else:
+            phys_01 = (
                 float(
-                    serialization_array[required_key][1]["b:value"]["PixelCenter"][
-                        "c:x"
+                    serialization_array[required_key][i]["b:value"]["StagePosition"][
+                        "c:X"
                     ]
-                )
-            ),
-            int(
+                ),
                 float(
-                    serialization_array[required_key][1]["b:value"]["PixelCenter"][
-                        "c:y"
+                    serialization_array[required_key][i]["b:value"]["StagePosition"][
+                        "c:Y"
                     ]
-                )
-            ),
-        ),
-    )
-    physical_positions = (
-        (
-            float(
-                serialization_array[required_key][0]["b:value"]["StagePosition"]["c:X"]
-            ),
-            float(
-                serialization_array[required_key][0]["b:value"]["StagePosition"]["c:Y"]
-            ),
-        ),
-        (
-            float(
-                serialization_array[required_key][1]["b:value"]["StagePosition"]["c:X"]
-            ),
-            float(
-                serialization_array[required_key][1]["b:value"]["StagePosition"]["c:Y"]
-            ),
-        ),
-    )
+                ),
+            )
+        if (
+            serialization_array[required_key][
+                (i + 10) % len(serialization_array[required_key])
+            ]["b:value"]["IsPositionCorrected"]
+            == "true"
+        ):
+            phys_02 = (
+                float(
+                    serialization_array[required_key][
+                        (i + 10) % len(serialization_array[required_key])
+                    ]["b:value"]["CorrectedStagePosition"]["c:X"]
+                ),
+                float(
+                    serialization_array[required_key][
+                        (i + 10) % len(serialization_array[required_key])
+                    ]["b:value"]["CorrectedStagePosition"]["c:Y"]
+                ),
+            )
+        else:
+            phys_02 = (
+                float(
+                    serialization_array[required_key][
+                        (i + 10) % len(serialization_array[required_key])
+                    ]["b:value"]["StagePosition"]["c:X"]
+                ),
+                float(
+                    serialization_array[required_key][
+                        (i + 10) % len(serialization_array[required_key])
+                    ]["b:value"]["StagePosition"]["c:Y"]
+                ),
+            )
+        physical_positions = (phys_01, phys_02)
+        pix_diff = (
+            pix_positions[1][0] - pix_positions[0][0],
+            pix_positions[1][1] - pix_positions[0][1],
+        )
+        physical_diff = (
+            physical_positions[1][0] - physical_positions[0][0],
+            physical_positions[1][1] - physical_positions[0][1],
+        )
+        if (
+            all(physical_diff)
+            and all(pix_diff)
+            and pix_diff[0] > 100
+            and pix_diff[1] > 100
+        ):
+            pprint(json.loads(json.dumps(serialization_array[required_key][i])))
+            pprint(json.loads(json.dumps(serialization_array[required_key][i + 1])))
+            break
     return calibrate(pix_positions, physical_positions)
 
 
