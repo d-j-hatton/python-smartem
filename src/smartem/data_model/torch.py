@@ -1,3 +1,4 @@
+import functools
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -19,6 +20,7 @@ from smartem.data_model.structure import (
 from smartem.stage_model import StageCalibration, find_point_pixel
 
 
+@functools.lru_cache(maxsize=50)
 def mrc_to_tensor(mrc_file: Path) -> Tensor:
     with mrcfile.open(mrc_file) as mrc:
         data = mrc.data
