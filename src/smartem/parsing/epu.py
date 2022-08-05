@@ -1,13 +1,11 @@
-import json
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import xmltodict
-from rich.pretty import pprint
 
 from smartem.data_model import Atlas, Exposure, FoilHole, GridSquare, Tile
 from smartem.data_model.extract import DataAPI
-from smartem.stage_model import calibrate, stage_position
+from smartem.stage_model import StageCalibration, calibrate, stage_position
 
 
 def parse_epu_xml(xml_path: Path) -> Dict[str, Any]:
@@ -66,7 +64,7 @@ def metadata_foil_hole_positions(xml_path: Path) -> Dict[str, Tuple[int, int]]:
     return fh_pix_positions
 
 
-def calibrate_coordinate_system(xml_path: Path):
+def calibrate_coordinate_system(xml_path: Path) -> Optional[StageCalibration]:
     with open(xml_path, "r") as xml:
         for_parsing = xml.read()
         data = xmltodict.parse(for_parsing)
@@ -80,7 +78,8 @@ def calibrate_coordinate_system(xml_path: Path):
             required_key = key
             break
     if not required_key:
-        return
+        return None
+    found = False
     for i in range(len(serialization_array[required_key]) - 1):
         pix_positions = (
             (
@@ -191,9 +190,10 @@ def calibrate_coordinate_system(xml_path: Path):
             and pix_diff[0] > 100
             and pix_diff[1] > 100
         ):
-            pprint(json.loads(json.dumps(serialization_array[required_key][i])))
-            pprint(json.loads(json.dumps(serialization_array[required_key][i + 1])))
+            found = True
             break
+    if not found:
+        return None
     return calibrate(pix_positions, physical_positions)
 
 

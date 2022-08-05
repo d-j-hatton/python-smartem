@@ -11,7 +11,7 @@ from PyQt5.QtGui import QBrush, QColor, QPainter, QPen
 from PyQt5.QtWidgets import QComboBox, QLabel
 
 from smartem.data_model import Atlas, Exposure, FoilHole, GridSquare, Particle, Tile
-from smartem.stage_model import find_point_pixel
+from smartem.stage_model import StageCalibration, find_point_pixel
 
 
 def colour_gradient(value: float) -> str:
@@ -105,6 +105,7 @@ class ImageLabel(QLabel):
         extra_images: Optional[list] = None,
         image_values: Optional[List[float]] = None,
         selection_box: Optional[QComboBox] = None,
+        stage_calibration: Optional[StageCalibration] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -117,6 +118,7 @@ class ImageLabel(QLabel):
         self._value = value
         self._image_values = image_values or []
         self._selection_box = selection_box
+        self._stage_calibration = stage_calibration or StageCalibration()
 
     def mousePressEvent(self, ev):
         if self._selection_box is not None:
@@ -172,8 +174,8 @@ class ImageLabel(QLabel):
                 painter.drawEllipse(
                     int(rect_centre[0] - 0.5 * edge_lengths[0]),
                     int(rect_centre[1] - 0.5 * edge_lengths[1]),
-                    edge_lengths[0],
-                    edge_lengths[1],
+                    0.5 * edge_lengths[0],
+                    0.5 * edge_lengths[1],
                 )
             else:
                 rect_centre = find_point_pixel(
@@ -193,8 +195,9 @@ class ImageLabel(QLabel):
                             / (scaled_pixel_size / self._image.pixel_size)
                         ),
                     ),
-                    xfactor=1,
-                    yfactor=-1,
+                    xfactor=-1 if self._stage_calibration.x_flip else 1,
+                    # yfactor=1,
+                    yfactor=-1 if self._stage_calibration.y_flip else 1,
                 )
                 edge_lengths = (
                     int(
@@ -209,8 +212,12 @@ class ImageLabel(QLabel):
                     ),
                 )
                 painter.drawRect(
-                    int(rect_centre[0] - 0.5 * edge_lengths[0]),
-                    int(rect_centre[1] - 0.5 * edge_lengths[1]),
+                    int(rect_centre[1] - 0.5 * edge_lengths[0])
+                    if self._stage_calibration.inverted
+                    else int(rect_centre[0] - 0.5 * edge_lengths[0]),
+                    int(rect_centre[0] - 0.5 * edge_lengths[1])
+                    if self._stage_calibration.inverted
+                    else int(rect_centre[1] - 0.5 * edge_lengths[1]),
                     edge_lengths[0],
                     edge_lengths[1],
                 )

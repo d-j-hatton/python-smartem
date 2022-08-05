@@ -31,6 +31,8 @@ from smartem.data_model.structure import (
 from smartem.gui.qt.component_tab import ComponentTab
 from smartem.gui.qt.image_utils import ImageLabel, ParticleImageLabel
 from smartem.gui.qt.plotting_utils import InteractivePlot
+from smartem.parsing.epu import calibrate_coordinate_system
+from smartem.stage_model import StageCalibration
 
 
 class MainDisplay(ComponentTab):
@@ -111,6 +113,7 @@ class MainDisplay(ComponentTab):
         self._gather_btn.clicked.connect(self._gather_data)
         self.grid.addWidget(self._gather_btn, 3, 1)
         self.project = ""
+        self._stage_calibration = StageCalibration()
 
     def load(self):
         self._grid_squares = self._extractor.get_grid_squares(project=self.project)
@@ -122,6 +125,11 @@ class MainDisplay(ComponentTab):
 
     def _set_epu_directory(self, epu_dir: Path):
         self._epu_dir = epu_dir
+        for dm in (epu_dir.parent / "Metadata").glob("*.dm"):
+            cal = calibrate_coordinate_system(dm)
+            if cal:
+                self._stage_calibration = cal
+                break
 
     def _set_data_size(self, project_dir: Path):
         try:
@@ -495,6 +503,7 @@ class MainDisplay(ComponentTab):
                 ],
                 image_values=imvs,
                 selection_box=self._square_combo,
+                stage_calibration=self._stage_calibration,
             )
             self.grid.addWidget(square_lbl, 1, 1)
             square_lbl.setPixmap(square_pixmap)
@@ -525,6 +534,7 @@ class MainDisplay(ComponentTab):
                     self._epu_dir,
                     parent=self,
                     selection_box=self._foil_hole_combo,
+                    stage_calibration=self._stage_calibration,
                 )
                 self.grid.addWidget(hole_lbl, 1, 2)
                 hole_lbl.setPixmap(hole_pixmap)
