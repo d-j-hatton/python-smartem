@@ -167,15 +167,8 @@ class ImageLabel(QLabel):
                             / (scaled_pixel_size / self._image.pixel_size)
                         ),
                     ),
-                    xfactor=1,
-                    yfactor=-1,
-                )
-                edge_lengths = (20, 20)
-                painter.drawEllipse(
-                    int(rect_centre[0] - 0.5 * edge_lengths[0]),
-                    int(rect_centre[1] - 0.5 * edge_lengths[1]),
-                    0.5 * edge_lengths[0],
-                    0.5 * edge_lengths[1],
+                    xfactor=-1 if self._stage_calibration.x_flip else 1,
+                    yfactor=-1 if self._stage_calibration.y_flip else 1,
                 )
             else:
                 rect_centre = find_point_pixel(
@@ -196,9 +189,21 @@ class ImageLabel(QLabel):
                         ),
                     ),
                     xfactor=-1 if self._stage_calibration.x_flip else 1,
-                    # yfactor=1,
                     yfactor=-1 if self._stage_calibration.y_flip else 1,
                 )
+            if not inner_image.thumbnail:
+                edge_lengths = (10, 10)
+                painter.drawEllipse(
+                    int(rect_centre[1] - 0.5 * edge_lengths[0])
+                    if self._stage_calibration.inverted
+                    else int(rect_centre[0] - 0.5 * edge_lengths[0]),
+                    int(rect_centre[0] - 0.5 * edge_lengths[1])
+                    if self._stage_calibration.inverted
+                    else int(rect_centre[1] - 0.5 * edge_lengths[1]),
+                    edge_lengths[0],
+                    edge_lengths[1],
+                )
+            else:
                 edge_lengths = (
                     int(
                         inner_image.readout_area_x

@@ -5,7 +5,7 @@ import xmltodict
 
 from smartem.data_model import Atlas, Exposure, FoilHole, GridSquare, Tile
 from smartem.data_model.extract import DataAPI
-from smartem.stage_model import StageCalibration, calibrate, stage_position
+from smartem.stage_model import StageCalibration, calibrate
 
 
 def parse_epu_xml(xml_path: Path) -> Dict[str, Any]:
@@ -62,6 +62,61 @@ def metadata_foil_hole_positions(xml_path: Path) -> Dict[str, Tuple[int, int]]:
             int(float(pix_center["c:y"])),
         )
     return fh_pix_positions
+
+
+def metadata_foil_hole_stage(xml_path: Path) -> Dict[str, Tuple[float, float]]:
+    with open(xml_path, "r") as xml:
+        for_parsing = xml.read()
+        data = xmltodict.parse(for_parsing)
+    data = data["GridSquareXml"]
+    serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
+        "a:m_serializationArray"
+    ]
+    required_key = ""
+    for key in serialization_array.keys():
+        if key.startswith("b:KeyValuePairOfintTargetLocation"):
+            required_key = key
+            break
+    if not required_key:
+        return {}
+    fh_stage_positions = {}
+    for fh_block in serialization_array[required_key]:
+        stage = fh_block["b:value"]["StagePosition"]
+        fh_stage_positions[fh_block["b:key"]] = (
+            float(stage["c:X"]) * 1e9,
+            float(stage["c:Y"]) * 1e9,
+        )
+    return fh_stage_positions
+
+
+def metadata_foil_hole_corrected_stage(
+    xml_path: Path,
+) -> Dict[str, tuple]:
+    with open(xml_path, "r") as xml:
+        for_parsing = xml.read()
+        data = xmltodict.parse(for_parsing)
+    data = data["GridSquareXml"]
+    serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
+        "a:m_serializationArray"
+    ]
+    required_key = ""
+    for key in serialization_array.keys():
+        if key.startswith("b:KeyValuePairOfintTargetLocation"):
+            required_key = key
+            break
+    if not required_key:
+        return {}
+    fh_cs_positions: Dict[str, tuple] = {}
+    for fh_block in serialization_array[required_key]:
+        if fh_block["b:value"]["IsPositionCorrected"] == "true":
+            corrected_stage = fh_block["b:value"]["CorrectedStagePosition"]
+            fh_cs_positions[fh_block["b:key"]] = (
+                float(corrected_stage["c:X"]) * 1e9,
+                float(corrected_stage["c:Y"]) * 1e9,
+            )
+        else:
+            fh_cs_positions[fh_block["b:key"]] = (None, None)
+    return fh_cs_positions
 
 
 def calibrate_coordinate_system(xml_path: Path) -> Optional[StageCalibration]:
@@ -246,7 +301,7 @@ def parse_epu_dir(epu_path: Path, extractor: DataAPI, project: str):
             grid_square_jpeg = next(grid_square_dir.glob("*.jpg"))
             grid_square_data = parse_epu_xml(grid_square_jpeg.with_suffix(".xml"))
             metadata_path = epu_path.parent / "Metadata"
-            foil_hole_metadata = metadata_foil_hole_positions(
+            foil_hole_stage = metadata_foil_hole_stage(
                 metadata_path / f"{grid_square_dir.name}.dm"
             )
             tile_id = extractor.get_tile_id(grid_square_data["stage_position"], project)
@@ -275,6 +330,7 @@ def parse_epu_dir(epu_path: Path, extractor: DataAPI, project: str):
                         ).stat().st_mtime > foil_hole_jpeg.stat().st_mtime:
                             continue
                 foil_hole_data = parse_epu_xml(foil_hole_jpeg.with_suffix(".xml"))
+                foil_hole_label = foil_hole_name.split("_")[1]
                 foil_holes[foil_hole_name] = FoilHole(
                     grid_square_name=grid_square_dir.name,
                     stage_position_x=foil_hole_data["stage_position"][0],
@@ -284,6 +340,8 @@ def parse_epu_dir(epu_path: Path, extractor: DataAPI, project: str):
                     readout_area_x=foil_hole_data["readout_area"][0],
                     readout_area_y=foil_hole_data["readout_area"][0],
                     foil_hole_name=foil_hole_name,
+                    adjusted_stage_position_x=foil_hole_stage[foil_hole_label][0],
+                    adjusted_stage_position_y=foil_hole_stage[foil_hole_label][1],
                 )
             extractor.put(list(foil_holes.values()))
             for exposure_jpeg in (grid_square_dir / "Data").glob("*.jpg"):
@@ -295,12 +353,7 @@ def parse_epu_dir(epu_path: Path, extractor: DataAPI, project: str):
                 else:
                     foil_hole_name = exposure_jpeg.name.split("_Data")[0]
                     foil_hole_label = foil_hole_name.split("_")[1]
-                    adjusted_stage_position = stage_position(
-                        foil_hole_metadata[foil_hole_label],
-                        grid_square_data["pixel_size"],
-                        grid_square_data["stage_position"],
-                        grid_square_data["readout_area"],
-                    )
+                    adjusted_stage_position = foil_hole_stage[foil_hole_label]
                     afis_foil_holes[foil_hole_name] = FoilHole(
                         grid_square_name=grid_square_dir.name,
                         stage_position_x=exposure_data["stage_position"][0],
