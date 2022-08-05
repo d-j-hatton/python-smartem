@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import mrcfile
 import numpy as np
 import pandas as pd
+import yaml
 from PIL import Image
 from torch import Tensor, reshape, zeros
 from torch.utils.data import DataLoader
@@ -15,7 +16,7 @@ from smartem.data_model.structure import (
     extract_keys_with_foil_hole_averages,
     extract_keys_with_grid_square_averages,
 )
-from smartem.stage_model import find_point_pixel
+from smartem.stage_model import StageCalibration, find_point_pixel
 
 
 def mrc_to_tensor(mrc_file: Path) -> Tensor:
@@ -147,6 +148,9 @@ class SmartEMDiskDataLoader(DataLoader):
                 f"Unrecognised SmartEMDataLoader level {self._level}: accepted values are grid_sqaure or foil_hole"
             )
         self._df = pd.read_csv(self._data_dir / labels_csv)
+        with open(self._data_dir / "coordinate_calibration.yaml", "r") as cal_in:
+            sc = yaml.safe_load(cal_in)
+        self._stage_calibration = StageCalibration(**sc)
         if level == "foil_hole":
             self._df = self._df[self._df["foil_hole"].notna()]
         with mrcfile.open(
@@ -209,9 +213,11 @@ class SmartEMDiskDataLoader(DataLoader):
                         (row["grid_square_x"], row["grid_square_y"]),
                         row["grid_square_pixel_size"],
                         (self._gs_mrc_size[1], self._gs_mrc_size[0]),
-                        xfactor=1,
-                        yfactor=-1,
+                        xfactor=-1 if self._stage_calibration.x_flip else 1,
+                        yfactor=-1 if self._stage_calibration.y_flip else 1,
                     )
+                    if self._stage_calibration.inverted:
+                        fh_centre = (fh_centre[1], fh_centre[0])
                     if (
                         fh_centre[0] < sub_sample_boundaries[0]
                         or fh_centre[1] < sub_sample_boundaries[1]
@@ -232,9 +238,11 @@ class SmartEMDiskDataLoader(DataLoader):
                         row["grid_square_pixel_size"]
                         * (self._gs_mrc_size[1] / self._gs_jpeg_size[0]),
                         self._gs_jpeg_size,
-                        xfactor=1,
-                        yfactor=-1,
+                        xfactor=-1 if self._stage_calibration.x_flip else 1,
+                        yfactor=-1 if self._stage_calibration.y_flip else 1,
                     )
+                    if self._stage_calibration.inverted:
+                        fh_centre = (fh_centre[1], fh_centre[0])
                     if (
                         fh_centre[0] < sub_sample_boundaries[0]
                         or fh_centre[1] < sub_sample_boundaries[1]
