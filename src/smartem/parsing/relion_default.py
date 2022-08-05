@@ -61,28 +61,35 @@ def _ctf(relion_dir: Path, data_handler: DataAPI, project: str):
     )
 
 
-def _prob_dist_max_class2d(relion_dir: Path, data_handler: DataAPI, project: str):
+def _prob_dist_max_class2d(
+    relion_dir: Path,
+    data_handler: DataAPI,
+    project: str,
+    excluded_directories: Optional[List[str]] = None,
+):
+    exclude = excluded_directories or []
     for class_file_path in (relion_dir / "Class2D").glob("job*"):
-        star_file = open_star_file(class_file_path / "run_it020_data.star")
-        column_data = get_column_data(
-            star_file,
-            [
+        if class_file_path.name not in exclude:
+            star_file = open_star_file(class_file_path / "run_it020_data.star")
+            column_data = get_column_data(
+                star_file,
+                [
+                    "_rlnmicrographname",
+                    "_rlncoordinatex",
+                    "_rlncoordinatey",
+                    "_rlnmaxvalueprobdistribution",
+                ],
+                "particles",
+            )
+            insert_particle_data(
+                column_data,
                 "_rlnmicrographname",
                 "_rlncoordinatex",
                 "_rlncoordinatey",
-                "_rlnmaxvalueprobdistribution",
-            ],
-            "particles",
-        )
-        insert_particle_data(
-            column_data,
-            "_rlnmicrographname",
-            "_rlncoordinatex",
-            "_rlncoordinatey",
-            str(class_file_path / "run_it020_data.star"),
-            data_handler,
-            project=project,
-        )
+                str(class_file_path / "run_it020_data.star"),
+                data_handler,
+                project=project,
+            )
 
 
 def _class2d(
@@ -152,5 +159,7 @@ def gather_relion_defaults(
 ):
     _motion_corr(relion_dir, data_handler, project)
     _ctf(relion_dir, data_handler, project)
-    _prob_dist_max_class2d(relion_dir, data_handler, project)
+    _prob_dist_max_class2d(
+        relion_dir, data_handler, project, excluded_directories=class_2d_excludes
+    )
     _class2d(relion_dir, data_handler, project, excluded_directories=class_2d_excludes)
