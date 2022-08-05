@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import List, Optional
 
 from numpy import argmin
 
@@ -84,58 +85,72 @@ def _prob_dist_max_class2d(relion_dir: Path, data_handler: DataAPI, project: str
         )
 
 
-def _class2d(relion_dir: Path, data_handler: DataAPI, project: str):
+def _class2d(
+    relion_dir: Path,
+    data_handler: DataAPI,
+    project: str,
+    excluded_directories: Optional[List[str]] = None,
+):
+    exclude = excluded_directories or []
     for class_file_path in (relion_dir / "Class2D").glob("job*"):
-        star_file = open_star_file(class_file_path / "run_it020_data.star")
-        cross_ref_star_file = open_star_file(class_file_path / "run_it020_model.star")
-        column_data = get_column_data(
-            star_file,
-            [
+        if class_file_path.name not in exclude:
+            star_file = open_star_file(class_file_path / "run_it020_data.star")
+            cross_ref_star_file = open_star_file(
+                class_file_path / "run_it020_model.star"
+            )
+            column_data = get_column_data(
+                star_file,
+                [
+                    "_rlnmicrographname",
+                    "_rlncoordinatex",
+                    "_rlncoordinatey",
+                    "_rlnclassnumber",
+                ],
+                "particles",
+            )
+            cross_ref_column_data = get_column_data(
+                cross_ref_star_file,
+                ["_rlnreferenceimage", "_rlnestimatedresolution"],
+                "model_classes",
+            )
+            for v in cross_ref_column_data.values():
+                for i, elem in enumerate(v):
+                    if isinstance(elem, str) and "@" in elem:
+                        _elem = elem.split("@")[0]
+                        while _elem.startswith("0"):
+                            _elem = _elem[1:]
+                        v[i] = _elem
+            cross_ref_dict = {}
+            for i, k02 in enumerate(column_data["_rlnclassnumber"]):
+                for j, k01 in enumerate(cross_ref_column_data["_rlnreferenceimage"]):
+                    if k01 == str(k02):
+                        cross_ref_dict[i] = cross_ref_column_data[
+                            "_rlnestimatedresolution"
+                        ][j]
+            column_data["_rlnestimatedresolution"] = [
+                cross_ref_dict[i] for i in range(len(column_data["_rlnclassnumber"]))
+            ]
+            insert_particle_set(
+                column_data,
+                "class_2d",
+                "_rlnclassnumber",
                 "_rlnmicrographname",
                 "_rlncoordinatex",
                 "_rlncoordinatey",
-                "_rlnclassnumber",
-            ],
-            "particles",
-        )
-        cross_ref_column_data = get_column_data(
-            cross_ref_star_file,
-            ["_rlnreferenceimage", "_rlnestimatedresolution"],
-            "model_classes",
-        )
-        for v in cross_ref_column_data.values():
-            for i, elem in enumerate(v):
-                if isinstance(elem, str) and "@" in elem:
-                    _elem = elem.split("@")[0]
-                    while _elem.startswith("0"):
-                        _elem = _elem[1:]
-                    v[i] = _elem
-        cross_ref_dict = {}
-        for i, k02 in enumerate(column_data["_rlnclassnumber"]):
-            for j, k01 in enumerate(cross_ref_column_data["_rlnreferenceimage"]):
-                if k01 == str(k02):
-                    cross_ref_dict[i] = cross_ref_column_data[
-                        "_rlnestimatedresolution"
-                    ][j]
-        column_data["_rlnestimatedresolution"] = [
-            cross_ref_dict[i] for i in range(len(column_data["_rlnclassnumber"]))
-        ]
-        insert_particle_set(
-            column_data,
-            "class_2d",
-            "_rlnclassnumber",
-            "_rlnmicrographname",
-            "_rlncoordinatex",
-            "_rlncoordinatey",
-            str(class_file_path / "run_it020_data.star"),
-            data_handler,
-            project,
-            add_source_to_id=True,
-        )
+                str(class_file_path / "run_it020_data.star"),
+                data_handler,
+                project,
+                add_source_to_id=True,
+            )
 
 
-def gather_relion_defaults(relion_dir: Path, data_handler: DataAPI, project: str):
+def gather_relion_defaults(
+    relion_dir: Path,
+    data_handler: DataAPI,
+    project: str,
+    class_2d_excludes: Optional[List[str]] = None,
+):
     _motion_corr(relion_dir, data_handler, project)
     _ctf(relion_dir, data_handler, project)
     _prob_dist_max_class2d(relion_dir, data_handler, project)
-    _class2d(relion_dir, data_handler, project)
+    _class2d(relion_dir, data_handler, project, excluded_directories=class_2d_excludes)
