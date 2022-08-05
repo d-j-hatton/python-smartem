@@ -1,4 +1,6 @@
-from typing import Tuple
+from typing import NamedTuple, Tuple
+
+import numpy as np
 
 
 def find_point_pixel(
@@ -28,7 +30,55 @@ def stage_position(
 ) -> Tuple[float, float]:
     pix_centre = (image_size[0] // 2, image_size[1] // 2)
     delta = (
-        (pix_pos[0] - pix_centre[0]) * spacing,
+        -(pix_pos[0] - pix_centre[0]) * spacing,
         (pix_pos[1] - pix_centre[1]) * spacing,
     )
     return (physical_centre[0] + delta[0], physical_centre[1] + delta[1])
+
+
+class StageCalibration(NamedTuple):
+    inverted: bool = False
+    x_flip: bool = False
+    y_flip: bool = False
+
+
+def calibrate(
+    pix_positions: Tuple[Tuple[int, int], Tuple[int, int]],
+    physical_positions: Tuple[Tuple[float, float], Tuple[float, float]],
+) -> StageCalibration:
+    pix_diff = (
+        pix_positions[1][0] - pix_positions[0][0],
+        pix_positions[1][1] - pix_positions[0][1],
+    )
+    physical_diff = (
+        physical_positions[1][0] - physical_positions[0][0],
+        physical_positions[1][1] - physical_positions[0][1],
+    )
+    inv_checks = (
+        abs(
+            1 - abs((pix_diff[0] / physical_diff[0]) / (pix_diff[1] / physical_diff[1]))
+        ),
+        abs(
+            1 - abs((pix_diff[0] / physical_diff[1]) / (pix_diff[1] / physical_diff[0]))
+        ),
+    )
+    inv = bool(np.argmin(inv_checks))
+    if inv:
+        if pix_diff[0] / physical_diff[1] > 0:
+            x_flip = True
+        else:
+            x_flip = False
+        if pix_diff[1] / physical_diff[0] > 0:
+            y_flip = True
+        else:
+            y_flip = False
+    else:
+        if pix_diff[0] / physical_diff[0] > 0:
+            x_flip = True
+        else:
+            x_flip = False
+        if pix_diff[1] / physical_diff[1] > 0:
+            y_flip = True
+        else:
+            y_flip = False
+    return StageCalibration(inverted=inv, x_flip=x_flip, y_flip=y_flip)

@@ -5,7 +5,7 @@ import xmltodict
 
 from smartem.data_model import Atlas, Exposure, FoilHole, GridSquare, Tile
 from smartem.data_model.extract import DataAPI
-from smartem.stage_model import stage_position
+from smartem.stage_model import calibrate, stage_position
 
 
 def parse_epu_xml(xml_path: Path) -> Dict[str, Any]:
@@ -62,6 +62,76 @@ def metadata_foil_hole_positions(xml_path: Path) -> Dict[str, Tuple[int, int]]:
             int(float(pix_center["c:y"])),
         )
     return fh_pix_positions
+
+
+def calibrate_coordinate_system(xml_path: Path):
+    with open(xml_path, "r") as xml:
+        for_parsing = xml.read()
+        data = xmltodict.parse(for_parsing)
+    data = data["GridSquareXml"]
+    serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
+        "a:m_serializationArray"
+    ]
+    required_key = ""
+    for key in serialization_array.keys():
+        if key.startswith("b:KeyValuePairOfintTargetLocation"):
+            required_key = key
+            break
+    if not required_key:
+        return
+    pix_positions = (
+        (
+            int(
+                float(
+                    serialization_array[required_key][0]["b:value"]["PixelCenter"][
+                        "c:x"
+                    ]
+                )
+            ),
+            int(
+                float(
+                    serialization_array[required_key][0]["b:value"]["PixelCenter"][
+                        "c:y"
+                    ]
+                )
+            ),
+        ),
+        (
+            int(
+                float(
+                    serialization_array[required_key][1]["b:value"]["PixelCenter"][
+                        "c:x"
+                    ]
+                )
+            ),
+            int(
+                float(
+                    serialization_array[required_key][1]["b:value"]["PixelCenter"][
+                        "c:y"
+                    ]
+                )
+            ),
+        ),
+    )
+    physical_positions = (
+        (
+            float(
+                serialization_array[required_key][0]["b:value"]["StagePosition"]["c:X"]
+            ),
+            float(
+                serialization_array[required_key][0]["b:value"]["StagePosition"]["c:Y"]
+            ),
+        ),
+        (
+            float(
+                serialization_array[required_key][1]["b:value"]["StagePosition"]["c:X"]
+            ),
+            float(
+                serialization_array[required_key][1]["b:value"]["StagePosition"]["c:Y"]
+            ),
+        ),
+    )
+    return calibrate(pix_positions, physical_positions)
 
 
 def create_atlas_and_tiles(atlas_image: Path, extractor: DataAPI) -> int:
