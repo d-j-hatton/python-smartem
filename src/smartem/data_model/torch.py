@@ -150,8 +150,11 @@ class SmartEMDiskDataLoader(DataLoader):
                 f"Unrecognised SmartEMDataLoader level {self._level}: accepted values are grid_sqaure or foil_hole"
             )
         self._df = pd.read_csv(self._data_dir / labels_csv)
-        with open(self._data_dir / "coordinate_calibration.yaml", "r") as cal_in:
-            sc = yaml.safe_load(cal_in)
+        try:
+            with open(self._data_dir / "coordinate_calibration.yaml", "r") as cal_in:
+                sc = yaml.safe_load(cal_in)
+        except FileNotFoundError:
+            sc = {"inverted": False, "x_flip": False, "y_flip": True}
         self._stage_calibration = StageCalibration(**sc)
         if level == "foil_hole":
             self._df = self._df[self._df["foil_hole"].notna()]
