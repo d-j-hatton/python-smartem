@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+import PyQt5.QtCore as QtCore
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt5.QtGui import QPixmap, QTransform
@@ -18,6 +19,7 @@ from PyQt5.QtWidgets import (
     QLabel,
     QListWidget,
     QPushButton,
+    QSlider,
     QVBoxLayout,
 )
 
@@ -112,6 +114,16 @@ class MainDisplay(ComponentTab):
         self._gather_btn = QPushButton("Gather data")
         self._gather_btn.clicked.connect(self._gather_data)
         self.grid.addWidget(self._gather_btn, 3, 1)
+
+        self._square_slider = QSlider(QtCore.Qt.Horizontal)
+        self._square_slider.setMaximum(100)
+        self._square_slider.setTickInterval(1)
+        self._square_slider.setValue(100)
+        self._square_slider_maximum = 0.0
+        self._for_removal = None
+        self._square_slider.valueChanged.connect(self._square_slider_changed)
+        self.grid.addWidget(self._square_slider, 5, 1)
+
         self.project = ""
         self._stage_calibration = StageCalibration()
 
@@ -194,6 +206,26 @@ class MainDisplay(ComponentTab):
             k: v.averages for k, v in extracted_grid_square_data.items()
         }
 
+    def _square_slider_changed(self, value: int):
+        # print((value/100)*self._square_slider_maximum)
+        try:
+            self._draw_grid_square(
+                self._grid_squares[self._square_combo.currentIndex()],
+                foil_hole=self._foil_holes[self._foil_hole_combo.currentIndex()],
+                max_value=(value / 100) * self._square_slider_maximum,
+            )
+        except IndexError:
+            self._draw_grid_square(
+                self._grid_squares[self._square_combo.currentIndex()],
+                max_value=(value / 100) * self._square_slider_maximum,
+            )
+        if self._for_removal is not None:
+            self._for_removal.remove()
+        self._for_removal = self._grid_square_stats_fig.axvline(
+            (value / 100) * self._square_slider_maximum
+        )
+        self._grid_square_stats.draw()
+
     def _gather_foil_hole_data(self):
         sql_data = self._extractor.get_foil_hole_info(
             self._foil_hole_combo.currentText(),
@@ -213,6 +245,7 @@ class MainDisplay(ComponentTab):
             pass
 
     def _gather_data(self, evt):
+        self._square_slider.setValue(100)
         selected_keys = [d.text() for d in self._data_list.selectedItems()]
         self._exposure_keys = [
             k for k in selected_keys if k in self._data_keys["micrograph"]
@@ -309,6 +342,7 @@ class MainDisplay(ComponentTab):
                 list(stats.values())[0], color="darkturquoise"
             )
             self._grid_square_stats_fig.axes.set_xlabel(list(stats.keys())[0])
+            self._square_slider_maximum = max(list(stats.values())[0])
         if len(stats.keys()) == 2:
             labels = []
             data = []
@@ -466,6 +500,7 @@ class MainDisplay(ComponentTab):
         grid_square: GridSquare,
         foil_hole: Optional[FoilHole] = None,
         flip: Tuple[int, int] = (1, 1),
+        max_value: Optional[float] = None,
     ) -> QLabel:
         if not self._epu_dir or not grid_square.thumbnail:
             return
@@ -485,6 +520,15 @@ class MainDisplay(ComponentTab):
                     and fh.thumbnail
                     or fh.adjusted_stage_position_x is not None
                 ]
+                if max_value is not None:
+                    imvs = [i if i < max_value else None for i in imvs]
+                    if (
+                        list(self._foil_hole_averages.values())[0][
+                            foil_hole.foil_hole_name
+                        ]
+                        > max_value
+                    ):
+                        _key = None
             square_lbl = ImageLabel(
                 grid_square,
                 foil_hole,
