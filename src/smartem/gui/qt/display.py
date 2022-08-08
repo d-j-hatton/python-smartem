@@ -481,7 +481,9 @@ class MainDisplay(ComponentTab):
                 imvs = [
                     list(self._foil_hole_averages.values())[0].get(fh.foil_hole_name)
                     for fh in self._foil_holes
-                    if fh != foil_hole and fh.thumbnail
+                    if fh != foil_hole
+                    and fh.thumbnail
+                    or fh.adjusted_stage_position_x is not None
                 ]
             square_lbl = ImageLabel(
                 grid_square,
