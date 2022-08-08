@@ -30,6 +30,7 @@ class ParticleImageLabel(QLabel):
         image_size: Tuple[int, int],
         image_scale: float = 0.5,
         selection_box: Optional[QComboBox] = None,
+        particle_diameter: int = 30,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -38,6 +39,7 @@ class ParticleImageLabel(QLabel):
         self._particles = particles
         self._image_scale = image_scale
         self._selection_box = selection_box
+        self._diameter = particle_diameter
 
     def mousePressEvent(self, ev):
         if self._selection_box is not None:
@@ -81,14 +83,14 @@ class ParticleImageLabel(QLabel):
 
         if self._particles and isinstance(self._particles[0], Particle):
             for particle in self._particles:
-                self.draw_circle((particle.x, particle.y), 30, painter)
+                self.draw_circle((particle.x, particle.y), self._diameter, painter)
         elif self._particles:
             for particle_group in self._particles:
                 pen = QPen(next(colour_cycle))
                 pen.setWidth(3)
                 painter.setPen(pen)
                 for particle in particle_group:
-                    self.draw_circle((particle.x, particle.y), 30, painter)
+                    self.draw_circle((particle.x, particle.y), self._diameter, painter)
 
         painter.end()
 

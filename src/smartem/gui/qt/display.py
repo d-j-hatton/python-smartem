@@ -14,6 +14,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt5.QtGui import QPixmap, QTransform
 from PyQt5.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QGridLayout,
     QLabel,
@@ -124,6 +125,32 @@ class MainDisplay(ComponentTab):
         self._square_slider.valueChanged.connect(self._square_slider_changed)
         self.grid.addWidget(self._square_slider, 5, 1)
 
+        self._particle_diameter_slider = QSlider(QtCore.Qt.Vertical)
+        self._particle_diameter_slider.setMaximum(100)
+        self._particle_diameter_slider.setTickInterval(1)
+        self._particle_diameter_slider.setValue(30)
+        self._particle_diameter = 30
+        self._particle_diameter_slider.valueChanged.connect(
+            self._particle_diameter_slider_changed
+        )
+        self.grid.addWidget(self._particle_diameter_slider, 1, 4)
+
+        self._particle_tick_boxes = (
+            QCheckBox("Show particles"),
+            QCheckBox("Flip x"),
+            QCheckBox("Flip y"),
+        )
+        self._particle_tick_boxes[0].toggled.connect(self._draw_current_exposure)
+        self._particle_tick_boxes[1].toggled.connect(self._draw_current_exposure)
+        self._particle_tick_boxes[2].toggled.connect(self._draw_current_exposure)
+        self._particle_diameter_label = QLabel("Diameter: ? Angstroms")
+        particles_vbox = QVBoxLayout()
+        particles_vbox.addWidget(self._particle_tick_boxes[0], 1)
+        particles_vbox.addWidget(self._particle_tick_boxes[1], 2)
+        particles_vbox.addWidget(self._particle_tick_boxes[2], 3)
+        particles_vbox.addWidget(self._particle_diameter_label, 4)
+        self.grid.addLayout(particles_vbox, 1, 5)
+
         self.project = ""
         self._stage_calibration = StageCalibration()
 
@@ -134,6 +161,16 @@ class MainDisplay(ComponentTab):
             self._square_combo.addItem(gs.grid_square_name)
         self._update_fh_choices(self._grid_squares[0].grid_square_name)
         self.refresh()
+
+    def set_project(self, project: str):
+        self.project = project
+        _project = self._extractor.get_project(project_name=self.project)
+        _epu_version = _project.acquisition_software_version
+        if (
+            int(_epu_version.split(".")[0]) >= 2
+            and int(_epu_version.split(".")[1]) > 12
+        ):
+            self._particle_tick_boxes[2].setChecked(True)
 
     def _set_epu_directory(self, epu_dir: Path):
         self._epu_dir = epu_dir
@@ -226,6 +263,26 @@ class MainDisplay(ComponentTab):
         )
         self._grid_square_stats.draw()
 
+    def _particle_diameter_slider_changed(self, value: int):
+        self._particle_diameter = value
+        self._draw_current_exposure()
+        exposure_pixmap = QPixmap(
+            str(
+                self._epu_dir
+                / self._exposures[self._exposure_combo.currentIndex()].thumbnail
+            )
+        )
+        qsize = exposure_pixmap.size()
+        scaled_pixel_size = self._exposures[
+            self._exposure_combo.currentIndex()
+        ].pixel_size * (
+            self._exposures[self._exposure_combo.currentIndex()].readout_area_x
+            / qsize.width()
+        )
+        self._particle_diameter_label.setText(
+            f"Diameter: {int(self._particle_diameter*scaled_pixel_size*10)} Angstroms"
+        )
+
     def _gather_foil_hole_data(self):
         sql_data = self._extractor.get_foil_hole_info(
             self._foil_hole_combo.currentText(),
@@ -267,7 +324,11 @@ class MainDisplay(ComponentTab):
             self._foil_holes[self._foil_hole_combo.currentIndex()], flip=(-1, -1)
         )
         self._draw_exposure(
-            self._exposures[self._exposure_combo.currentIndex()], flip=(1, -1)
+            self._exposures[self._exposure_combo.currentIndex()],
+            flip=(
+                -1 if self._particle_tick_boxes[1].isChecked() else 1,
+                -1 if self._particle_tick_boxes[2].isChecked() else 1,
+            ),
         )
 
         try:
@@ -595,15 +656,13 @@ class MainDisplay(ComponentTab):
     def _select_exposure(self, index: int):
         exposure_lbl = QLabel(self)
         try:
-            _project = self._extractor.get_project(project_name=self.project)
-            _epu_version = _project.acquisition_software_version
-            if (
-                int(_epu_version.split(".")[0]) >= 2
-                and int(_epu_version.split(".")[1]) > 12
-            ):
-                exposure_lbl = self._draw_exposure(self._exposures[index], flip=(1, -1))
-            else:
-                exposure_lbl = self._draw_exposure(self._exposures[index], flip=(1, 1))
+            exposure_lbl = self._draw_exposure(
+                self._exposures[index],
+                flip=(
+                    -1 if self._particle_tick_boxes[1].isChecked() else 1,
+                    -1 if self._particle_tick_boxes[2].isChecked() else 1,
+                ),
+            )
         except IndexError:
             return
         self.grid.addWidget(exposure_lbl, 1, 3)
@@ -631,6 +690,18 @@ class MainDisplay(ComponentTab):
             )
             self._update_exposure_stats(key_extracted_data)
 
+    def _draw_current_exposure(self):
+        try:
+            self._draw_exposure(
+                self._exposures[self._exposure_combo.currentIndex()],
+                flip=(
+                    -1 if self._particle_tick_boxes[1].isChecked() else 1,
+                    -1 if self._particle_tick_boxes[2].isChecked() else 1,
+                ),
+            )
+        except IndexError:
+            return
+
     def _draw_exposure(
         self, exposure: Exposure, flip: Tuple[int, int] = (1, 1)
     ) -> QLabel:
@@ -641,22 +712,23 @@ class MainDisplay(ComponentTab):
             exposure_pixmap = exposure_pixmap.transformed(QTransform().scale(*flip))
         qsize = exposure_pixmap.size()
         particles = []
-        if self._pick_list.selectedItems():
-            for p in self._pick_list.selectedItems():
-                if p.text() in self._pick_keys["source"]:
-                    exp_parts = self._extractor.get_particles(
-                        exposure_name=exposure.exposure_name, source=p.text()
-                    )
-                    particles.append(exp_parts)
-                else:
-                    exp_parts = self._extractor.get_particles(
-                        exposure_name=exposure.exposure_name,  # group_name=p.text()
-                    )
-                    particles.append(exp_parts)
-        else:
-            particles = [
-                self._extractor.get_particles(exposure_name=exposure.exposure_name)
-            ]
+        if self._particle_tick_boxes[0].isChecked():
+            if self._pick_list.selectedItems():
+                for p in self._pick_list.selectedItems():
+                    if p.text() in self._pick_keys["source"]:
+                        exp_parts = self._extractor.get_particles(
+                            exposure_name=exposure.exposure_name, source=p.text()
+                        )
+                        particles.append(exp_parts)
+                    else:
+                        exp_parts = self._extractor.get_particles(
+                            exposure_name=exposure.exposure_name,  # group_name=p.text()
+                        )
+                        particles.append(exp_parts)
+            else:
+                particles = [
+                    self._extractor.get_particles(exposure_name=exposure.exposure_name)
+                ]
         with mrcfile.open(
             (self._epu_dir / exposure.thumbnail).with_suffix(".mrc")
         ) as mrc:
@@ -669,6 +741,7 @@ class MainDisplay(ComponentTab):
             if self._data_size is None
             else thumbnail_size[0] / self._data_size[0],
             selection_box=self._exposure_combo,
+            particle_diameter=self._particle_diameter,
         )
         self.grid.addWidget(exposure_lbl, 1, 3)
         exposure_lbl.setPixmap(exposure_pixmap)

@@ -245,7 +245,7 @@ class ProjectLoader(ComponentTab):
         parse_epu_dir(Path(self.epu_dir), self._extractor, self._project_name)
         self._main_display._set_epu_directory(Path(self.epu_dir))
         self._main_display._set_data_size(Path(self.project_dir))
-        self._main_display.project = self._project_name
+        self._main_display.set_project(self._project_name)
         self._atlas_display.project = self._project_name
         self.refresh()
         self._update_loaders()
@@ -256,7 +256,7 @@ class ProjectLoader(ComponentTab):
             raise ValueError("Atlas record not found")
         self._main_display._set_epu_directory(Path(self.epu_dir))
         self._main_display._set_data_size(Path(self.project_dir))
-        self._main_display.project = self._project_name
+        self._main_display.set_project(self._project_name)
         self._atlas_display.project = self._project_name
         self.refresh()
         self._update_loaders()
