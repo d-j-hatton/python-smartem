@@ -63,3 +63,7 @@ QRadioButton {
 QLabel {
   font-size: 12pt;
 }
+
+QCheckBox::indicator:checked {
+  background-color: #36f1cd;
+}

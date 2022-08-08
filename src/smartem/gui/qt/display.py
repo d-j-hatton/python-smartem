@@ -143,13 +143,16 @@ class MainDisplay(ComponentTab):
         self._particle_tick_boxes[0].toggled.connect(self._draw_current_exposure)
         self._particle_tick_boxes[1].toggled.connect(self._draw_current_exposure)
         self._particle_tick_boxes[2].toggled.connect(self._draw_current_exposure)
-        self._particle_diameter_label = QLabel("Diameter: ? Angstroms")
+        self._particle_diameter_label = QLabel("Diameter: \n? Angstroms")
+        # self._particle_dia
         particles_vbox = QVBoxLayout()
+        full_vbox = QVBoxLayout()
         particles_vbox.addWidget(self._particle_tick_boxes[0], 1)
         particles_vbox.addWidget(self._particle_tick_boxes[1], 2)
         particles_vbox.addWidget(self._particle_tick_boxes[2], 3)
-        particles_vbox.addWidget(self._particle_diameter_label, 4)
-        self.grid.addLayout(particles_vbox, 1, 5)
+        full_vbox.addLayout(particles_vbox, 1)
+        full_vbox.addWidget(self._particle_diameter_label, 2)
+        self.grid.addLayout(full_vbox, 1, 5)
 
         self.project = ""
         self._stage_calibration = StageCalibration()
@@ -280,7 +283,7 @@ class MainDisplay(ComponentTab):
             / qsize.width()
         )
         self._particle_diameter_label.setText(
-            f"Diameter: {int(self._particle_diameter*scaled_pixel_size*10)} Angstroms"
+            f"Diameter: \n{int(self._particle_diameter*scaled_pixel_size*10)} Angstroms"
         )
 
     def _gather_foil_hole_data(self):
