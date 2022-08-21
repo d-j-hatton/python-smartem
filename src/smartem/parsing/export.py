@@ -69,7 +69,8 @@ def export_foil_holes(
         atlas_image_path = Path(atlas.thumbnail)
         shutil.copy(atlas_image_path, out_dir / atlas_image_path.name)
         shutil.copy(
-            atlas_image_path, out_dir / atlas_image_path.with_suffix(".mrc").name
+            atlas_image_path.with_suffix(".mrc"),
+            out_dir / atlas_image_path.with_suffix(".mrc").name,
         )
 
         gs_coordinates = {}
