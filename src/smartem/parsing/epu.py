@@ -105,11 +105,8 @@ def mask_foil_hole_positions(
                 xshift = xidx - fh[0]
                 try:
                     mask[xidx][yidx] = True
-                    # if xidx != fh[0]:
                     mask[xidx][fh[1] - yshift] = True
-                    # if yidx != fh[1]:
                     mask[fh[0] - xshift][fh[1] - yshift] = True
-                    # if yidx != fh[1]:
                     mask[fh[0] - xshift][yidx] = True
                 except IndexError:
                     pass
