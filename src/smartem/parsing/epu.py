@@ -98,19 +98,19 @@ def mask_foil_hole_positions(
     if not diameter:
         return mask
     for fh in fh_pix_positions.values():
-        for yidx in range(int(fh[1] - diameter / 2), fh[1]):
+        for yidx in range(int(fh[1] - diameter / 2), fh[1] + 1):
             xidx = fh[0]
             yshift = -(fh[1] - yidx)
             while (yidx - fh[1]) ** 2 + (xidx - fh[0]) ** 2 <= (diameter / 2) ** 2:
                 xshift = xidx - fh[0]
                 try:
                     mask[xidx][yidx] = True
-                    if xidx != fh[0]:
-                        mask[xidx][fh[1] - yshift] = True
-                        if yidx != fh[1]:
-                            mask[fh[0] - xshift][fh[1] - yshift] = True
-                    if yidx != fh[1]:
-                        mask[fh[0] - xshift][yidx] = True
+                    # if xidx != fh[0]:
+                    mask[xidx][fh[1] - yshift] = True
+                    # if yidx != fh[1]:
+                    mask[fh[0] - xshift][fh[1] - yshift] = True
+                    # if yidx != fh[1]:
+                    mask[fh[0] - xshift][yidx] = True
                 except IndexError:
                     pass
                 xidx += 1
