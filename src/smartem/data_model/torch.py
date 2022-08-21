@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import yaml
 from PIL import Image
-from torch import Tensor, reshape, zeros
+from torch import Tensor, from_numpy, reshape, zeros
 from torch.utils.data import DataLoader
 from torchvision.io import read_image
 
@@ -319,3 +319,20 @@ class SmartEMDiskDataLoader(DataLoader):
                     str(self._data_dir / self._df.iloc[idx][self._level])
                 )
         return image, labels
+
+
+class SmartEMMaskDataLoader(DataLoader):
+    def __init__(self, data_dir: Path, labels_csv: str = "labels.csv"):
+        self._data_dir = data_dir
+        self._df = pd.read_csv(self._data_dir / labels_csv)
+
+    def __len__(self) -> int:
+        return self._df["grid_square"].nunique()
+
+    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
+        mrc_path = (self._data_dir / self._df.iloc[idx]["grid_square"]).with_suffix(
+            ".mrc"
+        )
+        image = mrc_to_tensor(mrc_path)
+        mask = from_numpy(np.load(mrc_path.with_suffix(".npy")))
+        return image, mask
