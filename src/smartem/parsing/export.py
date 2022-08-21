@@ -2,12 +2,13 @@ import shutil
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import numpy as np
 import yaml
 from pandas import DataFrame
 
 from smartem.data_model.extract import DataAPI
 from smartem.data_model.structure import extract_keys_with_foil_hole_averages
-from smartem.parsing.epu import calibrate_coordinate_system
+from smartem.parsing.epu import calibrate_coordinate_system, mask_foil_hole_positions
 
 
 def export_foil_holes(
@@ -15,6 +16,7 @@ def export_foil_holes(
     out_dir: Path = Path("."),
     projects: Optional[List[str]] = None,
     use_adjusted_stage: bool = False,
+    foil_hole_masks: bool = True,
 ):
     if not projects:
         projects = [data_api._project]
@@ -63,6 +65,7 @@ def export_foil_holes(
         )
 
         epu_dir = Path(_project.acquisition_directory)
+        metadata_path = epu_dir.parent / "Metadata"
 
         if not atlas.thumbnail:
             raise ValueError(f"No atlas image was found for {project}")
@@ -95,6 +98,18 @@ def export_foil_holes(
                     gs.stage_position_y,
                 )
                 gs_pixel_sizes[gs.grid_square_name] = gs.pixel_size
+                if (
+                    foil_hole_masks
+                    and gs.grid_square_name
+                    and gs.readout_area_x
+                    and gs.readout_area_y
+                    and thumbnail_path
+                ):
+                    mask = mask_foil_hole_positions(
+                        metadata_path / f"{gs.grid_square_name}.dm",
+                        (gs.readout_area_x, gs.readout_area_y),
+                    )
+                    np.save(mask, gs_dir / thumbnail_path.with_suffix(".np").name)
         for fh in foil_holes:
             if all(
                 fh_extracted[dl].averages is not None for dl in data_labels

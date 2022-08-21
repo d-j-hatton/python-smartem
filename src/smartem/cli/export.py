@@ -26,6 +26,10 @@ def run():
         action="store_true",
         dest="use_adjusted_stage",
     )
+    parser.add_argument(
+        "--no_masks",
+        action="store_true",
+    )
     args = parser.parse_args()
 
     data_api = DataAPI()
@@ -34,4 +38,5 @@ def run():
         out_dir=Path(args.out_dir),
         projects=args.projects,
         use_adjusted_stage=args.use_adjusted_stage,
+        foil_hole_masks=not args.no_masks,
     )
