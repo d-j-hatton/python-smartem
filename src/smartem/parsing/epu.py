@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+import numpy as np
 import xmltodict
 
 from smartem.data_model import Atlas, Exposure, FoilHole, GridSquare, Tile
@@ -62,6 +65,56 @@ def metadata_foil_hole_positions(xml_path: Path) -> Dict[str, Tuple[int, int]]:
             int(float(pix_center["c:y"])),
         )
     return fh_pix_positions
+
+
+def mask_foil_hole_positions(
+    xml_path: Path, image_size: Tuple[int, int], diameter: float | None = None
+):
+    with open(xml_path, "r") as xml:
+        for_parsing = xml.read()
+        data = xmltodict.parse(for_parsing)
+    data = data["GridSquareXml"]
+    serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
+        "a:m_serializationArray"
+    ]
+    required_key = ""
+    for key in serialization_array.keys():
+        if key.startswith("b:KeyValuePairOfintTargetLocation"):
+            required_key = key
+            break
+    if not required_key:
+        return {}
+    fh_pix_positions = {}
+    for fh_block in serialization_array[required_key]:
+        pix_center = fh_block["b:value"]["PixelCenter"]
+        fh_pix_positions[fh_block["b:key"]] = (
+            int(float(pix_center["c:x"])),
+            int(float(pix_center["c:y"])),
+        )
+        if not diameter:
+            diameter = float(fh_block["b:value"]["PixelWidthHeight"]["c:height"])
+
+    mask = np.full(image_size, False)
+    if not diameter:
+        return mask
+    for fh in fh_pix_positions.values():
+        for yidx in range(int(fh[1] - diameter / 2), fh[1]):
+            xidx = fh[0]
+            yshift = -(fh[1] - yidx)
+            while (yidx - fh[1]) ** 2 + (xidx - fh[0]) ** 2 <= (diameter / 2) ** 2:
+                xshift = xidx - fh[0]
+                try:
+                    mask[xidx][yidx] = True
+                    if xidx != fh[0]:
+                        mask[xidx][fh[1] - yshift] = True
+                        if yidx != fh[1]:
+                            mask[fh[0] - xshift][fh[1] - yshift] = True
+                    if yidx != fh[1]:
+                        mask[fh[0] - xshift][yidx] = True
+                except IndexError:
+                    pass
+                xidx += 1
+    return mask.transpose()
 
 
 def metadata_foil_hole_stage(xml_path: Path) -> Dict[str, Tuple[float, float]]:
