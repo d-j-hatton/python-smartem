@@ -109,7 +109,7 @@ def export_foil_holes(
                         metadata_path / f"{gs.grid_square_name}.dm",
                         (gs.readout_area_x, gs.readout_area_y),
                     )
-                    np.save(gs_dir / thumbnail_path.with_suffix(".np").name, mask)
+                    np.save(gs_dir / thumbnail_path.with_suffix("").name, mask)
         for fh in foil_holes:
             if all(
                 fh_extracted[dl].averages is not None for dl in data_labels
