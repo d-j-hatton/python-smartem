@@ -86,13 +86,14 @@ def mask_foil_hole_positions(
         return {}
     fh_pix_positions = {}
     for fh_block in serialization_array[required_key]:
-        pix_center = fh_block["b:value"]["PixelCenter"]
-        fh_pix_positions[fh_block["b:key"]] = (
-            int(float(pix_center["c:x"])),
-            int(float(pix_center["c:y"])),
-        )
-        if not diameter:
-            diameter = float(fh_block["b:value"]["PixelWidthHeight"]["c:height"])
+        if fh_block["b:value"]["IsNearGridBar"] == "false":
+            pix_center = fh_block["b:value"]["PixelCenter"]
+            fh_pix_positions[fh_block["b:key"]] = (
+                int(float(pix_center["c:x"])),
+                int(float(pix_center["c:y"])),
+            )
+            if not diameter:
+                diameter = float(fh_block["b:value"]["PixelWidthHeight"]["c:height"])
 
     mask = np.full(image_size, False)
     if not diameter:
