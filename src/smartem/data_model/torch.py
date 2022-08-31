@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import mrcfile
 import numpy as np
 import pandas as pd
+import tifffile
 import yaml
 from PIL import Image
 from torch import Tensor, from_numpy, reshape, zeros
@@ -24,6 +25,17 @@ from smartem.stage_model import StageCalibration, find_point_pixel
 def mrc_to_tensor(mrc_file: Path) -> Tensor:
     with mrcfile.open(mrc_file) as mrc:
         data = mrc.data
+    shape = data.shape
+    if data.dtype.char in np.typecodes["AllInteger"]:
+        tensor_2d = Tensor(data.astype(np.int16))
+    else:
+        tensor_2d = Tensor(data.astype(np.float16))
+    return reshape(tensor_2d, (1, shape[0], shape[1]))
+
+
+@functools.lru_cache(maxsize=50)
+def tiff_to_tensor(tiff_file: Path) -> Tensor:
+    data = tifffile.imread(tiff_file)
     shape = data.shape
     if data.dtype.char in np.typecodes["AllInteger"]:
         tensor_2d = Tensor(data.astype(np.int16))
@@ -324,15 +336,15 @@ class SmartEMDiskDataLoader(DataLoader):
 class SmartEMMaskDataLoader(DataLoader):
     def __init__(self, data_dir: Path, labels_csv: str = "labels.csv"):
         self._data_dir = data_dir
-        self._df = pd.read_csv(self._data_dir / labels_csv)
+        self._df = (
+            pd.read_csv(self._data_dir / labels_csv).groupby("grid_square").mean()
+        )
 
     def __len__(self) -> int:
-        return self._df["grid_square"].nunique()
+        return len(self._df.index)
 
     def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
-        mrc_path = (self._data_dir / self._df.iloc[idx]["grid_square"]).with_suffix(
-            ".mrc"
-        )
+        mrc_path = (self._data_dir / self._df.iloc[idx].name).with_suffix(".mrc")
         image = mrc_to_tensor(mrc_path)
         mask = from_numpy(np.load(mrc_path.with_suffix(".npy")))
         return image, mask
