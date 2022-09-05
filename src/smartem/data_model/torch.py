@@ -138,7 +138,7 @@ class SmartEMDiskDataLoader(DataLoader):
         self,
         level: str,
         data_dir: Path,
-        mrc: bool = False,
+        full_res: bool = False,
         labels_csv: str = "labels.csv",
         num_samples: int = 0,
         sub_sample_size: Optional[Tuple[int, int]] = None,
@@ -148,7 +148,7 @@ class SmartEMDiskDataLoader(DataLoader):
         np.random.seed(seed)
         self._level = level
         self._data_dir = data_dir
-        self._mrc = mrc
+        self._use_full_res = full_res
         self._num_samples = num_samples
         self._sub_sample_size = sub_sample_size or (256, 256)
         self._allowed_labels = allowed_labels or list(_standard_labels.keys())
@@ -167,32 +167,60 @@ class SmartEMDiskDataLoader(DataLoader):
                 sc = yaml.safe_load(cal_in)
         except FileNotFoundError:
             sc = {"inverted": False, "x_flip": False, "y_flip": True}
+
+        if (
+            (self._data_dir / self._df.iloc[0]["grid_square"])
+            .with_suffix(".mrc")
+            .exists()
+        ):
+            self._full_res_extension = ".mrc"
+        elif (
+            (self._data_dir / self._df.iloc[0]["grid_square"])
+            .with_suffix(".tiff")
+            .exists()
+        ):
+            self._full_res_extension = ".tiff"
+        elif (
+            (self._data_dir / self._df.iloc[0]["grid_square"])
+            .with_suffix(".tif")
+            .exists()
+        ):
+            self._full_res_extension = ".tif"
+        else:
+            self._full_res_extension = ""
+
         self._stage_calibration = StageCalibration(**sc)
         if level == "foil_hole":
             self._df = self._df[self._df["foil_hole"].notna()]
-        with mrcfile.open(
-            (self._data_dir / self._df.iloc[0]["grid_square"]).with_suffix(".mrc")
-        ) as _mrc:
-            self._gs_mrc_size = _mrc.data.shape
+        if self._full_res_extension in (".tiff", ".tif"):
+            tiff_file = (self._data_dir / self._df.iloc[0]["grid_square"]).with_suffix(
+                self._full_res_extension
+            )
+            self._gs_full_res_size = tifffile.imread(tiff_file).shape
+        else:
+            with mrcfile.open(
+                (self._data_dir / self._df.iloc[0]["grid_square"]).with_suffix(".mrc")
+            ) as _mrc:
+                self._gs_full_res_size = _mrc.data.shape
         with Image.open(self._data_dir / self._df.iloc[0]["grid_square"]) as im:
             self._gs_jpeg_size = im.size
-        for row in self._df:
-            try:
-                with mrcfile.open(
-                    (self._data_dir / self._df.iloc[0]["foil_hole"]).with_suffix(".mrc")
-                ) as _mrc:
-                    self._fh_mrc_size = _mrc.data.shape
-                with Image.open(self._data_dir / self._df.iloc[0]["foil_hole"]) as im:
-                    self._fh_jpeg_size = im.size
-                break
-            except TypeError:
-                continue
-        if self._mrc:
+        # for row in self._df:
+        #     try:
+        #         with mrcfile.open(
+        #             (self._data_dir / self._df.iloc[0]["foil_hole"]).with_suffix(".mrc")
+        #         ) as _mrc:
+        #             self._fh_mrc_size = _mrc.data.shape
+        #         with Image.open(self._data_dir / self._df.iloc[0]["foil_hole"]) as im:
+        #             self._fh_jpeg_size = im.size
+        #         break
+        #     except TypeError:
+        #         continue
+        if self._use_full_res:
             self._boundary_points_x = np.random.randint(
-                self._gs_mrc_size[1] - self._sub_sample_size[0], size=len(self)
+                self._gs_full_res_size[1] - self._sub_sample_size[0], size=len(self)
             )
             self._boundary_points_y = np.random.randint(
-                self._gs_mrc_size[0] - self._sub_sample_size[1], size=len(self)
+                self._gs_full_res_size[0] - self._sub_sample_size[1], size=len(self)
             )
         else:
             self._boundary_points_x = np.random.randint(
@@ -220,7 +248,7 @@ class SmartEMDiskDataLoader(DataLoader):
                 self._df["grid_square"] == _grid_squares[grid_square_idx]
             ]
             drop_indices = []
-            if self._mrc:
+            if self._use_full_res:
                 for ri, row in selected_df.iterrows():
                     fh_centre = find_point_pixel(
                         (
@@ -229,7 +257,7 @@ class SmartEMDiskDataLoader(DataLoader):
                         ),
                         (row["grid_square_x"], row["grid_square_y"]),
                         row["grid_square_pixel_size"],
-                        (self._gs_mrc_size[1], self._gs_mrc_size[0]),
+                        (self._gs_full_res_size[1], self._gs_full_res_size[0]),
                         xfactor=-1 if self._stage_calibration.x_flip else 1,
                         yfactor=-1 if self._stage_calibration.y_flip else 1,
                     )
@@ -253,7 +281,7 @@ class SmartEMDiskDataLoader(DataLoader):
                         ),
                         (row["grid_square_x"], row["grid_square_y"]),
                         row["grid_square_pixel_size"]
-                        * (self._gs_mrc_size[1] / self._gs_jpeg_size[0]),
+                        * (self._gs_full_res_size[1] / self._gs_jpeg_size[0]),
                         self._gs_jpeg_size,
                         xfactor=-1 if self._stage_calibration.x_flip else 1,
                         yfactor=-1 if self._stage_calibration.y_flip else 1,
@@ -279,12 +307,20 @@ class SmartEMDiskDataLoader(DataLoader):
                 ]
             else:
                 labels = [np.inf if b else -np.inf for b in self._lower_better_label]
-            if self._mrc:
-                image = mrc_to_tensor(
-                    (self._data_dir / _grid_squares[grid_square_idx]).with_suffix(
-                        ".mrc"
+            if self._use_full_res:
+                if self._full_res_extension == ".mrc":
+                    preimage = mrc_to_tensor(
+                        (self._data_dir / _grid_squares[grid_square_idx]).with_suffix(
+                            ".mrc"
+                        )
                     )
-                )[
+                elif self._full_res_extension in (".tiff", ".tif"):
+                    preimage = tiff_to_tensor(
+                        (self._data_dir / _grid_squares[grid_square_idx]).with_suffix(
+                            self._full_res_extension
+                        )
+                    )
+                image = preimage[
                     :,
                     sub_sample_boundaries[1] : sub_sample_boundaries[1]
                     + self._sub_sample_size[1],
@@ -320,12 +356,19 @@ class SmartEMDiskDataLoader(DataLoader):
                 for k, v in self._df.iloc[idx].to_dict().items()
                 if k in self._allowed_labels
             ]
-            if self._mrc:
-                image = mrc_to_tensor(
-                    (self._data_dir / self._df.iloc[idx][self._level]).with_suffix(
-                        ".mrc"
+            if self._use_full_res:
+                if self._full_res_extension == ".mrc":
+                    image = mrc_to_tensor(
+                        (self._data_dir / self._df.iloc[idx][self._level]).with_suffix(
+                            ".mrc"
+                        )
                     )
-                )
+                elif self._full_res_extension in (".tiff", ".tif"):
+                    image = tiff_to_tensor(
+                        (self._data_dir / self._df.iloc[idx][self._level]).with_suffix(
+                            self._full_res_extension
+                        )
+                    )
             else:
                 image = read_image(
                     str(self._data_dir / self._df.iloc[idx][self._level])
