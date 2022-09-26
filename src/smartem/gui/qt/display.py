@@ -37,6 +37,8 @@ from smartem.gui.qt.plotting_utils import InteractivePlot
 from smartem.parsing.epu import calibrate_coordinate_system
 from smartem.stage_model import StageCalibration
 
+SLIDER_MAX_VALUE = 500
+
 
 class MainDisplay(ComponentTab):
     def __init__(
@@ -117,9 +119,9 @@ class MainDisplay(ComponentTab):
         self.grid.addWidget(self._gather_btn, 3, 1)
 
         self._square_slider = QSlider(QtCore.Qt.Horizontal)
-        self._square_slider.setMaximum(100)
+        self._square_slider.setMaximum(SLIDER_MAX_VALUE)
         self._square_slider.setTickInterval(1)
-        self._square_slider.setValue(100)
+        self._square_slider.setValue(SLIDER_MAX_VALUE)
         self._square_slider_maximum = 0.0
         self._for_removal = None
         self._square_slider.valueChanged.connect(self._square_slider_changed)
@@ -252,17 +254,17 @@ class MainDisplay(ComponentTab):
             self._draw_grid_square(
                 self._grid_squares[self._square_combo.currentIndex()],
                 foil_hole=self._foil_holes[self._foil_hole_combo.currentIndex()],
-                max_value=(value / 100) * self._square_slider_maximum,
+                max_value=(value / SLIDER_MAX_VALUE) * self._square_slider_maximum,
             )
         except IndexError:
             self._draw_grid_square(
                 self._grid_squares[self._square_combo.currentIndex()],
-                max_value=(value / 100) * self._square_slider_maximum,
+                max_value=(value / SLIDER_MAX_VALUE) * self._square_slider_maximum,
             )
         if self._for_removal is not None:
             self._for_removal.remove()
         self._for_removal = self._grid_square_stats_fig.axvline(
-            (value / 100) * self._square_slider_maximum
+            (value / SLIDER_MAX_VALUE) * self._square_slider_maximum
         )
         self._grid_square_stats.draw()
 
@@ -305,7 +307,7 @@ class MainDisplay(ComponentTab):
             pass
 
     def _gather_data(self, evt):
-        self._square_slider.setValue(100)
+        self._square_slider.setValue(SLIDER_MAX_VALUE)
         selected_keys = [d.text() for d in self._data_list.selectedItems()]
         self._exposure_keys = [
             k for k in selected_keys if k in self._data_keys["micrograph"]
@@ -326,13 +328,18 @@ class MainDisplay(ComponentTab):
         self._draw_foil_hole(
             self._foil_holes[self._foil_hole_combo.currentIndex()], flip=(-1, -1)
         )
-        self._draw_exposure(
-            self._exposures[self._exposure_combo.currentIndex()],
-            flip=(
-                -1 if self._particle_tick_boxes[1].isChecked() else 1,
-                -1 if self._particle_tick_boxes[2].isChecked() else 1,
-            ),
-        )
+        try:
+            self._draw_exposure(
+                self._exposures[self._exposure_combo.currentIndex()],
+                flip=(
+                    -1 if self._particle_tick_boxes[1].isChecked() else 1,
+                    -1 if self._particle_tick_boxes[2].isChecked() else 1,
+                ),
+            )
+        except IndexError:
+            print(
+                f"No exposure images for {self._foil_holes[self._foil_hole_combo.currentIndex()].foil_hole_name}"
+            )
 
         try:
             self._draw_grid_square(
@@ -585,7 +592,9 @@ class MainDisplay(ComponentTab):
                     or fh.adjusted_stage_position_x is not None
                 ]
                 if max_value is not None:
-                    imvs = [i if i < max_value else None for i in imvs]
+                    imvs = [
+                        i if i is not None and i < max_value else None for i in imvs
+                    ]
                     if (
                         list(self._foil_hole_averages.values())[0][
                             foil_hole.foil_hole_name
