@@ -375,6 +375,22 @@ class SmartEMDiskDataLoader(DataLoader):
                 )
         return image, labels
 
+    def thresholds(self, quantile: float = 0.7):
+        required_columns = (
+            [*_standard_labels, self._level]
+            if self._level == "grid_square"
+            else list(_standard_labels)
+        )
+        if self._level == "grid_square":
+            newdf = (
+                self._df[required_columns]
+                .groupby(self._level)
+                .mean()[list(_standard_labels)]
+            )
+        else:
+            newdf = self._df[required_columns]
+        return newdf.quantile(q=quantile)
+
 
 class SmartEMMaskDataLoader(DataLoader):
     def __init__(self, data_dir: Path, labels_csv: str = "labels.csv"):
@@ -382,12 +398,39 @@ class SmartEMMaskDataLoader(DataLoader):
         self._df = (
             pd.read_csv(self._data_dir / labels_csv).groupby("grid_square").mean()
         )
+        if (
+            (self._data_dir / self._df.iloc[0]["grid_square"])
+            .with_suffix(".mrc")
+            .exists()
+        ):
+            self._full_res_extension = ".mrc"
+        elif (
+            (self._data_dir / self._df.iloc[0]["grid_square"])
+            .with_suffix(".tiff")
+            .exists()
+        ):
+            self._full_res_extension = ".tiff"
+        elif (
+            (self._data_dir / self._df.iloc[0]["grid_square"])
+            .with_suffix(".tif")
+            .exists()
+        ):
+            self._full_res_extension = ".tif"
+        else:
+            raise FileNotFoundError(
+                f"{self._data_dir / self._df.iloc[0]['grid_square']} was not found with any of the following suffixes: .mrc, .tiff, .tif"
+            )
 
     def __len__(self) -> int:
         return len(self._df.index)
 
     def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
-        mrc_path = (self._data_dir / self._df.iloc[idx].name).with_suffix(".mrc")
-        image = mrc_to_tensor(mrc_path)
-        mask = from_numpy(np.load(mrc_path.with_suffix(".npy")))
+        image_path = (self._data_dir / self._df.iloc[idx].name).with_suffix(
+            self._full_res_extension
+        )
+        if self._full_res_extension == ".mrc":
+            image = mrc_to_tensor(image_path)
+        else:
+            image = tiff_to_tensor(image_path)
+        mask = from_numpy(np.load(image_path.with_suffix(".npy")))
         return image, mask
