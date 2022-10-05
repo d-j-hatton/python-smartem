@@ -17,6 +17,7 @@ def export_foil_holes(
     projects: Optional[List[str]] = None,
     use_adjusted_stage: bool = False,
     foil_hole_masks: bool = True,
+    alternative_extension: str = "",
 ):
     if not projects:
         projects = [data_api._project]
@@ -87,8 +88,11 @@ def export_foil_holes(
                 if thumbnail_path:
                     shutil.copy(thumbnail_path, gs_dir / thumbnail_path.name)
                     shutil.copy(
-                        thumbnail_path.with_suffix(".mrc"),
-                        gs_dir / thumbnail_path.with_suffix(".mrc").name,
+                        thumbnail_path.with_suffix(alternative_extension or ".mrc"),
+                        gs_dir
+                        / thumbnail_path.with_suffix(
+                            alternative_extension or ".mrc"
+                        ).name,
                     )
                     out_gs_paths[gs.grid_square_name] = (
                         gs_dir / thumbnail_path.name
@@ -128,8 +132,11 @@ def export_foil_holes(
                         thumbnail_path = epu_dir / fh.thumbnail
                         shutil.copy(thumbnail_path, fh_dir / thumbnail_path.name)
                         shutil.copy(
-                            thumbnail_path.with_suffix(".mrc"),
-                            fh_dir / thumbnail_path.with_suffix(".mrc").name,
+                            thumbnail_path.with_suffix(alternative_extension or ".mrc"),
+                            fh_dir
+                            / thumbnail_path.with_suffix(
+                                alternative_extension or ".mrc"
+                            ).name,
                         )
                     data["grid_square"].append(str(out_gs_paths[fh.grid_square_name]))
                     data["grid_square_pixel_size"].append(

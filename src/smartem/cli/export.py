@@ -30,6 +30,12 @@ def run():
         "--no_masks",
         action="store_true",
     )
+    parser.add_argument(
+        "-e",
+        "--extension",
+        dest="extension",
+        default="",
+    )
     args = parser.parse_args()
 
     data_api = DataAPI()
@@ -39,4 +45,5 @@ def run():
         projects=args.projects,
         use_adjusted_stage=args.use_adjusted_stage,
         foil_hole_masks=not args.no_masks,
+        alternative_extension=args.extension,
     )

@@ -654,6 +654,7 @@ class MainDisplay(ComponentTab):
                     parent=self,
                     selection_box=self._foil_hole_combo,
                     stage_calibration=self._stage_calibration,
+                    draw=False,
                 )
                 self.grid.addWidget(hole_lbl, 1, 2)
                 hole_lbl.setPixmap(hole_pixmap)

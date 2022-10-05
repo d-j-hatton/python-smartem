@@ -67,6 +67,58 @@ def metadata_foil_hole_positions(xml_path: Path) -> Dict[str, Tuple[int, int]]:
     return fh_pix_positions
 
 
+def metadata_grid_square_positions(xml_path: Path) -> Dict[str, Tuple[int, int]]:
+    with open(xml_path, "r") as xml:
+        for_parsing = xml.read()
+        data = xmltodict.parse(for_parsing)
+    tile_info = data["AtlasSessionXml"]["Atlas"]["TilesEfficient"]["_items"]["TileXml"]
+    gs_pix_positions = {}
+    for ti in tile_info:
+        try:
+            nodes = ti["Nodes"]["KeyValuePairs"]
+        except KeyError:
+            continue
+        required_key = ""
+        for key in nodes.keys():
+            if key.startswith("KeyValuePairOfintNodeXml"):
+                required_key = key
+                break
+        if not required_key:
+            continue
+        for gs in nodes[required_key]:
+            gs_pix_positions[gs["key"]] = (
+                int(float(gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:x"])),
+                int(float(gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:y"])),
+            )
+    return gs_pix_positions
+
+
+def metadata_grid_square_stage(xml_path: Path) -> Dict[str, Tuple[float, float]]:
+    with open(xml_path, "r") as xml:
+        for_parsing = xml.read()
+        data = xmltodict.parse(for_parsing)
+    tile_info = data["AtlasSessionXml"]["Atlas"]["TilesEfficient"]["_items"]["TileXml"]
+    gs_stage_positions = {}
+    for ti in tile_info:
+        try:
+            nodes = ti["Nodes"]["KeyValuePairs"]
+        except KeyError:
+            continue
+        required_key = ""
+        for key in nodes.keys():
+            if key.startswith("KeyValuePairOfintNodeXml"):
+                required_key = key
+                break
+        if not required_key:
+            continue
+        for gs in nodes[required_key]:
+            gs_stage_positions[gs["key"]] = (
+                float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:x"]) * 1e9,
+                float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:y"]) * 1e9,
+            )
+    return gs_stage_positions
+
+
 def mask_foil_hole_positions(
     xml_path: Path, image_size: Tuple[int, int], diameter: float | None = None
 ):
@@ -343,7 +395,7 @@ def parse_epu_version(epu_path: Path) -> Tuple[str, str]:
     return (res["software"], res["version"])
 
 
-def parse_epu_dir(epu_path: Path, extractor: DataAPI, project: str):
+def parse_epu_dir(epu_path: Path, atlas_path: Path, extractor: DataAPI, project: str):
     exposures = {}
     for grid_square_dir in epu_path.glob("GridSquare*"):
         if grid_square_dir.is_dir():
@@ -351,11 +403,16 @@ def parse_epu_dir(epu_path: Path, extractor: DataAPI, project: str):
             afis_foil_holes: Dict[str, FoilHole] = {}
             grid_square_jpeg = next(grid_square_dir.glob("*.jpg"))
             grid_square_data = parse_epu_xml(grid_square_jpeg.with_suffix(".xml"))
+            # grid_square_label = grid_square_dir.name.split("_")[1]
             metadata_path = epu_path.parent / "Metadata"
             foil_hole_stage = metadata_foil_hole_stage(
                 metadata_path / f"{grid_square_dir.name}.dm"
             )
+            # grid_square_stage = metadata_grid_square_stage(
+            #     atlas_path / "Atlas.dm"
+            # )
             tile_id = extractor.get_tile_id(grid_square_data["stage_position"], project)
+            print(tile_id)
             if tile_id is not None:
                 extractor.put(
                     [
@@ -371,6 +428,8 @@ def parse_epu_dir(epu_path: Path, extractor: DataAPI, project: str):
                         )
                     ]
                 )
+            else:
+                continue
             for foil_hole_jpeg in (grid_square_dir / "FoilHoles").glob("FoilHole*.jpg"):
                 foil_hole_name = "_".join(foil_hole_jpeg.stem.split("_")[:2])
                 if foil_holes.get(foil_hole_name):

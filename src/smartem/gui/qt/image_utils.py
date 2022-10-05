@@ -15,8 +15,8 @@ from smartem.stage_model import StageCalibration, find_point_pixel
 
 
 def colour_gradient(value: float) -> str:
-    low = "#EF3054"
-    high = "#47682C"
+    high = "#EF3054"
+    low = "#47682C"
     low_rgb = np.array(matplotlib.colors.to_rgb(low))
     high_rgb = np.array(matplotlib.colors.to_rgb(high))
     return matplotlib.colors.to_hex((1 - value) * low_rgb + value * high_rgb)
@@ -108,6 +108,7 @@ class ImageLabel(QLabel):
         image_values: Optional[List[float]] = None,
         selection_box: Optional[QComboBox] = None,
         stage_calibration: Optional[StageCalibration] = None,
+        draw: bool = True,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -121,6 +122,7 @@ class ImageLabel(QLabel):
         self._image_values = image_values or []
         self._selection_box = selection_box
         self._stage_calibration = stage_calibration or StageCalibration()
+        self._draw_inner_image = draw
 
     def mousePressEvent(self, ev):
         if self._selection_box is not None:
@@ -317,7 +319,7 @@ class ImageLabel(QLabel):
                     painter,
                     normalised_value=norm_value,
                 )
-            else:
+            elif self._draw_inner_image:
                 self.draw_rectangle(
                     self._contained_image, readout_area, scaled_pixel_size, painter
                 )
