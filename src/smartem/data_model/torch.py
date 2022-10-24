@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 from torchvision.io import read_image
 
 from smartem.data_model.extract import DataAPI
+from smartem.parsing.epu import calibrate_coordinate_system
 from smartem.parsing.export import get_dataframe
 from smartem.stage_model import StageCalibration, find_point_pixel
 
@@ -81,6 +82,34 @@ class SmartEMDataLoader(DataLoader):
             self._full_res_extension = ".tif"
         else:
             self._full_res_extension = ""
+        if self._level == "foil_hole":
+            self._df = self._df[self._df["foil_hole"].notna()]
+        if self._full_res_extension in (".tiff", ".tif"):
+            tiff_file = (self._data_dir / self._df.iloc[0]["grid_square"]).with_suffix(
+                self._full_res_extension
+            )
+            self._gs_full_res_size = tifffile.imread(tiff_file).shape
+        else:
+            with mrcfile.open(
+                (self._data_dir / self._df.iloc[0]["grid_square"]).with_suffix(".mrc")
+            ) as _mrc:
+                self._gs_full_res_size = _mrc.data.shape
+        with Image.open(self._data_dir / self._df.iloc[0]["grid_square"]) as im:
+            self._gs_jpeg_size = im.size
+        if self._use_full_res:
+            self._boundary_points_x = np.random.randint(
+                self._gs_full_res_size[1] - self._sub_sample_size[0], size=len(self)
+            )
+            self._boundary_points_y = np.random.randint(
+                self._gs_full_res_size[0] - self._sub_sample_size[1], size=len(self)
+            )
+        else:
+            self._boundary_points_x = np.random.randint(
+                self._gs_jpeg_size[0] - self._sub_sample_size[0], size=len(self)
+            )
+            self._boundary_points_y = np.random.randint(
+                self._gs_jpeg_size[1] - self._sub_sample_size[1], size=len(self)
+            )
 
     def __len__(self) -> int:
         if self._level == "grid_square" and self._num_samples:
@@ -257,6 +286,14 @@ class SmartEMDataLoaderDB(SmartEMDataLoader):
         self._df = get_dataframe(self._data_api, projects)
         super()._determine_extension()
 
+        _project = data_api.get_project(project_name=projects[0])
+        for dm in (Path(_project.acquisition_directory).parent / "Metadata").glob(
+            "*.dm"
+        ):
+            self._stage_calibration = calibrate_coordinate_system(dm)
+            if self._stage_calibration:
+                break
+
 
 _standard_labels = {
     "accummotiontotal": True,
@@ -297,34 +334,35 @@ class SmartEMDiskDataLoader(SmartEMDataLoader):
             sc = {"inverted": False, "x_flip": False, "y_flip": True}
 
         self._stage_calibration = StageCalibration(**sc)
-        if level == "foil_hole":
-            self._df = self._df[self._df["foil_hole"].notna()]
-        if self._full_res_extension in (".tiff", ".tif"):
-            tiff_file = (self._data_dir / self._df.iloc[0]["grid_square"]).with_suffix(
-                self._full_res_extension
-            )
-            self._gs_full_res_size = tifffile.imread(tiff_file).shape
-        else:
-            with mrcfile.open(
-                (self._data_dir / self._df.iloc[0]["grid_square"]).with_suffix(".mrc")
-            ) as _mrc:
-                self._gs_full_res_size = _mrc.data.shape
-        with Image.open(self._data_dir / self._df.iloc[0]["grid_square"]) as im:
-            self._gs_jpeg_size = im.size
-        if self._use_full_res:
-            self._boundary_points_x = np.random.randint(
-                self._gs_full_res_size[1] - self._sub_sample_size[0], size=len(self)
-            )
-            self._boundary_points_y = np.random.randint(
-                self._gs_full_res_size[0] - self._sub_sample_size[1], size=len(self)
-            )
-        else:
-            self._boundary_points_x = np.random.randint(
-                self._gs_jpeg_size[0] - self._sub_sample_size[0], size=len(self)
-            )
-            self._boundary_points_y = np.random.randint(
-                self._gs_jpeg_size[1] - self._sub_sample_size[1], size=len(self)
-            )
+
+        # if level == "foil_hole":
+        #     self._df = self._df[self._df["foil_hole"].notna()]
+        # if self._full_res_extension in (".tiff", ".tif"):
+        #     tiff_file = (self._data_dir / self._df.iloc[0]["grid_square"]).with_suffix(
+        #         self._full_res_extension
+        #     )
+        #     self._gs_full_res_size = tifffile.imread(tiff_file).shape
+        # else:
+        #     with mrcfile.open(
+        #         (self._data_dir / self._df.iloc[0]["grid_square"]).with_suffix(".mrc")
+        #     ) as _mrc:
+        #         self._gs_full_res_size = _mrc.data.shape
+        # with Image.open(self._data_dir / self._df.iloc[0]["grid_square"]) as im:
+        #     self._gs_jpeg_size = im.size
+        # if self._use_full_res:
+        #     self._boundary_points_x = np.random.randint(
+        #         self._gs_full_res_size[1] - self._sub_sample_size[0], size=len(self)
+        #     )
+        #     self._boundary_points_y = np.random.randint(
+        #         self._gs_full_res_size[0] - self._sub_sample_size[1], size=len(self)
+        #     )
+        # else:
+        #     self._boundary_points_x = np.random.randint(
+        #         self._gs_jpeg_size[0] - self._sub_sample_size[0], size=len(self)
+        #     )
+        #     self._boundary_points_y = np.random.randint(
+        #         self._gs_jpeg_size[1] - self._sub_sample_size[1], size=len(self)
+        #     )
 
 
 class SmartEMMaskDataLoader(DataLoader):
