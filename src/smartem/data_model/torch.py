@@ -271,7 +271,7 @@ class SmartEMDataLoader(DataLoader):
         return newdf.quantile(q=quantile)
 
 
-class SmartEMDataLoaderDB(SmartEMDataLoader):
+class SmartEMPostgresDataLoader(SmartEMDataLoader):
     def __init__(
         self,
         level: str,
