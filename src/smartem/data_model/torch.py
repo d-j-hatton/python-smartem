@@ -249,8 +249,6 @@ class SmartEMDataLoaderDB(SmartEMDataLoader):
         self,
         level: str,
         projects: List[str],
-        # epu_dir: Path,
-        # atlas_id: int,
         data_api: DataAPI,
         **kwargs,
     ):
@@ -288,22 +286,6 @@ class SmartEMDiskDataLoader(SmartEMDataLoader):
             allowed_labels=allowed_labels,
             seed=seed,
         )
-        # np.random.seed(seed)
-        # self._level = level
-        # self._data_dir = data_dir
-        # self._use_full_res = full_res
-        # self._num_samples = num_samples
-        # self._sub_sample_size = sub_sample_size or (256, 256)
-        # self._allowed_labels = allowed_labels or list(_standard_labels.keys())
-        # self._lower_better_label = (
-        #     [allowed_labels[k] for k in self._allowed_labels]
-        #     if allowed_labels
-        #     else [_standard_labels[k] for k in self._allowed_labels]
-        # )
-        # if self._level not in ("grid_square", "foil_hole"):
-        #     raise ValueError(
-        #         f"Unrecognised SmartEMDataLoader level {self._level}: accepted values are grid_sqaure or foil_hole"
-        #     )
         self._data_dir = data_dir
         self._df = pd.read_csv(self._data_dir / labels_csv)
         super()._determine_extension()
@@ -329,17 +311,6 @@ class SmartEMDiskDataLoader(SmartEMDataLoader):
                 self._gs_full_res_size = _mrc.data.shape
         with Image.open(self._data_dir / self._df.iloc[0]["grid_square"]) as im:
             self._gs_jpeg_size = im.size
-        # for row in self._df:
-        #     try:
-        #         with mrcfile.open(
-        #             (self._data_dir / self._df.iloc[0]["foil_hole"]).with_suffix(".mrc")
-        #         ) as _mrc:
-        #             self._fh_mrc_size = _mrc.data.shape
-        #         with Image.open(self._data_dir / self._df.iloc[0]["foil_hole"]) as im:
-        #             self._fh_jpeg_size = im.size
-        #         break
-        #     except TypeError:
-        #         continue
         if self._use_full_res:
             self._boundary_points_x = np.random.randint(
                 self._gs_full_res_size[1] - self._sub_sample_size[0], size=len(self)
