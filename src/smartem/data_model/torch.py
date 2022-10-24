@@ -45,7 +45,6 @@ class SmartEMDataLoader(DataLoader):
     def __init__(
         self,
         level: str,
-        # projects: List[str],
         full_res: bool = False,
         num_samples: int = 0,
         sub_sample_size: Optional[Tuple[int, int]] = None,
@@ -65,13 +64,12 @@ class SmartEMDataLoader(DataLoader):
         )
         if self._level not in ("grid_square", "foil_hole"):
             raise ValueError(
-                f"Unrecognised SmartEMDataLoader level {self._level}: accepted values are grid_sqaure or foil_hole"
+                f"Unrecognised SmartEMDataLoader level {self._level}: accepted values are grid_square or foil_hole"
             )
 
         self._full_res_extension = ""
         self._data_dir = Path("/")
         self._df = pd.DataFrame()
-        # self._stage_calibration = StageCalibration(**sc)
 
     def _determine_extension(self):
         if Path(self._df.iloc[0]["grid_square"]).with_suffix(".mrc").exists():
@@ -278,15 +276,15 @@ class SmartEMDataLoaderDB(SmartEMDataLoader):
         self,
         level: str,
         projects: List[str],
-        data_api: DataAPI,
+        data_api: Optional[DataAPI] = None,
         **kwargs,
     ):
         super().__init__(level, **kwargs)
-        self._data_api = data_api
+        self._data_api: DataAPI = data_api or DataAPI()
         self._df = get_dataframe(self._data_api, projects)
         super()._determine_extension()
 
-        _project = data_api.get_project(project_name=projects[0])
+        _project = self._data_api.get_project(project_name=projects[0])
         for dm in (Path(_project.acquisition_directory).parent / "Metadata").glob(
             "*.dm"
         ):
@@ -332,37 +330,7 @@ class SmartEMDiskDataLoader(SmartEMDataLoader):
                 sc = yaml.safe_load(cal_in)
         except FileNotFoundError:
             sc = {"inverted": False, "x_flip": False, "y_flip": True}
-
         self._stage_calibration = StageCalibration(**sc)
-
-        # if level == "foil_hole":
-        #     self._df = self._df[self._df["foil_hole"].notna()]
-        # if self._full_res_extension in (".tiff", ".tif"):
-        #     tiff_file = (self._data_dir / self._df.iloc[0]["grid_square"]).with_suffix(
-        #         self._full_res_extension
-        #     )
-        #     self._gs_full_res_size = tifffile.imread(tiff_file).shape
-        # else:
-        #     with mrcfile.open(
-        #         (self._data_dir / self._df.iloc[0]["grid_square"]).with_suffix(".mrc")
-        #     ) as _mrc:
-        #         self._gs_full_res_size = _mrc.data.shape
-        # with Image.open(self._data_dir / self._df.iloc[0]["grid_square"]) as im:
-        #     self._gs_jpeg_size = im.size
-        # if self._use_full_res:
-        #     self._boundary_points_x = np.random.randint(
-        #         self._gs_full_res_size[1] - self._sub_sample_size[0], size=len(self)
-        #     )
-        #     self._boundary_points_y = np.random.randint(
-        #         self._gs_full_res_size[0] - self._sub_sample_size[1], size=len(self)
-        #     )
-        # else:
-        #     self._boundary_points_x = np.random.randint(
-        #         self._gs_jpeg_size[0] - self._sub_sample_size[0], size=len(self)
-        #     )
-        #     self._boundary_points_y = np.random.randint(
-        #         self._gs_jpeg_size[1] - self._sub_sample_size[1], size=len(self)
-        #     )
 
 
 class SmartEMMaskDataLoader(DataLoader):
