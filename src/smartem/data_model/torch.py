@@ -1,6 +1,6 @@
 import functools
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import mrcfile
 import numpy as np
@@ -8,16 +8,13 @@ import pandas as pd
 import tifffile
 import yaml
 from PIL import Image
-from torch import Tensor, from_numpy, reshape, zeros
+from torch import Tensor, from_numpy, reshape
 from torch.utils.data import DataLoader
 from torchvision.io import read_image
 
-from smartem.data_model import EPUImage, FoilHole, GridSquare
 from smartem.data_model.extract import DataAPI
-from smartem.data_model.structure import (
-    extract_keys_with_foil_hole_averages,
-    extract_keys_with_grid_square_averages,
-)
+from smartem.parsing.epu import calibrate_coordinate_system
+from smartem.parsing.export import get_dataframe
 from smartem.stage_model import StageCalibration, find_point_pixel
 
 
@@ -48,98 +45,7 @@ class SmartEMDataLoader(DataLoader):
     def __init__(
         self,
         level: str,
-        epu_dir: Path,
-        project: str,
-        atlas_id: int,
-        data_api: DataAPI,
-        mrc: bool = False,
-    ):
-        self._data_api = data_api
-        self._level = level
-        self._epu_dir = epu_dir
-        self._mrc = mrc
-        atlas_info = self._data_api.get_atlas_info(
-            atlas_id,
-            ["_rlnaccummotiontotal", "_rlnctfmaxresolution"],
-            [],
-            ["_rlnestimatedresolution"],
-        )
-        if self._level not in ("grid_square", "foil_hole"):
-            raise ValueError(
-                f"Unrecognised SmartEMDataLoader level {self._level}: accepted values are grid_sqaure or foil_hole"
-            )
-        self._indexed: Sequence[EPUImage] = []
-        if self._level == "grid_square":
-            _labels = extract_keys_with_grid_square_averages(
-                atlas_info,
-                ["_rlnaccummotiontotal", "_rlnctfmaxresolution"],
-                [],
-                ["_rlnestimatedresolution"],
-            )
-            self._labels = {k: v.averages for k, v in _labels.items() if v.averages}
-            _gs_indexed: Sequence[GridSquare] = self._data_api.get_grid_squares(
-                project=project
-            )
-            self._image_paths = {
-                p.grid_square_name: p.thumbnail
-                for p in _gs_indexed
-                if p.grid_square_name
-            }
-            self._indexed = _gs_indexed
-        elif self._level == "foil_hole":
-            _labels = extract_keys_with_foil_hole_averages(
-                atlas_info,
-                ["_rlnaccummotiontotal", "_rlnctfmaxresolution"],
-                [],
-                ["_rlnestimatedresolution"],
-            )
-            self._labels = {k: v.averages for k, v in _labels.items() if v.averages}
-            _fh_indexed: Sequence[FoilHole] = self._data_api.get_foil_holes()
-            self._image_paths = {
-                p.foil_hole_name: p.thumbnail for p in _fh_indexed if p.foil_hole_name
-            }
-            self._indexed = _fh_indexed
-
-    def __len__(self) -> int:
-        return len(self._image_paths)
-
-    def __getitem__(self, idx: int) -> Tuple[Tensor, List[float]]:
-        ordered_labels = [
-            "_rlnaccummotiontotal",
-            "_rlnctfmaxresolution",
-            "_rlnestimatedresolution",
-        ]
-        if self._level == "grid_square":
-            index_name = self._indexed[idx].grid_square_name  # type: ignore
-        elif self._label == "foil_hole":
-            index_name = self._indexed[idx].foil_hole_name  # type: ignore
-        img_path = self._image_paths[index_name]
-        if img_path:
-            if self._mrc:
-                image = mrc_to_tensor((self._epu_dir / img_path).with_suffix(".mrc"))
-            else:
-                image = read_image(str(self._epu_dir / img_path))
-            labels = [self._labels[l][index_name] for l in ordered_labels]
-        else:
-            image = zeros(1, 512, 512)
-        return image, labels
-
-
-_standard_labels = {
-    "accummotiontotal": True,
-    "ctfmaxresolution": True,
-    "estimatedresolution": True,
-    "maxvalueprobdistribution": False,
-}
-
-
-class SmartEMDiskDataLoader(DataLoader):
-    def __init__(
-        self,
-        level: str,
-        data_dir: Path,
         full_res: bool = False,
-        labels_csv: str = "labels.csv",
         num_samples: int = 0,
         sub_sample_size: Optional[Tuple[int, int]] = None,
         allowed_labels: Optional[Dict[str, bool]] = None,
@@ -147,7 +53,6 @@ class SmartEMDiskDataLoader(DataLoader):
     ):
         np.random.seed(seed)
         self._level = level
-        self._data_dir = data_dir
         self._use_full_res = full_res
         self._num_samples = num_samples
         self._sub_sample_size = sub_sample_size or (256, 256)
@@ -159,38 +64,23 @@ class SmartEMDiskDataLoader(DataLoader):
         )
         if self._level not in ("grid_square", "foil_hole"):
             raise ValueError(
-                f"Unrecognised SmartEMDataLoader level {self._level}: accepted values are grid_sqaure or foil_hole"
+                f"Unrecognised SmartEMDataLoader level {self._level}: accepted values are grid_square or foil_hole"
             )
-        self._df = pd.read_csv(self._data_dir / labels_csv)
-        try:
-            with open(self._data_dir / "coordinate_calibration.yaml", "r") as cal_in:
-                sc = yaml.safe_load(cal_in)
-        except FileNotFoundError:
-            sc = {"inverted": False, "x_flip": False, "y_flip": True}
 
-        if (
-            (self._data_dir / self._df.iloc[0]["grid_square"])
-            .with_suffix(".mrc")
-            .exists()
-        ):
+        self._full_res_extension = ""
+        self._data_dir = Path("/")
+        self._df = pd.DataFrame()
+
+    def _determine_extension(self):
+        if Path(self._df.iloc[0]["grid_square"]).with_suffix(".mrc").exists():
             self._full_res_extension = ".mrc"
-        elif (
-            (self._data_dir / self._df.iloc[0]["grid_square"])
-            .with_suffix(".tiff")
-            .exists()
-        ):
+        elif Path(self._df.iloc[0]["grid_square"]).with_suffix(".tiff").exists():
             self._full_res_extension = ".tiff"
-        elif (
-            (self._data_dir / self._df.iloc[0]["grid_square"])
-            .with_suffix(".tif")
-            .exists()
-        ):
+        elif Path(self._df.iloc[0]["grid_square"]).with_suffix(".tif").exists():
             self._full_res_extension = ".tif"
         else:
             self._full_res_extension = ""
-
-        self._stage_calibration = StageCalibration(**sc)
-        if level == "foil_hole":
+        if self._level == "foil_hole":
             self._df = self._df[self._df["foil_hole"].notna()]
         if self._full_res_extension in (".tiff", ".tif"):
             tiff_file = (self._data_dir / self._df.iloc[0]["grid_square"]).with_suffix(
@@ -204,17 +94,6 @@ class SmartEMDiskDataLoader(DataLoader):
                 self._gs_full_res_size = _mrc.data.shape
         with Image.open(self._data_dir / self._df.iloc[0]["grid_square"]) as im:
             self._gs_jpeg_size = im.size
-        # for row in self._df:
-        #     try:
-        #         with mrcfile.open(
-        #             (self._data_dir / self._df.iloc[0]["foil_hole"]).with_suffix(".mrc")
-        #         ) as _mrc:
-        #             self._fh_mrc_size = _mrc.data.shape
-        #         with Image.open(self._data_dir / self._df.iloc[0]["foil_hole"]) as im:
-        #             self._fh_jpeg_size = im.size
-        #         break
-        #     except TypeError:
-        #         continue
         if self._use_full_res:
             self._boundary_points_x = np.random.randint(
                 self._gs_full_res_size[1] - self._sub_sample_size[0], size=len(self)
@@ -344,7 +223,7 @@ class SmartEMDiskDataLoader(DataLoader):
                 for k, v in averaged_df.iloc[idx].to_dict().items()
                 if k in self._allowed_labels
             ]
-            if self._mrc:
+            if self._full_res_extension == ".mrc":
                 image = mrc_to_tensor(
                     (self._data_dir / averaged_df.iloc[idx].name).with_suffix(".mrc")
                 )
@@ -390,6 +269,68 @@ class SmartEMDiskDataLoader(DataLoader):
         else:
             newdf = self._df[required_columns]
         return newdf.quantile(q=quantile)
+
+
+class SmartEMPostgresDataLoader(SmartEMDataLoader):
+    def __init__(
+        self,
+        level: str,
+        projects: List[str],
+        data_api: Optional[DataAPI] = None,
+        **kwargs,
+    ):
+        super().__init__(level, **kwargs)
+        self._data_api: DataAPI = data_api or DataAPI()
+        self._df = get_dataframe(self._data_api, projects)
+        super()._determine_extension()
+
+        _project = self._data_api.get_project(project_name=projects[0])
+        for dm in (Path(_project.acquisition_directory).parent / "Metadata").glob(
+            "*.dm"
+        ):
+            self._stage_calibration = calibrate_coordinate_system(dm)
+            if self._stage_calibration:
+                break
+
+
+_standard_labels = {
+    "accummotiontotal": True,
+    "ctfmaxresolution": True,
+    "estimatedresolution": True,
+    "maxvalueprobdistribution": False,
+}
+
+
+class SmartEMDiskDataLoader(SmartEMDataLoader):
+    def __init__(
+        self,
+        level: str,
+        data_dir: Path,
+        full_res: bool = False,
+        labels_csv: str = "labels.csv",
+        num_samples: int = 0,
+        sub_sample_size: Optional[Tuple[int, int]] = None,
+        allowed_labels: Optional[Dict[str, bool]] = None,
+        seed: int = 0,
+    ):
+        super().__init__(
+            level,
+            full_res=full_res,
+            num_samples=num_samples,
+            sub_sample_size=sub_sample_size,
+            allowed_labels=allowed_labels,
+            seed=seed,
+        )
+        self._data_dir = data_dir
+        self._df = pd.read_csv(self._data_dir / labels_csv)
+        super()._determine_extension()
+
+        try:
+            with open(self._data_dir / "coordinate_calibration.yaml", "r") as cal_in:
+                sc = yaml.safe_load(cal_in)
+        except FileNotFoundError:
+            sc = {"inverted": False, "x_flip": False, "y_flip": True}
+        self._stage_calibration = StageCalibration(**sc)
 
 
 class SmartEMMaskDataLoader(DataLoader):
