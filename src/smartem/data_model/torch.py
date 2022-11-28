@@ -26,17 +26,17 @@ def compute_label(
     labels: List[Tuple[str, bool]],
     data_loader: SmartEMDataLoader,
 ) -> int:
-    ths = data_loader.thresholds()
+    ths = data_loader.thresholds(quantile=0.7)
     conds = [
         annotation[i] < ths[labels[i][0]]
         if labels[i][1]
         else annotation[i] > ths[labels[i][0]]
         for i in range(len(annotation))
     ]
-    if pixel_condition < 0.1:
-        if all(conds):
+    if pixel_condition < 0.25:
+        if sum(conds) >= 0.75 * len(labels):
             return 0
-        if conds.count(True) <= 1:
+        if any(conds):
             return 1
         return 2
     return 2
@@ -311,6 +311,24 @@ class SmartEMDataLoader(DataLoader):
             data_set = np.random.choice(data_set_names, p=probs)
             selected_indices[data_set].append(i)
         return selected_indices
+
+    def check_split_ratios(
+        self, labels: List[Tuple[str, bool]], selected_indices: Dict[str, List[int]]
+    ) -> Dict[str, Dict[int, float]]:
+        counts: Dict[str, Dict[int, float]] = {}
+        for k, v in selected_indices.items():
+            vlen = len(v)
+            counts[k] = {}
+            for i in v:
+                elem = self[i]
+                pixel_condition = len(np.where(elem[0].detach().numpy() < 150)[0]) / (
+                    self._sub_sample_size[0] * self._sub_sample_size[1]
+                )
+                label = compute_label(elem[1], pixel_condition, labels, self)
+                if counts[k].get(label) is None:
+                    counts[k][label] = 0
+                counts[k][label] += 1 / vlen
+        return counts
 
 
 class SmartEMPostgresDataLoader(SmartEMDataLoader):
