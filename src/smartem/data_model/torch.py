@@ -73,14 +73,18 @@ class SmartEMDataLoader(DataLoader):
         num_samples: int = 0,
         sub_sample_size: Optional[Tuple[int, int]] = None,
         allowed_labels: Optional[Dict[str, bool]] = None,
+        restricted_indices: Optional[List[int]] = None,
         seed: int = 0,
+        **kwargs,
     ):
+        super().__init__(**kwargs)
         np.random.seed(seed)
         self._level = level
         self._use_full_res = full_res
         self._num_samples = num_samples
         self._sub_sample_size = sub_sample_size or (256, 256)
         self._allowed_labels = allowed_labels or list(_standard_labels.keys())
+        self._restricted_indices = restricted_indices or []
         self._lower_better_label = (
             [allowed_labels[k] for k in self._allowed_labels]
             if allowed_labels
@@ -134,11 +138,15 @@ class SmartEMDataLoader(DataLoader):
             )
 
     def __len__(self) -> int:
+        if self._restricted_indices:
+            return len(self._restricted_indices)
         if self._level == "grid_square" and self._num_samples:
             return self._df[self._level].nunique() * self._num_samples
         return self._df[self._level].nunique()
 
     def __getitem__(self, idx: int) -> Tuple[Tensor, List[float]]:
+        if self._restricted_indices:
+            idx = self._restricted_indices[idx]
         sub_sample_boundaries = (-1, -1)
         if self._level == "grid_square" and self._num_samples:
             sub_sample_boundaries = (
@@ -306,7 +314,6 @@ class SmartEMDataLoader(DataLoader):
             data_set_names.append(k)
             probs.append(v)
         selected_indices: Dict[str, List[int]] = {dn: [] for dn in data_set_names}
-        print(len(self))
         for i in range(len(self)):
             data_set = np.random.choice(data_set_names, p=probs)
             selected_indices[data_set].append(i)
