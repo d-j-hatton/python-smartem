@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import functools
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -16,6 +18,28 @@ from smartem.data_model.extract import DataAPI
 from smartem.parsing.epu import calibrate_coordinate_system
 from smartem.parsing.export import get_dataframe
 from smartem.stage_model import StageCalibration, find_point_pixel
+
+
+def compute_label(
+    annotation: List[float],
+    pixel_condition: float,
+    labels: List[Tuple[str, bool]],
+    data_loader: SmartEMDataLoader,
+) -> int:
+    ths = data_loader.thresholds()
+    conds = [
+        annotation[i] < ths[labels[i][0]]
+        if labels[i][1]
+        else annotation[i] > ths[labels[i][0]]
+        for i in range(len(annotation))
+    ]
+    if pixel_condition < 0.1:
+        if all(conds):
+            return 0
+        if conds.count(True) <= 1:
+            return 1
+        return 2
+    return 2
 
 
 @functools.lru_cache(maxsize=50)
@@ -254,6 +278,7 @@ class SmartEMDataLoader(DataLoader):
                 )
         return image, labels
 
+    @functools.lru_cache(maxsize=1)
     def thresholds(self, quantile: float = 0.7):
         required_columns = (
             [*_standard_labels, self._level]
@@ -269,6 +294,23 @@ class SmartEMDataLoader(DataLoader):
         else:
             newdf = self._df[required_columns]
         return newdf.quantile(q=quantile)
+
+    def split_dataloader(
+        self,
+        labels: List[Tuple[str, bool]],
+        probs_per_set={"train": 0.8, "val": 0.1, "test": 0.1},
+    ) -> Dict[str, List[int]]:
+        data_set_names = []
+        probs = []
+        for k, v in probs_per_set.items():
+            data_set_names.append(k)
+            probs.append(v)
+        selected_indices: Dict[str, List[int]] = {dn: [] for dn in data_set_names}
+        print(len(self))
+        for i in range(len(self)):
+            data_set = np.random.choice(data_set_names, p=probs)
+            selected_indices[data_set].append(i)
+        return selected_indices
 
 
 class SmartEMPostgresDataLoader(SmartEMDataLoader):
