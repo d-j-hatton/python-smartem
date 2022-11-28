@@ -11,7 +11,7 @@ import tifffile
 import yaml
 from PIL import Image
 from torch import Tensor, from_numpy, reshape
-from torch.utils.data import DataLoader
+from torch.utils.data import Dataset
 from torchvision.io import read_image
 
 from smartem.data_model.extract import DataAPI
@@ -65,7 +65,7 @@ def tiff_to_tensor(tiff_file: Path) -> Tensor:
     return reshape(tensor_2d, (1, shape[0], shape[1]))
 
 
-class SmartEMDataLoader(DataLoader):
+class SmartEMDataLoader(Dataset):
     def __init__(
         self,
         level: str,
@@ -400,7 +400,7 @@ class SmartEMDiskDataLoader(SmartEMDataLoader):
         self._stage_calibration = StageCalibration(**sc)
 
 
-class SmartEMMaskDataLoader(DataLoader):
+class SmartEMMaskDataLoader(Dataset):
     def __init__(self, data_dir: Path, labels_csv: str = "labels.csv"):
         self._data_dir = data_dir
         self._df = (
