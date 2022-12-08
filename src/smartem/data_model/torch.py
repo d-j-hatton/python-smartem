@@ -24,9 +24,9 @@ def compute_label(
     annotation: List[float],
     pixel_condition: float,
     labels: List[Tuple[str, bool]],
-    data_loader: SmartEMDataLoader,
+    dataset: SmartEMDataset,
 ) -> int:
-    ths = data_loader.thresholds(quantile=0.7)
+    ths = dataset.thresholds(quantile=0.7)
     conds = [
         annotation[i] < ths[labels[i][0]]
         if labels[i][1]
@@ -65,7 +65,7 @@ def tiff_to_tensor(tiff_file: Path) -> Tensor:
     return reshape(tensor_2d, (1, shape[0], shape[1])).repeat(3, 1, 1)
 
 
-class SmartEMDataLoader(Dataset):
+class SmartEMDataset(Dataset):
     def __init__(
         self,
         level: str,
@@ -348,7 +348,7 @@ class SmartEMDataLoader(Dataset):
         return counts
 
 
-class SmartEMPostgresDataLoader(SmartEMDataLoader):
+class SmartEMPostgresDataset(SmartEMDataset):
     def __init__(
         self,
         level: str,
@@ -378,7 +378,7 @@ _standard_labels = {
 }
 
 
-class SmartEMDiskDataLoader(SmartEMDataLoader):
+class SmartEMDiskDataLoader(SmartEMDataset):
     def __init__(
         self,
         level: str,
@@ -410,7 +410,7 @@ class SmartEMDiskDataLoader(SmartEMDataLoader):
         self._stage_calibration = StageCalibration(**sc)
 
 
-class SmartEMMaskDataLoader(Dataset):
+class SmartEMMaskDataset(Dataset):
     def __init__(self, data_dir: Path, labels_csv: str = "labels.csv"):
         self._data_dir = data_dir
         self._df = (
