@@ -51,7 +51,7 @@ def mrc_to_tensor(mrc_file: Path) -> Tensor:
         tensor_2d = Tensor(data.astype(np.int16))
     else:
         tensor_2d = Tensor(data.astype(np.float16))
-    return reshape(tensor_2d, (1, shape[0], shape[1]))
+    return reshape(tensor_2d, (1, shape[0], shape[1])).repeat(3, 1, 1)
 
 
 @functools.lru_cache(maxsize=50)
@@ -62,7 +62,7 @@ def tiff_to_tensor(tiff_file: Path) -> Tensor:
         tensor_2d = Tensor(data.astype(np.int16))
     else:
         tensor_2d = Tensor(data.astype(np.float16))
-    return reshape(tensor_2d, (1, shape[0], shape[1]))
+    return reshape(tensor_2d, (1, shape[0], shape[1])).repeat(3, 1, 1)
 
 
 class SmartEMDataLoader(Dataset):
@@ -75,6 +75,7 @@ class SmartEMDataLoader(Dataset):
         allowed_labels: Optional[Dict[str, bool]] = None,
         restricted_indices: Optional[List[int]] = None,
         seed: int = 0,
+        transform=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -85,6 +86,7 @@ class SmartEMDataLoader(Dataset):
         self._sub_sample_size = sub_sample_size or (256, 256)
         self._allowed_labels = allowed_labels or list(_standard_labels.keys())
         self._restricted_indices = restricted_indices or []
+        self._transform = transform
         self._lower_better_label = (
             [allowed_labels[k] for k in self._allowed_labels]
             if allowed_labels
@@ -144,14 +146,17 @@ class SmartEMDataLoader(Dataset):
             return self._df[self._level].nunique() * self._num_samples
         return self._df[self._level].nunique()
 
-    def __getitem__(self, idx: int) -> Tuple[Tensor, List[float]]:
+    def __getitem__(self, idx: int) -> Tuple[Tensor, int]:
+        if idx >= len(self):
+            raise IndexError
+        old_idx = idx
         if self._restricted_indices:
             idx = self._restricted_indices[idx]
         sub_sample_boundaries = (-1, -1)
         if self._level == "grid_square" and self._num_samples:
             sub_sample_boundaries = (
-                self._boundary_points_x[idx],
-                self._boundary_points_y[idx],
+                self._boundary_points_x[old_idx],
+                self._boundary_points_y[old_idx],
             )
             grid_square_idx = idx // self._num_samples
             _grid_squares = self._df["grid_square"].unique()
@@ -209,7 +214,7 @@ class SmartEMDataLoader(Dataset):
                     ):
                         drop_indices.append(ri)
             selected_df = selected_df.drop(drop_indices)
-            averaged_df = selected_df.groupby("grid_square").mean()
+            averaged_df = selected_df.groupby("grid_square").mean(numeric_only=True)
             if len(averaged_df):
                 labels = [
                     v
@@ -249,7 +254,7 @@ class SmartEMDataLoader(Dataset):
                     + self._sub_sample_size[0],
                 ]
         elif self._level == "grid_square":
-            averaged_df = self._df.groupby("grid_square").mean()
+            averaged_df = self._df.groupby("grid_square").mean(numeric_only=True)
             labels = [
                 v
                 for k, v in averaged_df.iloc[idx].to_dict().items()
@@ -284,7 +289,15 @@ class SmartEMDataLoader(Dataset):
                 image = read_image(
                     str(self._data_dir / self._df.iloc[idx][self._level])
                 )
-        return image, labels
+        if self._transform:
+            image = self._transform(image)
+        pixel_condition = len(np.where(image.detach().numpy() < 150)[0]) / (
+            self._sub_sample_size[0] * self._sub_sample_size[1]
+        )
+        computed_label = compute_label(
+            labels, pixel_condition, [(k, v) for k, v in _standard_labels.items()], self
+        )
+        return image, computed_label
 
     @functools.lru_cache(maxsize=1)
     def thresholds(self, quantile: float = 0.7):
@@ -297,7 +310,7 @@ class SmartEMDataLoader(Dataset):
             newdf = (
                 self._df[required_columns]
                 .groupby(self._level)
-                .mean()[list(_standard_labels)]
+                .mean(numeric_only=True)[list(_standard_labels)]
             )
         else:
             newdf = self._df[required_columns]
@@ -328,10 +341,7 @@ class SmartEMDataLoader(Dataset):
             counts[k] = {}
             for i in v:
                 elem = self[i]
-                pixel_condition = len(np.where(elem[0].detach().numpy() < 150)[0]) / (
-                    self._sub_sample_size[0] * self._sub_sample_size[1]
-                )
-                label = compute_label(elem[1], pixel_condition, labels, self)
+                label = elem[1]
                 if counts[k].get(label) is None:
                     counts[k][label] = 0
                 counts[k][label] += 1 / vlen
@@ -404,7 +414,9 @@ class SmartEMMaskDataLoader(Dataset):
     def __init__(self, data_dir: Path, labels_csv: str = "labels.csv"):
         self._data_dir = data_dir
         self._df = (
-            pd.read_csv(self._data_dir / labels_csv).groupby("grid_square").mean()
+            pd.read_csv(self._data_dir / labels_csv)
+            .groupby("grid_square")
+            .mean(numeric_only=True)
         )
         if (
             (self._data_dir / self._df.iloc[0]["grid_square"])
