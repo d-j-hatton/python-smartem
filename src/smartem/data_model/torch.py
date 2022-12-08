@@ -98,46 +98,56 @@ class SmartEMDataset(Dataset):
                 f"Unrecognised SmartEMDataLoader level {self._level}: accepted values are grid_square or foil_hole"
             )
 
-        self._full_res_extension = ""
-        self._data_dir = Path("/")
+        self._full_res_extension = {"__default__": ""}
+        self._data_dir = {"__default__": Path("/")}
+        self._stage_calibration: Dict[str, StageCalibration | None] = {}
+        self._gs_full_res_size: Dict[str, Tuple[int, int]] = {}
+        self._gs_jpeg_size: Dict[str, Tuple[int, int]] = {}
         self._df = pd.DataFrame()
 
-    def _determine_extension(self):
-        if Path(self._df.iloc[0]["grid_square"]).with_suffix(".mrc").exists():
-            self._full_res_extension = ".mrc"
-        elif Path(self._df.iloc[0]["grid_square"]).with_suffix(".tiff").exists():
-            self._full_res_extension = ".tiff"
-        elif Path(self._df.iloc[0]["grid_square"]).with_suffix(".tif").exists():
-            self._full_res_extension = ".tif"
+    def _determine_extension(self, collection: str = "__default__"):
+        cdf = self._df["collection" == collection]
+        if Path(cdf.iloc[0]["grid_square"]).with_suffix(".mrc").exists():
+            self._full_res_extension[collection] = ".mrc"
+        elif Path(cdf.iloc[0]["grid_square"]).with_suffix(".tiff").exists():
+            self._full_res_extension[collection] = ".tiff"
+        elif Path(cdf.iloc[0]["grid_square"]).with_suffix(".tif").exists():
+            self._full_res_extension[collection] = ".tif"
         else:
-            self._full_res_extension = ""
+            self._full_res_extension[collection] = ""
         if self._level == "foil_hole":
             self._df = self._df[self._df["foil_hole"].notna()]
-        if self._full_res_extension in (".tiff", ".tif"):
-            tiff_file = (self._data_dir / self._df.iloc[0]["grid_square"]).with_suffix(
-                self._full_res_extension
-            )
-            self._gs_full_res_size = tifffile.imread(tiff_file).shape
+        if self._full_res_extension[collection] in (".tiff", ".tif"):
+            tiff_file = (
+                self._data_dir[collection] / cdf.iloc[0]["grid_square"]
+            ).with_suffix(self._full_res_extension[collection])
+            self._gs_full_res_size[collection] = tifffile.imread(tiff_file).shape
         else:
             with mrcfile.open(
-                (self._data_dir / self._df.iloc[0]["grid_square"]).with_suffix(".mrc")
+                (self._data_dir[collection] / cdf.iloc[0]["grid_square"]).with_suffix(
+                    ".mrc"
+                )
             ) as _mrc:
-                self._gs_full_res_size = _mrc.data.shape
-        with Image.open(self._data_dir / self._df.iloc[0]["grid_square"]) as im:
+                self._gs_full_res_size[collection] = _mrc.data.shape
+        with Image.open(self._data_dir[collection] / cdf.iloc[0]["grid_square"]) as im:
             self._gs_jpeg_size = im.size
         if self._use_full_res:
             self._boundary_points_x = np.random.randint(
-                self._gs_full_res_size[1] - self._sub_sample_size[0], size=len(self)
+                self._gs_full_res_size[collection][1] - self._sub_sample_size[0],
+                size=len(self),
             )
             self._boundary_points_y = np.random.randint(
-                self._gs_full_res_size[0] - self._sub_sample_size[1], size=len(self)
+                self._gs_full_res_size[collection][0] - self._sub_sample_size[1],
+                size=len(self),
             )
         else:
             self._boundary_points_x = np.random.randint(
-                self._gs_jpeg_size[0] - self._sub_sample_size[0], size=len(self)
+                self._gs_jpeg_size[collection][0] - self._sub_sample_size[0],
+                size=len(self),
             )
             self._boundary_points_y = np.random.randint(
-                self._gs_jpeg_size[1] - self._sub_sample_size[1], size=len(self)
+                self._gs_jpeg_size[collection][1] - self._sub_sample_size[1],
+                size=len(self),
             )
 
     def __len__(self) -> int:
@@ -150,6 +160,7 @@ class SmartEMDataset(Dataset):
     def __getitem__(self, idx: int) -> Tuple[Tensor, int]:
         if idx >= len(self):
             raise IndexError
+        collection = self._df.iloc[idx]["collection"]
         old_idx = idx
         if self._restricted_indices:
             idx = self._restricted_indices[idx]
@@ -165,6 +176,12 @@ class SmartEMDataset(Dataset):
                 self._df["grid_square"] == _grid_squares[grid_square_idx]
             ]
             drop_indices = []
+            if self._stage_calibration.get(collection):
+                xfactor = -1 if self._stage_calibration[collection].x_flip else 1  # type: ignore
+                yfactor = -1 if self._stage_calibration[collection].y_flip else 1  # type: ignore
+            else:
+                xfactor = 1
+                yfactor = 1
             if self._use_full_res:
                 for ri, row in selected_df.iterrows():
                     fh_centre = find_point_pixel(
@@ -174,12 +191,16 @@ class SmartEMDataset(Dataset):
                         ),
                         (row["grid_square_x"], row["grid_square_y"]),
                         row["grid_square_pixel_size"],
-                        (self._gs_full_res_size[1], self._gs_full_res_size[0]),
-                        xfactor=-1 if self._stage_calibration.x_flip else 1,
-                        yfactor=-1 if self._stage_calibration.y_flip else 1,
+                        (
+                            self._gs_full_res_size[collection][1],
+                            self._gs_full_res_size[collection][0],
+                        ),
+                        xfactor=xfactor,
+                        yfactor=yfactor,
                     )
-                    if self._stage_calibration.inverted:
-                        fh_centre = (fh_centre[1], fh_centre[0])
+                    if self._stage_calibration[collection]:
+                        if self._stage_calibration[collection].inverted:  # type: ignore
+                            fh_centre = (fh_centre[1], fh_centre[0])
                     if (
                         fh_centre[0] < sub_sample_boundaries[0]
                         or fh_centre[1] < sub_sample_boundaries[1]
@@ -198,13 +219,17 @@ class SmartEMDataset(Dataset):
                         ),
                         (row["grid_square_x"], row["grid_square_y"]),
                         row["grid_square_pixel_size"]
-                        * (self._gs_full_res_size[1] / self._gs_jpeg_size[0]),
-                        self._gs_jpeg_size,
-                        xfactor=-1 if self._stage_calibration.x_flip else 1,
-                        yfactor=-1 if self._stage_calibration.y_flip else 1,
+                        * (
+                            self._gs_full_res_size[collection][1]
+                            / self._gs_jpeg_size[collection][0]
+                        ),
+                        self._gs_jpeg_size[collection],
+                        xfactor=xfactor,
+                        yfactor=yfactor,
                     )
-                    if self._stage_calibration.inverted:
-                        fh_centre = (fh_centre[1], fh_centre[0])
+                    if self._stage_calibration.get(collection):
+                        if self._stage_calibration[collection].inverted:  # type: ignore
+                            fh_centre = (fh_centre[1], fh_centre[0])
                     if (
                         fh_centre[0] < sub_sample_boundaries[0]
                         or fh_centre[1] < sub_sample_boundaries[1]
@@ -225,17 +250,17 @@ class SmartEMDataset(Dataset):
             else:
                 labels = [np.inf if b else -np.inf for b in self._lower_better_label]
             if self._use_full_res:
-                if self._full_res_extension == ".mrc":
+                if self._full_res_extension[collection] == ".mrc":
                     preimage = mrc_to_tensor(
-                        (self._data_dir / _grid_squares[grid_square_idx]).with_suffix(
-                            ".mrc"
-                        )
+                        (
+                            self._data_dir[collection] / _grid_squares[grid_square_idx]
+                        ).with_suffix(".mrc")
                     )
-                elif self._full_res_extension in (".tiff", ".tif"):
+                elif self._full_res_extension[collection] in (".tiff", ".tif"):
                     preimage = tiff_to_tensor(
-                        (self._data_dir / _grid_squares[grid_square_idx]).with_suffix(
-                            self._full_res_extension
-                        )
+                        (
+                            self._data_dir[collection] / _grid_squares[grid_square_idx]
+                        ).with_suffix(self._full_res_extension[collection])
                     )
                 image = preimage[
                     :,
@@ -246,7 +271,7 @@ class SmartEMDataset(Dataset):
                 ]
             else:
                 image = read_image(
-                    str(self._data_dir / _grid_squares[grid_square_idx])
+                    str(self._data_dir[collection] / _grid_squares[grid_square_idx])
                 )[
                     :,
                     sub_sample_boundaries[1] : sub_sample_boundaries[1]
@@ -261,12 +286,16 @@ class SmartEMDataset(Dataset):
                 for k, v in averaged_df.iloc[idx].to_dict().items()
                 if k in self._allowed_labels
             ]
-            if self._full_res_extension == ".mrc":
+            if self._full_res_extension[collection] == ".mrc":
                 image = mrc_to_tensor(
-                    (self._data_dir / averaged_df.iloc[idx].name).with_suffix(".mrc")
+                    (
+                        self._data_dir[collection] / averaged_df.iloc[idx].name
+                    ).with_suffix(".mrc")
                 )
             else:
-                image = read_image(str(self._data_dir / averaged_df.iloc[idx].name))
+                image = read_image(
+                    str(self._data_dir[collection] / averaged_df.iloc[idx].name)
+                )
         else:
             labels = [
                 v
@@ -274,21 +303,21 @@ class SmartEMDataset(Dataset):
                 if k in self._allowed_labels
             ]
             if self._use_full_res:
-                if self._full_res_extension == ".mrc":
+                if self._full_res_extension[collection] == ".mrc":
                     image = mrc_to_tensor(
-                        (self._data_dir / self._df.iloc[idx][self._level]).with_suffix(
-                            ".mrc"
-                        )
+                        (
+                            self._data_dir[collection] / self._df.iloc[idx][self._level]
+                        ).with_suffix(".mrc")
                     )
-                elif self._full_res_extension in (".tiff", ".tif"):
+                elif self._full_res_extension[collection] in (".tiff", ".tif"):
                     image = tiff_to_tensor(
-                        (self._data_dir / self._df.iloc[idx][self._level]).with_suffix(
-                            self._full_res_extension
-                        )
+                        (
+                            self._data_dir[collection] / self._df.iloc[idx][self._level]
+                        ).with_suffix(self._full_res_extension[collection])
                     )
             else:
                 image = read_image(
-                    str(self._data_dir / self._df.iloc[idx][self._level])
+                    str(self._data_dir[collection] / self._df.iloc[idx][self._level])
                 )
         if self._transform:
             image = self._transform(image)
@@ -303,13 +332,14 @@ class SmartEMDataset(Dataset):
     @functools.lru_cache(maxsize=1)
     def thresholds(self, quantile: float = 0.7):
         required_columns = (
-            [*_standard_labels, self._level]
+            [*_standard_labels, self._level, "collection"]
             if self._level == "grid_square"
             else list(_standard_labels)
         )
         if self._level == "grid_square":
             newdf = (
                 self._df[required_columns]
+                .groupby("collection")
                 .groupby(self._level)
                 .mean(numeric_only=True)[list(_standard_labels)]
             )
@@ -362,13 +392,16 @@ class SmartEMPostgresDataset(SmartEMDataset):
         self._df = get_dataframe(self._data_api, projects)
         super()._determine_extension()
 
-        _project = self._data_api.get_project(project_name=projects[0])
-        for dm in (Path(_project.acquisition_directory).parent / "Metadata").glob(
-            "*.dm"
-        ):
-            self._stage_calibration = calibrate_coordinate_system(dm)
-            if self._stage_calibration:
-                break
+        _projects = (self._data_api.get_project(project_name=p) for p in projects)
+        for _project in _projects:
+            for dm in (Path(_project.acquisition_directory).parent / "Metadata").glob(
+                "*.dm"
+            ):
+                self._stage_calibration[
+                    _project.project_name
+                ] = calibrate_coordinate_system(dm)
+                if self._stage_calibration[_project.project_name]:
+                    break
 
 
 _standard_labels = {
@@ -399,16 +432,18 @@ class SmartEMDiskDataLoader(SmartEMDataset):
             allowed_labels=allowed_labels,
             seed=seed,
         )
-        self._data_dir = data_dir
-        self._df = pd.read_csv(self._data_dir / labels_csv)
+        self._data_dir["__default__"] = data_dir
+        self._df = pd.read_csv(self._data_dir["__default__"] / labels_csv)
         super()._determine_extension()
 
         try:
-            with open(self._data_dir / "coordinate_calibration.yaml", "r") as cal_in:
+            with open(
+                self._data_dir["__default__"] / "coordinate_calibration.yaml", "r"
+            ) as cal_in:
                 sc = yaml.safe_load(cal_in)
         except FileNotFoundError:
             sc = {"inverted": False, "x_flip": False, "y_flip": True}
-        self._stage_calibration = StageCalibration(**sc)
+        self._stage_calibration["__default__"] = StageCalibration(**sc)
 
 
 class SmartEMMaskDataset(Dataset):

@@ -24,6 +24,7 @@ def get_dataframe(
     out_gs_paths = out_gs_paths or {}
     out_fh_paths = out_fh_paths or {}
     data: Dict[str, list] = {
+        "collection": [],
         "grid_square": [],
         "grid_square_pixel_size": [],
         "grid_square_x": [],
@@ -94,6 +95,7 @@ def get_dataframe(
                     thumbnail_path = None
                     if fh.thumbnail:
                         thumbnail_path = epu_dir / fh.thumbnail
+                    data["collection"].append(project)
                     data["grid_square"].append(str(out_gs_paths[fh.grid_square_name]))
                     data["grid_square_pixel_size"].append(
                         gs_pixel_sizes[fh.grid_square_name]
