@@ -13,6 +13,7 @@ from PIL import Image
 from torch import Tensor, from_numpy, reshape
 from torch.utils.data import Dataset
 from torchvision.io import read_image
+from torchvision.transforms import Compose
 
 from smartem.data_model.extract import DataAPI
 from smartem.parsing.epu import calibrate_coordinate_system
@@ -75,7 +76,7 @@ class SmartEMDataset(Dataset):
         allowed_labels: Optional[Dict[str, bool]] = None,
         restricted_indices: Optional[List[int]] = None,
         seed: int = 0,
-        transform=None,
+        transform: Compose | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
