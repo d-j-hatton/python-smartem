@@ -31,7 +31,6 @@ def write_sample_microscope_xml(make_test_folder_structure, tmp_path):
     Write an example xml file with the same structure
     as the microscope outputs
     """
-
     microscope_image = ET.Element("MicroscopeImage")
     microscope_data = ET.SubElement(microscope_image, "microscopeData")
 
@@ -75,7 +74,6 @@ def write_sample_metadata_xml(make_test_folder_structure, tmp_path):
     Write an example xml file with the same structure
     as the metadata outputs for the foil holes
     """
-
     grid_square = ET.Element("GridSquareXml")
     target_locations = ET.SubElement(grid_square, "TargetLocations")
     target_locations_eff = ET.SubElement(
@@ -125,10 +123,9 @@ def write_sample_metadata_xml(make_test_folder_structure, tmp_path):
 @pytest.fixture
 def write_sample_atlas_xml(make_test_folder_structure, tmp_path):
     """
-        Write an example xml file with the same structure
-        as the metadata outputs for the grid squares
-        """
-
+    Write an example xml file with the same structure
+    as the metadata outputs for the grid squares
+    """
     atlas_session = ET.Element("AtlasSessionXml")
     atlas = ET.SubElement(atlas_session, "Atlas")
     tiles_efficient = ET.SubElement(atlas, "TilesEfficient")

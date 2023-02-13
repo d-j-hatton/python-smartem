@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import MagicMock
 
 from smartem.data_model import (
@@ -19,6 +18,7 @@ from smartem.data_model import construct
 
 
 def test_table_chain():
+    """Test appending tables to each other"""
     return_value = construct.table_chain(ParticleSetInfo, Atlas)
     assert return_value == [ParticleSetInfo, ParticleSet, Project, Atlas]
 
@@ -45,6 +45,7 @@ def test_table_chain():
 
 
 def test_linear_joins():
+    """Test joining tables together"""
     session = MagicMock()
 
     return_value = construct.linear_joins(
@@ -54,5 +55,7 @@ def test_linear_joins():
     )
 
     assert return_value
-    session.query.assert_called_once()
     assert len(session.mock_calls) == 8
+    session.query.assert_called_once()
+    session.query().join.assert_called_once()
+    session.query().join().join().join().join().join().filter.assert_called_once()

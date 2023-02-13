@@ -1,4 +1,3 @@
-import pytest
 from unittest import mock
 
 import os
@@ -6,9 +5,6 @@ import copy
 
 from smartem.parsing import export
 
-
-class SampleAtlas:
-    pass
 
 def test_get_dataframe():
     mock_api = mock.MagicMock()

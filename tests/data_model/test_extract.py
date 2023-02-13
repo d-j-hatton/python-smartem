@@ -1,4 +1,3 @@
-import pytest
 from unittest import mock, TestCase
 
 from smartem.data_model import Project
@@ -74,7 +73,7 @@ class TestDataAPI(TestCase):
         mock_get_atlases.return_value = MockAtlas()
 
         return_value = self.test_api.get_tile(
-            stage_position=[0, 0],
+            stage_position=(0, 0),
             project="test"
         )
 
@@ -84,7 +83,7 @@ class TestDataAPI(TestCase):
 
     def test_get_tile_id(self):
         return_value = self.test_api.get_tile_id(
-            stage_position=[0, 0],
+            stage_position=(0, 0),
             project="test"
         )
 
@@ -176,7 +175,7 @@ class TestDataAPI(TestCase):
         return_value = self.test_api.get_particle_sets(
             project="test",
             group_name="test_group",
-            set_ids=[1, 2],
+            set_ids=['1', '2'],
             source_name="test_source"
         )
 
@@ -187,7 +186,7 @@ class TestDataAPI(TestCase):
     def test_get_particle_linkers(self):
         return_value = self.test_api.get_particle_linkers(
             project="test",
-            set_ids=[1, 2],
+            set_ids=['1', '2'],
             source_name="test_source"
         )
 

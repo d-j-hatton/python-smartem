@@ -63,7 +63,7 @@ def test_insert_exposure_data(mock_api, tmp_path):
     star.insert_exposure_data(
         data={"_exposure_tag": ["test"], "_dummy_tag": [1]},
         exposure_tag="_exposure_tag",
-        star_file_path=tmp_path,
+        star_file_path=str(tmp_path),
         extractor=mock_api,
         validate=True,
         extra_suffix="",
@@ -97,7 +97,7 @@ def test_insert_particle_data(mock_api, tmp_path):
         exposure_tag="_exposure_tag",
         x_tag="_x_tag",
         y_tag="_y_tag",
-        star_file_path=tmp_path,
+        star_file_path=str(tmp_path),
         extractor=mock_api,
         project="dummy"
     )
@@ -138,7 +138,7 @@ def test_insert_particle_set(mock_api, tmp_path):
         exposure_tag="_exposure_tag",
         x_tag="_x_tag",
         y_tag="_y_tag",
-        star_file_path=tmp_path,
+        star_file_path=str(tmp_path),
         extractor=mock_api,
         project="dummy",
         add_source_to_id=False

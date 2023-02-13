@@ -1,4 +1,3 @@
-import pytest
 from unittest import mock
 
 from smartem.cli import missing
@@ -9,7 +8,9 @@ from smartem.cli import missing
 @mock.patch("smartem.cli.missing.open_star_file")
 @mock.patch("smartem.cli.missing.get_column_data")
 def test_run(mock_get_column, mock_star, mock_api, mock_argparse, tmp_path):
-    mock_get_column.return_value = {"_rlnmicrographmoviename": ["test/test_file"]}
+    mock_get_column.return_value = {
+        "_rlnmicrographmoviename": ["test/test_file"]
+    }
 
     mock_file_structure = mock.MagicMock()
     mock_file_structure.output = tmp_path / "tmp"
