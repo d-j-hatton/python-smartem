@@ -1,10 +1,10 @@
-import pytest
+import os
+import xml.etree.ElementTree as ET
+from pathlib import Path
 from unittest import mock
 
-import os
 import numpy as np
-from pathlib import Path
-import xml.etree.ElementTree as ET
+import pytest
 
 from smartem.parsing import epu
 
@@ -76,18 +76,14 @@ def write_sample_metadata_xml(make_test_folder_structure, tmp_path):
     """
     grid_square = ET.Element("GridSquareXml")
     target_locations = ET.SubElement(grid_square, "TargetLocations")
-    target_locations_eff = ET.SubElement(
-        target_locations, "TargetLocationsEfficient"
-    )
-    serialization_array = ET.SubElement(
-        target_locations_eff, "a:m_serializationArray"
-    )
+    target_locations_eff = ET.SubElement(target_locations, "TargetLocationsEfficient")
+    serialization_array = ET.SubElement(target_locations_eff, "a:m_serializationArray")
     for block in range(3):
         key_value_pair = ET.SubElement(
             serialization_array, "b:KeyValuePairOfintTargetLocationTest"
         )
         b_key = ET.SubElement(key_value_pair, "b:key")
-        b_key.text = str(block+1)
+        b_key.text = str(block + 1)
 
         b_value = ET.SubElement(key_value_pair, "b:value")
         grid_bar = ET.SubElement(b_value, "IsNearGridBar")
@@ -136,11 +132,9 @@ def write_sample_atlas_xml(make_test_folder_structure, tmp_path):
         key_value_pairs = ET.SubElement(tile_nodes, "KeyValuePairs")
 
         for subblock in range(2):
-            key_value_node = ET.SubElement(
-                key_value_pairs, "KeyValuePairOfintNodeXml"
-            )
+            key_value_node = ET.SubElement(key_value_pairs, "KeyValuePairOfintNodeXml")
             atlas_key = ET.SubElement(key_value_node, "key")
-            atlas_key.text = str(block+1) + str(subblock+1)
+            atlas_key.text = str(block + 1) + str(subblock + 1)
             atlas_value = ET.SubElement(key_value_node, "value")
             atlas_pos = ET.SubElement(atlas_value, "b:PositionOnTheAtlas")
 
@@ -164,11 +158,7 @@ def test_parse_epu_xml(write_sample_microscope_xml, tmp_path):
     return_value = epu.parse_epu_xml(tmp_path / microscope_grid_file)
 
     assert type(return_value) == dict
-    assert list(return_value.keys()) == [
-        "stage_position",
-        "pixel_size",
-        "readout_area"
-    ]
+    assert list(return_value.keys()) == ["stage_position", "pixel_size", "readout_area"]
     assert return_value["stage_position"] == (1.5 * 1e9, 2.5 * 1e9)
     assert return_value["pixel_size"] == 1.5 * 1e9
     assert return_value["readout_area"] == (1, 2)
@@ -183,10 +173,7 @@ def test_parse_epu_xml_version(write_sample_microscope_xml, tmp_path):
     assert return_value["version"] == "ApplicationSoftwareVersion"
 
 
-def test_metadata_foil_hole_positions(
-        write_sample_metadata_xml,
-        tmp_path
-):
+def test_metadata_foil_hole_positions(write_sample_metadata_xml, tmp_path):
     return_value = epu.metadata_foil_hole_positions(tmp_path / grid_square_file)
 
     assert type(return_value) == dict
@@ -196,13 +183,8 @@ def test_metadata_foil_hole_positions(
     assert return_value["3"] == (302, 100)
 
 
-def test_metadata_grid_square_positions(
-        write_sample_atlas_xml,
-        tmp_path
-):
-    return_value = epu.metadata_grid_square_positions(
-        tmp_path / grid_metadata_file
-    )
+def test_metadata_grid_square_positions(write_sample_atlas_xml, tmp_path):
+    return_value = epu.metadata_grid_square_positions(tmp_path / grid_metadata_file)
 
     assert type(return_value) == dict
     assert list(return_value.keys()) == ["11", "12", "21", "22"]
@@ -212,10 +194,7 @@ def test_metadata_grid_square_positions(
     assert return_value["22"] == (2, 1)
 
 
-def test_metadata_grid_square_stage(
-        write_sample_atlas_xml,
-        tmp_path
-):
+def test_metadata_grid_square_stage(write_sample_atlas_xml, tmp_path):
     return_value = epu.metadata_grid_square_stage(tmp_path / grid_metadata_file)
 
     assert type(return_value) == dict
@@ -226,16 +205,12 @@ def test_metadata_grid_square_stage(
     assert return_value["22"] == (2.9 * 1e9, 1.9 * 1e9)
 
 
-def test_mask_foil_hope_positions(
-        write_sample_metadata_xml,
-        tmp_path
-):
+def test_mask_foil_hope_positions(write_sample_metadata_xml, tmp_path):
     return_value = epu.mask_foil_hole_positions(
-        tmp_path / grid_square_file,
-        (320, 350),
-        None
+        tmp_path / grid_square_file, (320, 350), None
     )
 
+    # expect an array of False except around the foil hole positions
     expected_return = np.zeros((320, 350), dtype=bool)
 
     expected_return[100, 201] = True
@@ -255,10 +230,7 @@ def test_mask_foil_hope_positions(
     assert (return_value == expected_return).all()
 
 
-def test_metadata_foil_hole_stage(
-        write_sample_metadata_xml,
-        tmp_path
-):
+def test_metadata_foil_hole_stage(write_sample_metadata_xml, tmp_path):
     return_value = epu.metadata_foil_hole_stage(tmp_path / grid_square_file)
 
     assert type(return_value) == dict
@@ -268,13 +240,8 @@ def test_metadata_foil_hole_stage(
     assert return_value["3"] == (302.9 * 1e9, 100.9 * 1e9)
 
 
-def test_metadata_foil_hole_corrected_stage(
-        write_sample_metadata_xml,
-        tmp_path
-):
-    return_value = epu.metadata_foil_hole_corrected_stage(
-        tmp_path / grid_square_file
-    )
+def test_metadata_foil_hole_corrected_stage(write_sample_metadata_xml, tmp_path):
+    return_value = epu.metadata_foil_hole_corrected_stage(tmp_path / grid_square_file)
 
     assert type(return_value) == dict
     assert list(return_value.keys()) == ["1", "2", "3"]
@@ -283,26 +250,22 @@ def test_metadata_foil_hole_corrected_stage(
     assert return_value["3"] == (302.6 * 1e9, 100.6 * 1e9)
 
 
-def test_calibrate_coordinate_system(
-        write_sample_metadata_xml,
-        tmp_path
-):
-    return_value = epu.calibrate_coordinate_system(
-        tmp_path / grid_square_file
-    )
+def test_calibrate_coordinate_system(write_sample_metadata_xml, tmp_path):
+    return_value = epu.calibrate_coordinate_system(tmp_path / grid_square_file)
 
-    assert return_value
+    assert not return_value.inverted
+    assert return_value.x_flip
+    assert return_value.y_flip
 
 
 def test_create_atlas_and_tiles(write_sample_microscope_xml, tmp_path):
     mock_extractor = mock.MagicMock()
 
-    tile_jpg_file = open(tmp_path / tile_file.with_suffix(".jpg"), 'w')
+    tile_jpg_file = open(tmp_path / tile_file.with_suffix(".jpg"), "w")
     tile_jpg_file.close()
 
     epu.create_atlas_and_tiles(tmp_path / microscope_grid_file, mock_extractor)
 
-    mock_extractor.put.assert_called()
     assert mock_extractor.put.call_count == 2
     assert mock.call([]) not in mock_extractor.put.call_args_list
 
@@ -310,43 +273,24 @@ def test_create_atlas_and_tiles(write_sample_microscope_xml, tmp_path):
 def test_parse_epu_version(write_sample_microscope_xml, tmp_path):
     return_value = epu.parse_epu_version(tmp_path / "Images-Disc1")
 
-    assert return_value == (
-        "ApplicationSoftware",
-        "ApplicationSoftwareVersion"
-    )
+    assert return_value == ("ApplicationSoftware", "ApplicationSoftwareVersion")
 
 
 def test_parse_epu_dir(
-        write_sample_microscope_xml,
-        write_sample_metadata_xml,
-        tmp_path):
-    grid_jpg_file = open(
-        tmp_path / microscope_grid_file.with_suffix(".jpg"),
-        'w'
-    )
+    write_sample_microscope_xml, write_sample_metadata_xml, tmp_path
+):
+    grid_jpg_file = open(tmp_path / microscope_grid_file.with_suffix(".jpg"), "w")
     grid_jpg_file.close()
 
-    foil_hole_jpg_file = open(
-        tmp_path / foil_hole_file.with_suffix(".jpg"),
-        'w'
-    )
+    foil_hole_jpg_file = open(tmp_path / foil_hole_file.with_suffix(".jpg"), "w")
     foil_hole_jpg_file.close()
 
-    exposure_jpg_file = open(
-        tmp_path / exposure_file.with_suffix(".jpg"),
-        'w'
-    )
+    exposure_jpg_file = open(tmp_path / exposure_file.with_suffix(".jpg"), "w")
     exposure_jpg_file.close()
 
     mock_extractor = mock.MagicMock()
 
-    epu.parse_epu_dir(
-        tmp_path / "Images-Disc1",
-        tmp_path,
-        mock_extractor,
-        "test"
-    )
+    epu.parse_epu_dir(tmp_path / "Images-Disc1", tmp_path, mock_extractor, "test")
 
-    mock_extractor.put.assert_called()
     assert mock_extractor.put.call_count == 4
     assert mock.call([]) not in mock_extractor.put.call_args_list

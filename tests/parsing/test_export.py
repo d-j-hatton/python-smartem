@@ -1,7 +1,6 @@
-from unittest import mock
-
-import os
 import copy
+import os
+from unittest import mock
 
 from smartem.parsing import export
 
@@ -26,7 +25,7 @@ def test_get_dataframe():
     mock_data.atlas_id = 1
     mock_api.get_atlas_from_project.return_value = mock_data
 
-    # set up mocks with the key values that get_dataframe reads
+    # set up mocks each with a different key value that get_dataframe reads
     mock_data.value = 1
     mock_data_rlnaccummotiontotal = copy.copy(mock_data)
     mock_data_rlnaccummotiontotal.key = "_rlnaccummotiontotal"
@@ -40,7 +39,7 @@ def test_get_dataframe():
         mock_data_rlnaccummotiontotal,
         mock_data_rlnctfmaxresolution,
         mock_data_rlnmaxvalueprobdistribution,
-        mock_data_rlnestimatedresolution
+        mock_data_rlnestimatedresolution,
     ]
 
     return_value = export.get_dataframe(
@@ -50,9 +49,10 @@ def test_get_dataframe():
         out_gs_paths=None,
         out_fh_paths=None,
         data_labels=None,
-        use_adjusted_stage=False
+        use_adjusted_stage=False,
     )
 
+    # assert that the dataframe has been returned with the correct keys and values
     assert return_value["grid_square"][0] == "sample.jpg"
     assert return_value["grid_square_pixel_size"][0] == 1
     assert return_value["grid_square_x"][0] == 2
@@ -83,7 +83,10 @@ def test_export_foil_holes(mock_yaml, mock_calibrate, mock_mask, tmp_path):
         f.write("data")
     with open(tmp_path / "test_export_foil_holes0/sample.mrc", "w") as f:
         f.write("data")
-    os.mkdir(tmp_path / "../Metadata")
+    try:
+        os.mkdir(tmp_path / "../Metadata")
+    except FileExistsError:
+        pass
     with open(tmp_path / "../Metadata/grid_1.dm", "w") as f:
         f.write("<data></data>")
 
@@ -119,7 +122,7 @@ def test_export_foil_holes(mock_yaml, mock_calibrate, mock_mask, tmp_path):
         mock_data_rlnaccummotiontotal,
         mock_data_rlnctfmaxresolution,
         mock_data_rlnmaxvalueprobdistribution,
-        mock_data_rlnestimatedresolution
+        mock_data_rlnestimatedresolution,
     ]
 
     export.export_foil_holes(
@@ -128,12 +131,11 @@ def test_export_foil_holes(mock_yaml, mock_calibrate, mock_mask, tmp_path):
         projects=["dummy"],
         use_adjusted_stage=False,
         foil_hole_masks=True,
-        alternative_extension=""
+        alternative_extension="",
     )
 
     mock_api.get_grid_squares.assert_called_once()
     mock_api.get_foil_holes.assert_called_once()
-    mock_api.get_project.assert_called()
     assert mock_api.get_project.call_count == 2
     mock_api.get_atlas_from_project.assert_called_once()
     mock_api.get_atlas_info.assert_called_once()

@@ -16,19 +16,16 @@ def test_find_point_pixel():
 
 def test_stage_position():
     return_value = stage_model.stage_position(
-        pix_pos=(2, 3),
-        spacing=0.5,
-        physical_centre=(1.5, 2.5),
-        image_size=(3, 4)
+        pix_pos=(2, 3), spacing=0.5, physical_centre=(1.5, 2.5), image_size=(3, 4)
     )
 
     assert return_value == (1.0, 3.0)
 
 
 def test_calibrate():
+    """Calibration when not inverted or flipped"""
     return_value = stage_model.calibrate(
-        pix_positions=((0, 0), (-1, -1)),
-        physical_positions=((0, 0), (1, 1))
+        pix_positions=((0, 0), (-1, -1)), physical_positions=((0, 0), (1, 1))
     )
 
     assert type(return_value) == stage_model.StageCalibration
@@ -38,9 +35,9 @@ def test_calibrate():
 
 
 def test_calibrate_inv():
+    """Calibration when inverted"""
     return_value = stage_model.calibrate(
-        pix_positions=((0, 0), (-2, -1)),
-        physical_positions=((0, 0), (0.5, 1))
+        pix_positions=((0, 0), (-2, -1)), physical_positions=((0, 0), (0.5, 1))
     )
 
     assert type(return_value) == stage_model.StageCalibration
@@ -50,9 +47,9 @@ def test_calibrate_inv():
 
 
 def test_calibrate_flip():
+    """Calibration when flipped"""
     return_value = stage_model.calibrate(
-        pix_positions=((0, 0), (1, 1)),
-        physical_positions=((0, 0), (1, 1))
+        pix_positions=((0, 0), (1, 1)), physical_positions=((0, 0), (1, 1))
     )
 
     assert type(return_value) == stage_model.StageCalibration
@@ -62,9 +59,9 @@ def test_calibrate_flip():
 
 
 def test_calibrate_inv_flip():
+    """Calibration when inverted and flipped"""
     return_value = stage_model.calibrate(
-        pix_positions=((0, 0), (2, 1)),
-        physical_positions=((0, 0), (0.5, 1))
+        pix_positions=((0, 0), (2, 1)), physical_positions=((0, 0), (0.5, 1))
     )
 
     assert type(return_value) == stage_model.StageCalibration

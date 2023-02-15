@@ -13,12 +13,12 @@ def test_run(mock_subprocess, mock_yaml, mock_getenv, mock_argparse):
 
     start.run()
 
+    # assert the arguments are read in
     mock_argparse.assert_called_once()
-    mock_argparse().add_argument.assert_called()
     assert mock_argparse().add_argument.call_count == 2
     mock_argparse().parse_args.assert_called_once()
 
+    # assert the environment is loaded and run
     mock_getenv.assert_called_once()
     mock_yaml.safe_load.assert_called_once()
-    mock_subprocess.run.assert_called()
     assert mock_subprocess.run.call_count == 2

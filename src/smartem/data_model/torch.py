@@ -285,7 +285,6 @@ class SmartEMPostgresDataLoader(SmartEMDataLoader):
         super()._determine_extension()
 
         _project = self._data_api.get_project(project_name=projects[0])
-        print(Path(_project.acquisition_directory).parent / "Metadata")
         for dm in (Path(_project.acquisition_directory).parent / "Metadata").glob(
             "*.dm"
         ):
