@@ -285,6 +285,7 @@ class SmartEMPostgresDataLoader(SmartEMDataLoader):
         super()._determine_extension()
 
         _project = self._data_api.get_project(project_name=projects[0])
+        print(Path(_project.acquisition_directory).parent / "Metadata")
         for dm in (Path(_project.acquisition_directory).parent / "Metadata").glob(
             "*.dm"
         ):
@@ -339,27 +340,15 @@ class SmartEMMaskDataLoader(DataLoader):
         self._df = (
             pd.read_csv(self._data_dir / labels_csv).groupby("grid_square").mean()
         )
-        if (
-            (self._data_dir / self._df.iloc[0]["grid_square"])
-            .with_suffix(".mrc")
-            .exists()
-        ):
+        if (self._data_dir / self._df.iloc[0].name).with_suffix(".mrc").exists():
             self._full_res_extension = ".mrc"
-        elif (
-            (self._data_dir / self._df.iloc[0]["grid_square"])
-            .with_suffix(".tiff")
-            .exists()
-        ):
+        elif (self._data_dir / self._df.iloc[0].name).with_suffix(".tiff").exists():
             self._full_res_extension = ".tiff"
-        elif (
-            (self._data_dir / self._df.iloc[0]["grid_square"])
-            .with_suffix(".tif")
-            .exists()
-        ):
+        elif (self._data_dir / self._df.iloc[0].name).with_suffix(".tif").exists():
             self._full_res_extension = ".tif"
         else:
             raise FileNotFoundError(
-                f"{self._data_dir / self._df.iloc[0]['grid_square']} was not found with any of the following suffixes: .mrc, .tiff, .tif"
+                f"{self._data_dir / self._df.iloc[0].name} was not found with any of the following suffixes: .mrc, .tiff, .tif"
             )
 
     def __len__(self) -> int:
