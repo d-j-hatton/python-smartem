@@ -42,31 +42,6 @@ def parse_epu_xml_version(xml_path: Path) -> Dict[str, Any]:
     }
 
 
-def metadata_foil_hole_positions(xml_path: Path) -> Dict[str, Tuple[int, int]]:
-    with open(xml_path, "r") as xml:
-        for_parsing = xml.read()
-        data = xmltodict.parse(for_parsing)
-    data = data["GridSquareXml"]
-    serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
-        "a:m_serializationArray"
-    ]
-    required_key = ""
-    for key in serialization_array.keys():
-        if key.startswith("b:KeyValuePairOfintTargetLocation"):
-            required_key = key
-            break
-    if not required_key:
-        return {}
-    fh_pix_positions = {}
-    for fh_block in serialization_array[required_key]:
-        pix_center = fh_block["b:value"]["PixelCenter"]
-        fh_pix_positions[fh_block["b:key"]] = (
-            int(float(pix_center["c:x"])),
-            int(float(pix_center["c:y"])),
-        )
-    return fh_pix_positions
-
-
 def metadata_grid_square_positions(xml_path: Path) -> Dict[str, Tuple[int, int]]:
     with open(xml_path, "r") as xml:
         for_parsing = xml.read()
@@ -167,6 +142,32 @@ def mask_foil_hole_positions(
     return mask.transpose()
 
 
+def metadata_foil_hole_positions(xml_path: Path) -> Dict[str, Tuple[int, int]]:
+    with open(xml_path, "r") as xml:
+        for_parsing = xml.read()
+        data = xmltodict.parse(for_parsing)
+    data = data["GridSquareXml"]
+    serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
+        "a:m_serializationArray"
+    ]
+    required_key = ""
+    for key in serialization_array.keys():
+        if key.startswith("b:KeyValuePairOfintTargetLocation"):
+            required_key = key
+            break
+    if not required_key:
+        return {}
+    fh_stage_positions = {}
+    for fh_block in serialization_array[required_key]:
+        if fh_block["b:value"]["IsNearGridBar"] == "false":
+            stage = fh_block["b:value"]["PixelCenter"]
+            fh_stage_positions[fh_block["b:key"]] = (
+                int(float(stage["c:x"])),
+                int(float(stage["c:y"])),
+            )
+    return fh_stage_positions
+
+
 def metadata_foil_hole_stage(xml_path: Path) -> Dict[str, Tuple[float, float]]:
     with open(xml_path, "r") as xml:
         for_parsing = xml.read()
@@ -184,11 +185,12 @@ def metadata_foil_hole_stage(xml_path: Path) -> Dict[str, Tuple[float, float]]:
         return {}
     fh_stage_positions = {}
     for fh_block in serialization_array[required_key]:
-        stage = fh_block["b:value"]["StagePosition"]
-        fh_stage_positions[fh_block["b:key"]] = (
-            float(stage["c:X"]) * 1e9,
-            float(stage["c:Y"]) * 1e9,
-        )
+        if fh_block["b:value"]["IsNearGridBar"] == "false":
+            stage = fh_block["b:value"]["StagePosition"]
+            fh_stage_positions[fh_block["b:key"]] = (
+                float(stage["c:X"]) * 1e9,
+                float(stage["c:Y"]) * 1e9,
+            )
     return fh_stage_positions
 
 
