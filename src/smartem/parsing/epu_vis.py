@@ -20,7 +20,10 @@ class Atlas:
         atlas_epu_dir = Path(atlas_epu_dir)
         self._epu_data_dir = epu_data_dir
         self._atlas_location = atlas_epu_dir / f"Sample{sample}" / "Atlas"
-        epu_data = parse_epu_xml(self._atlas_location / "Atlas_1.xml")
+        if (self._atlas_location / "Atlas_1.xml").is_file():
+            epu_data = parse_epu_xml(self._atlas_location / "Atlas_1.xml")
+        else:
+            epu_data = parse_epu_xml(list(self._atlas_location.glob("Atlas_*.xml"))[0])
         self._pixel_size = epu_data["pixel_size"]
         self._readout_area = epu_data["readout_area"]
         self._grid_square_positions = metadata_grid_square_positions(
