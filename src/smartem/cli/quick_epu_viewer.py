@@ -25,6 +25,13 @@ def run():
         dest="sample",
         default=None,
     )
+    parser.add_argument(
+        "--grid-square",
+        type=int,
+        help="Grid square EPU ID",
+        dest="grid_square",
+        default=0,
+    )
     args = parser.parse_args()
 
     if args.atlas_dir and args.sample is None:
@@ -34,5 +41,5 @@ def run():
         a = Atlas(Path(args.atlas_dir), args.sample, epu_data_dir=Path(args.epu_dir))
         a.display()
     else:
-        gs = GridSquare(Path(args.epu_dir), 0)
+        gs = GridSquare(Path(args.epu_dir), args.grid_square)
         gs.display()
