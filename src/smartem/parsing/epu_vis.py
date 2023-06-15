@@ -29,7 +29,11 @@ class Atlas:
 
     @property
     def image(self) -> np.array:
-        with mrcfile.open(self._atlas_location / "Atlas_1.mrc") as mrc:
+        if (self._atlas_location / "Atlas_1.mrc").is_file():
+            atlasf = self._atlas_location / "Atlas_1.mrc"
+        else:
+            atlasf = list(self._atlas_location.glob("Atlas_*.mrc"))[0]
+        with mrcfile.open(atlasf) as mrc:
             data = mrc.data
         return data
 
