@@ -186,9 +186,7 @@ class Atlas:
         fig.canvas.mpl_connect("motion_notify_event", hover)
         fig.canvas.mpl_connect("button_press_event", click)
         fig.canvas.mpl_connect("pick_event", on_pick)
-        fig.show()
         plt.show()
-        plt.close(fig)
 
 
 class GridSquare:
@@ -341,4 +339,3 @@ class GridSquare:
         fig.canvas.mpl_connect("motion_notify_event", hover)
         fig.canvas.mpl_connect("pick_event", on_pick)
         plt.show()
-        plt.close(fig)
