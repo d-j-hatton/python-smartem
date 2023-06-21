@@ -104,9 +104,15 @@ class Atlas:
                 for sc, c in scatters.items():
                     cont, ind = sc.contains(event)
                     if cont and self._epu_data_dir:
-                        gs = GridSquare(
-                            self._epu_data_dir, int(labels[sc][ind["ind"][0]])
-                        )
+                        try:
+                            gs = GridSquare(
+                                self._epu_data_dir, int(labels[sc][ind["ind"][0]])
+                            )
+                        except IndexError:
+                            print(
+                                f"No grid square mag image found for {labels[sc][ind['ind'][0]]}"
+                            )
+                            return
                         gs.display()
 
         def on_pick(event):
