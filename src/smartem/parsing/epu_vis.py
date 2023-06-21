@@ -282,15 +282,15 @@ class GridSquare:
         if show_stage_positions:
             stage_sc = ax.scatter(
                 [
-                    int((-p[0]) / self._pixel_size)
-                    + int(self._stage_position[0] / self._pixel_size)
-                    + self._readout_area[1] // 2
+                    int((-p[1]) / self._pixel_size)
+                    + int(self._stage_position[1] / self._pixel_size)
+                    + self._readout_area[0] // 2
                     for p in self._foil_hole_stage_locations.values()
                 ],
                 [
-                    int((p[1]) / self._pixel_size)
-                    - (self._stage_position[1] / self._pixel_size)
-                    + self._readout_area[0] // 2
+                    int((-p[0]) / self._pixel_size)
+                    + (self._stage_position[0] / self._pixel_size)
+                    + self._readout_area[1] // 2
                     for p in self._foil_hole_stage_locations.values()
                 ],
                 marker="x",
@@ -313,15 +313,15 @@ class GridSquare:
                     found_foil_holes.append(fh)
             fh_sc = ax.scatter(
                 [
-                    int((-p["stage_position"][0]) / self._pixel_size)
-                    + (self._stage_position[0] / self._pixel_size)
-                    + self._readout_area[1] // 2
+                    int((-p["stage_position"][1]) / self._pixel_size)
+                    + (self._stage_position[1] / self._pixel_size)
+                    + self._readout_area[0] // 2
                     for p in foil_holes
                 ],
                 [
-                    int((p["stage_position"][1]) / self._pixel_size)
-                    - (self._stage_position[1] / self._pixel_size)
-                    + self._readout_area[0] // 2
+                    int((-p["stage_position"][0]) / self._pixel_size)
+                    + (self._stage_position[0] / self._pixel_size)
+                    + self._readout_area[1] // 2
                     for p in foil_holes
                 ],
                 marker="x",
