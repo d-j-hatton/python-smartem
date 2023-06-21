@@ -135,13 +135,13 @@ class Atlas:
             gs = keys[0]
             stage_sc = ax.scatter(
                 [
-                    int((-p[0]) / self._pixel_size)
+                    int((-p[1]) / self._pixel_size)
                     - corrected_center[0][0]
                     + self._readout_area[1] // 2
                     for p in stage_data.values()
                 ],
                 [
-                    int(p[1] / self._pixel_size)
+                    int(-p[0] / self._pixel_size)
                     + corrected_center[1][0]
                     + self._readout_area[0] // 2
                     for p in stage_data.values()
@@ -160,13 +160,13 @@ class Atlas:
                     grid_squares.append(GridSquare(self._epu_data_dir, int(gs)))
             gs_sc = ax.scatter(
                 [
-                    int((-p._stage_position[0]) / self._pixel_size)
+                    int((-p._stage_position[1]) / self._pixel_size)
                     - corrected_center[0][0]
                     + self._readout_area[1] // 2
                     for p in grid_squares
                 ],
                 [
-                    int((p._stage_position[1]) / self._pixel_size)
+                    int((-p._stage_position[0]) / self._pixel_size)
                     + corrected_center[1][0]
                     + self._readout_area[0] // 2
                     for p in grid_squares
