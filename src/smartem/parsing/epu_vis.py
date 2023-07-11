@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Tuple
 
 import matplotlib.pyplot as plt
 import mrcfile
@@ -15,7 +16,12 @@ from smartem.parsing.epu import (
 
 class Atlas:
     def __init__(
-        self, atlas_epu_dir: Path, sample: int, epu_data_dir: Path | None = None
+        self,
+        atlas_epu_dir: Path,
+        sample: int,
+        epu_data_dir: Path | None = None,
+        flip: Tuple[bool, bool] = (False, False),
+        switch: bool = False,
     ):
         atlas_epu_dir = Path(atlas_epu_dir)
         self._epu_data_dir = epu_data_dir
@@ -29,6 +35,10 @@ class Atlas:
         self._grid_square_positions = metadata_grid_square_positions(
             self._atlas_location / "Atlas.dm"
         )
+        self._flip = flip
+        self._switch = switch
+        self._flip_powers = (1 if flip[0] else 2, 1 if flip[1] else 2)
+        self._switch_indices = (0 if switch else 1, 1 if switch else 0)
 
     @property
     def image(self) -> np.array:
@@ -106,7 +116,10 @@ class Atlas:
                     if cont and self._epu_data_dir:
                         try:
                             gs = GridSquare(
-                                self._epu_data_dir, int(labels[sc][ind["ind"][0]])
+                                self._epu_data_dir,
+                                int(labels[sc][ind["ind"][0]]),
+                                flip=self._flip,
+                                switch=self._switch,
                             )
                         except IndexError:
                             print(
@@ -141,13 +154,20 @@ class Atlas:
             gs = keys[0]
             stage_sc = ax.scatter(
                 [
-                    int((-p[1]) / self._pixel_size)
+                    int(
+                        (((-1) ** self._flip_powers[0]) * p[self._switch_indices[0]])
+                        / self._pixel_size
+                    )
                     - corrected_center[0][0]
                     + self._readout_area[1] // 2
                     for p in stage_data.values()
                 ],
                 [
-                    int(-p[0] / self._pixel_size)
+                    int(
+                        ((-1) ** self._flip_powers[1])
+                        * p[self._switch_indices[1]]
+                        / self._pixel_size
+                    )
                     + corrected_center[1][0]
                     + self._readout_area[0] // 2
                     for p in stage_data.values()
@@ -163,16 +183,35 @@ class Atlas:
             grid_squares = []
             for gs in self._grid_square_positions.keys():
                 if GridSquare.found(self._epu_data_dir, int(gs)):
-                    grid_squares.append(GridSquare(self._epu_data_dir, int(gs)))
+                    grid_squares.append(
+                        GridSquare(
+                            self._epu_data_dir,
+                            int(gs),
+                            flip=self._flip,
+                            switch=self._switch,
+                        )
+                    )
             gs_sc = ax.scatter(
                 [
-                    int((-p._stage_position[1]) / self._pixel_size)
+                    int(
+                        (
+                            ((-1) ** self._flip_powers[0])
+                            * p._stage_position[self._switch_indices[0]]
+                        )
+                        / self._pixel_size
+                    )
                     - corrected_center[0][0]
                     + self._readout_area[1] // 2
                     for p in grid_squares
                 ],
                 [
-                    int((-p._stage_position[0]) / self._pixel_size)
+                    int(
+                        (
+                            ((-1) ** self._flip_powers[1])
+                            * p._stage_position[self._switch_indices[1]]
+                        )
+                        / self._pixel_size
+                    )
                     + corrected_center[1][0]
                     + self._readout_area[0] // 2
                     for p in grid_squares
@@ -196,7 +235,14 @@ class Atlas:
 
 
 class GridSquare:
-    def __init__(self, epu_dir: Path, grid_square: int, images_disc: int = 1):
+    def __init__(
+        self,
+        epu_dir: Path,
+        grid_square: int,
+        images_disc: int = 1,
+        flip: Tuple[bool, bool] = (False, False),
+        switch: bool = False,
+    ):
         epu_dir = Path(epu_dir)
         self._id = grid_square
         self._epu_location = (
@@ -213,6 +259,8 @@ class GridSquare:
         self._foil_hole_stage_locations = metadata_foil_hole_stage(
             epu_dir / "Metadata" / f"GridSquare_{grid_square}.dm"
         )
+        self._flip_powers = (1 if flip[0] else 2, 1 if flip[1] else 2)
+        self._switch_indices = (0 if switch else 1, 1 if switch else 0)
 
     @classmethod
     def found(cls, epu_dir: Path, grid_square: int, images_disc: int = 1) -> bool:
@@ -288,13 +336,19 @@ class GridSquare:
         if show_stage_positions:
             stage_sc = ax.scatter(
                 [
-                    int((-p[1]) / self._pixel_size)
+                    int(
+                        (((-1) ** self._flip_powers[0]) * p[self._switch_indices[0]])
+                        / self._pixel_size
+                    )
                     + int(self._stage_position[1] / self._pixel_size)
                     + self._readout_area[0] // 2
                     for p in self._foil_hole_stage_locations.values()
                 ],
                 [
-                    int((-p[0]) / self._pixel_size)
+                    int(
+                        (((-1) ** self._flip_powers[1]) * p[self._switch_indices[1]])
+                        / self._pixel_size
+                    )
                     + (self._stage_position[0] / self._pixel_size)
                     + self._readout_area[1] // 2
                     for p in self._foil_hole_stage_locations.values()
@@ -319,13 +373,25 @@ class GridSquare:
                     found_foil_holes.append(fh)
             fh_sc = ax.scatter(
                 [
-                    int((-p["stage_position"][1]) / self._pixel_size)
+                    int(
+                        (
+                            ((-1) ** self._flip_powers[0])
+                            * p["stage_position"][self._switch_indices[0]]
+                        )
+                        / self._pixel_size
+                    )
                     + (self._stage_position[1] / self._pixel_size)
                     + self._readout_area[0] // 2
                     for p in foil_holes
                 ],
                 [
-                    int((-p["stage_position"][0]) / self._pixel_size)
+                    int(
+                        (
+                            ((-1) ** self._flip_powers[1])
+                            * p["stage_position"][self._switch_indices[1]]
+                        )
+                        / self._pixel_size
+                    )
                     + (self._stage_position[0] / self._pixel_size)
                     + self._readout_area[1] // 2
                     for p in foil_holes

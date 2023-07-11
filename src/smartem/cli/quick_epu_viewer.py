@@ -32,6 +32,24 @@ def run():
         dest="grid_square",
         default=0,
     )
+    parser.add_argument(
+        "--switch-xy",
+        help="Switch the x and y axes in display",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "--flip-x",
+        help="Flip x axis in display",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "--flip-y",
+        help="Flip y axis in display",
+        action="store_true",
+        default=False,
+    )
     args = parser.parse_args()
 
     if args.atlas_dir and args.sample is None:
