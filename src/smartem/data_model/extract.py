@@ -17,6 +17,7 @@ from smartem.data_model import (
     ParticleSet,
     ParticleSetInfo,
     ParticleSetLinker,
+    PhysicalSubset,
     Project,
     Tile,
     url,
@@ -104,6 +105,32 @@ class DataAPI:
             updated_values
         )
         self.session.commit()
+
+    def get_physcial_subset(
+        self, project: str, subset_shape: Tuple[float, float]
+    ) -> PhysicalSubset:
+        end: Type[Base] = Tile
+        tables = table_chain(GridSquare, end)
+        tables.append(Project)
+        query = linear_joins(self.session, tables, skip=[Project])
+        query = query.join(Project, Project.atlas_id == Tile.atlas_id).filter(
+            Project.project_name == project
+        )
+        grid_square = query.first()
+        assert isinstance(grid_square, GridSquare)
+        end = FoilHole
+        primary_filter = grid_square.grid_square_name
+        tables = table_chain(FoilHole, end)
+        query = linear_joins(self.session, tables, primary_filter=primary_filter)
+        foil_hole = query.first()
+        assert isinstance(foil_hole, FoilHole)
+        return PhysicalSubset(
+            pixel_sizes={
+                "grid_square": grid_square.pixel_size,
+                "foil_hole": foil_hole.pixel_size,
+            },
+            sub_sample_size=subset_shape,
+        )
 
     def get_tile(
         self,

@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, List, Optional, Type, Union, cast
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Type, Union, cast
 
 import yaml
 from sqlalchemy import Column
@@ -10,6 +10,12 @@ from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.type_api import TypeEngine
+
+
+class PhysicalSubset(NamedTuple):
+    pixel_sizes: Dict[str, float]
+    sub_sample_size: Tuple[float, float]
+
 
 # this is a mypy workaround suggeted in https://github.com/dropbox/sqlalchemy-stubs/issues/178
 Float = cast(Type[TypeEngine[float]], Float_org)

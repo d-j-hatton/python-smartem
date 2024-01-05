@@ -1,6 +1,6 @@
 import functools
 from pathlib import Path
-from typing import Dict, List, NamedTuple, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import mrcfile
 import numpy as np
@@ -13,15 +13,11 @@ from torch.utils.data import Dataset
 from torchvision.io import read_image
 from torchvision.transforms import Compose
 
+from smartem.data_model import PhysicalSubset
 from smartem.data_model.extract import DataAPI
 from smartem.parsing.epu import calibrate_coordinate_system
 from smartem.parsing.export import get_dataframe
 from smartem.stage_model import StageCalibration, find_point_pixel
-
-
-class PhysicalSubset(NamedTuple):
-    pixel_sizes: Dict[str, float]
-    sub_sample_size: Tuple[float, float]
 
 
 @functools.lru_cache(maxsize=50)
