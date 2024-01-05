@@ -34,6 +34,7 @@ def get_dataframe(
         "foil_hole_y": [],
         "accummotiontotal": [],
         "ctfmaxresolution": [],
+        "particlecount": [],
         "estimatedresolution": [],
         "maxvalueprobdistribution": [],
     }
@@ -44,6 +45,7 @@ def get_dataframe(
         _data_labels = data_labels or [
             "_rlnaccummotiontotal",
             "_rlnctfmaxresolution",
+            "_rlnmicrographparticlecount",
             "_rlnestimatedresolution",
             "_rlnmaxvalueprobdistribution",
         ]
@@ -53,14 +55,22 @@ def get_dataframe(
         atlas_id = atlas.atlas_id
         atlas_info = data_api.get_atlas_info(
             atlas_id,
-            ["_rlnaccummotiontotal", "_rlnctfmaxresolution"],
+            [
+                "_rlnaccummotiontotal",
+                "_rlnctfmaxresolution",
+                "_rlnmicrographparticlecount",
+            ],
             ["_rlnmaxvalueprobdistribution"],
             ["_rlnestimatedresolution"],
         )
 
         fh_extracted = extract_keys_with_foil_hole_averages(
             atlas_info,
-            ["_rlnaccummotiontotal", "_rlnctfmaxresolution"],
+            [
+                "_rlnaccummotiontotal",
+                "_rlnctfmaxresolution",
+                "_rlnmicrographparticlecount",
+            ],
             ["_rlnmaxvalueprobdistribution"],
             ["_rlnestimatedresolution"],
         )
@@ -128,6 +138,9 @@ def get_dataframe(
                     data["ctfmaxresolution"].append(
                         fh_extracted["_rlnctfmaxresolution"].averages[fh.foil_hole_name]  # type: ignore
                     )
+                    data["particlecount"].append(
+                        fh_extracted["_rlnmicrographparticlecount"].averages[fh.foil_hole_name]  # type: ignore
+                    )
                     data["estimatedresolution"].append(
                         fh_extracted["_rlnestimatedresolution"].averages[  # type: ignore
                             fh.foil_hole_name
@@ -164,6 +177,7 @@ def export_foil_holes(
         "foil_hole_y": [],
         "accummotiontotal": [],
         "ctfmaxresolution": [],
+        "particlecount": [],
         "estimatedresolution": [],
         "maxvalueprobdistribution": [],
     }
@@ -175,6 +189,7 @@ def export_foil_holes(
         data_labels = [
             "_rlnaccummotiontotal",
             "_rlnctfmaxresolution",
+            "_rlnmicrographparticlecount",
             "_rlnestimatedresolution",
             "_rlnmaxvalueprobdistribution",
         ]
@@ -184,14 +199,22 @@ def export_foil_holes(
         atlas_id = atlas.atlas_id
         atlas_info = data_api.get_atlas_info(
             atlas_id,
-            ["_rlnaccummotiontotal", "_rlnctfmaxresolution"],
+            [
+                "_rlnaccummotiontotal",
+                "_rlnctfmaxresolution",
+                "_rlnmicrographparticlecount",
+            ],
             ["_rlnmaxvalueprobdistribution"],
             ["_rlnestimatedresolution"],
         )
 
         fh_extracted = extract_keys_with_foil_hole_averages(
             atlas_info,
-            ["_rlnaccummotiontotal", "_rlnctfmaxresolution"],
+            [
+                "_rlnaccummotiontotal",
+                "_rlnctfmaxresolution",
+                "_rlnmicrographparticlecount",
+            ],
             ["_rlnmaxvalueprobdistribution"],
             ["_rlnestimatedresolution"],
         )
@@ -300,6 +323,9 @@ def export_foil_holes(
                     )
                     data["ctfmaxresolution"].append(
                         fh_extracted["_rlnctfmaxresolution"].averages[fh.foil_hole_name]  # type: ignore
+                    )
+                    data["particlecount"].append(
+                        fh_extracted["_rlnmicrographparticlecount"].averages[fh.foil_hole_name]  # type: ignore
                     )
                     data["estimatedresolution"].append(
                         fh_extracted["_rlnestimatedresolution"].averages[  # type: ignore
