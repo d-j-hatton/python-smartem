@@ -89,6 +89,7 @@ class SmartEMDataLoader(Dataset):
         self._full_res_extension = ""
         self._data_dir = Path("/")
         self._df = pd.DataFrame()
+        self._saved_thresholds: pd.DataFrame | None = None
 
     def _determine_extension(self):
         if Path(self._df.iloc[0]["grid_square"]).with_suffix(".mrc").exists():
@@ -133,7 +134,7 @@ class SmartEMDataLoader(Dataset):
             return self._df[self._level].nunique() * self._num_samples
         return self._df[self._level].nunique()
 
-    def __getitem__(self, idx: int) -> Tuple[Tensor, List[float]]:
+    def __getitem__(self, idx: int) -> Tuple[Tensor, int]:
         sub_sample_boundaries = (-1, -1)
         if self._level == "grid_square" and self._num_samples:
             sub_sample_boundaries = (
@@ -271,20 +272,58 @@ class SmartEMDataLoader(Dataset):
                 image = read_image(
                     str(self._data_dir / self._df.iloc[idx][self._level])
                 )
-        return self._transform(image), labels
+        return self._transform(image), self.compute_label(image, annotations=labels)
+
+    def compute_label(
+        self,
+        image: Tensor,
+        annotations: List[float],
+        sigmas: Dict[str, float] | None = None,
+    ) -> int:
+        imdata = image.detach().numpy()[0]
+        pixel_condition = len(imdata[imdata > 60]) / (image.shape[1] * image.shape[2])
+        sigmas = sigmas or {
+            "accummotiontotal": 1,
+            "ctfmaxresolution": 0.4,
+            "particlecount": 0.5,
+            "estimatedresolution": 1,
+            "maxvalueprobdistribution": -0.75,
+        }
+        ths = self.thresholds(sigmas=sigmas)
+        labels = [(k, v) for k, v in _standard_labels.items()]
+        conds = [
+            annotations[i] < ths[labels[i][0]].iloc[0]
+            if labels[i][1]
+            else annotations[i] > ths[labels[i][0]].iloc[0]
+            for i in range(len(annotations))
+        ]
+        if pixel_condition < 0.5:
+            return 3
+        if sum(conds) == len(labels):
+            return 0
+        if sum(conds) < len(labels) // 2:
+            return 1
+        return 3
 
     def thresholds(
         self,
         quantile: float = 0.7,
         sigmas: Dict[str, float] | None = None,
+        refresh: bool = False,
     ):
+        if self._saved_thresholds and not refresh:
+            return self._saved_thresholds
         required_columns = [*_standard_labels, self._level]
         newdf = self._df[required_columns]
         if sigmas:
-            return pd.DataFrame(
+            res = pd.DataFrame(
                 {k: [newdf[k].mean() + q * newdf[k].std()] for k, q in sigmas.items()}
             )
-        return newdf.quantile(q=quantile)
+            self._saved_thresholds = res
+            return res
+        res = newdf.quantile(q=quantile)
+        self._saved_thresholds = res
+        return res
 
 
 class SmartEMMultiDataLoader(Dataset):
