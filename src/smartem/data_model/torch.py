@@ -11,6 +11,7 @@ from PIL import Image
 from torch import Tensor, from_numpy, reshape
 from torch.utils.data import Dataset
 from torchvision.io import read_image
+from torchvision.transforms import Compose
 
 from smartem.data_model.extract import DataAPI
 from smartem.parsing.epu import calibrate_coordinate_system
@@ -56,6 +57,7 @@ class SmartEMDataLoader(Dataset):
         sub_sample_size: Optional[Tuple[int, int]] = None,
         physical_sub_sample_size: Optional[PhysicalSubset] = None,
         allowed_labels: Optional[Dict[str, bool]] = None,
+        transform: Compose | None = None,
         seed: int = 0,
     ):
         np.random.seed(seed)
@@ -77,6 +79,7 @@ class SmartEMDataLoader(Dataset):
         else:
             self._sub_sample_size = sub_sample_size or (256, 256)
         self._allowed_labels = allowed_labels or list(_standard_labels.keys())
+        self._transform = transform or Compose([])
         self._lower_better_label = (
             [allowed_labels[k] for k in self._allowed_labels]
             if allowed_labels
@@ -272,7 +275,7 @@ class SmartEMDataLoader(Dataset):
                 image = read_image(
                     str(self._data_dir / self._df.iloc[idx][self._level])
                 )
-        return image, labels
+        return self._transform(image), labels
 
     def thresholds(self, quantile: float = 0.7):
         required_columns = (
