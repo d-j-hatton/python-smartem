@@ -1,6 +1,6 @@
 import functools
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, NamedTuple, Optional, Tuple
 
 import mrcfile
 import numpy as np
@@ -16,6 +16,11 @@ from smartem.data_model.extract import DataAPI
 from smartem.parsing.epu import calibrate_coordinate_system
 from smartem.parsing.export import get_dataframe
 from smartem.stage_model import StageCalibration, find_point_pixel
+
+
+class PhysicalSubset(NamedTuple):
+    pixel_sizes: Dict[str, float]
+    sub_sample_size: Tuple[float, float]
 
 
 @functools.lru_cache(maxsize=50)
@@ -49,6 +54,7 @@ class SmartEMDataLoader(Dataset):
         full_res: bool = False,
         num_samples: int = 0,
         sub_sample_size: Optional[Tuple[int, int]] = None,
+        physical_sub_sample_size: Optional[PhysicalSubset] = None,
         allowed_labels: Optional[Dict[str, bool]] = None,
         seed: int = 0,
     ):
@@ -57,7 +63,19 @@ class SmartEMDataLoader(Dataset):
         self._level = level
         self._use_full_res = full_res
         self._num_samples = num_samples
-        self._sub_sample_size = sub_sample_size or (256, 256)
+        if physical_sub_sample_size:
+            self._sub_sample_size = (
+                int(
+                    physical_sub_sample_size.sub_sample_size[0]
+                    / physical_sub_sample_size.pixel_sizes[self._level]
+                ),
+                int(
+                    physical_sub_sample_size.sub_sample_size[1]
+                    / physical_sub_sample_size.pixel_sizes[self._level]
+                ),
+            )
+        else:
+            self._sub_sample_size = sub_sample_size or (256, 256)
         self._allowed_labels = allowed_labels or list(_standard_labels.keys())
         self._lower_better_label = (
             [allowed_labels[k] for k in self._allowed_labels]
