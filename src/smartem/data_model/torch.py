@@ -273,20 +273,17 @@ class SmartEMDataLoader(Dataset):
                 )
         return self._transform(image), labels
 
-    def thresholds(self, quantile: float = 0.7):
-        required_columns = (
-            [*_standard_labels, self._level]
-            if self._level == "grid_square"
-            else list(_standard_labels)
-        )
-        if self._level == "grid_square":
-            newdf = (
-                self._df[required_columns]
-                .groupby(self._level)
-                .mean()[list(_standard_labels)]
+    def thresholds(
+        self,
+        quantile: float = 0.7,
+        sigmas: Dict[str, float] | None = None,
+    ):
+        required_columns = [*_standard_labels, self._level]
+        newdf = self._df[required_columns]
+        if sigmas:
+            return pd.DataFrame(
+                {k: [newdf[k].mean() + q * newdf[k].std()] for k, q in sigmas.items()}
             )
-        else:
-            newdf = self._df[required_columns]
         return newdf.quantile(q=quantile)
 
 
