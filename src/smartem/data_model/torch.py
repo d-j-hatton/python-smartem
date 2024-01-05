@@ -29,7 +29,9 @@ def mrc_to_tensor(mrc_file: Path) -> Tensor:
         tensor_2d = Tensor(data.astype(np.int16))
     else:
         tensor_2d = Tensor(data.astype(np.float16))
-    return reshape(tensor_2d, (1, shape[0], shape[1]))
+    tensor_2d = (tensor_2d - tensor_2d.min()) * (255.0 / tensor_2d.max())
+    tensor_2d = Tensor(tensor_2d.detach().cpu().numpy().astype(np.uint8))
+    return reshape(tensor_2d, (1, shape[0], shape[1])).repeat(3, 1, 1)
 
 
 @functools.lru_cache(maxsize=50)
@@ -40,7 +42,9 @@ def tiff_to_tensor(tiff_file: Path) -> Tensor:
         tensor_2d = Tensor(data.astype(np.int16))
     else:
         tensor_2d = Tensor(data.astype(np.float16))
-    return reshape(tensor_2d, (1, shape[0], shape[1]))
+    tensor_2d = (tensor_2d - tensor_2d.min()) * (255.0 / tensor_2d.max())
+    tensor_2d = Tensor(tensor_2d.detach().cpu().numpy().astype(np.uint8))
+    return reshape(tensor_2d, (1, shape[0], shape[1])).repeat(3, 1, 1)
 
 
 class SmartEMDataLoader(Dataset):
