@@ -44,6 +44,7 @@ def tiff_to_tensor(tiff_file: Path) -> Tensor:
 class SmartEMDataLoader(Dataset):
     def __init__(
         self,
+        name: str,
         level: str,
         full_res: bool = False,
         num_samples: int = 0,
@@ -52,6 +53,7 @@ class SmartEMDataLoader(Dataset):
         seed: int = 0,
     ):
         np.random.seed(seed)
+        self.name = name
         self._level = level
         self._use_full_res = full_res
         self._num_samples = num_samples
@@ -271,6 +273,28 @@ class SmartEMDataLoader(Dataset):
         return newdf.quantile(q=quantile)
 
 
+class SmartEMMultiDataLoader(Dataset):
+    def __init__(self, *args: SmartEMDataLoader):
+        self._datasets = {d.name: d for d in args}
+        self._dataset_order = list(self._datasets.keys())
+
+    def _get_key_idx(self, idx: int) -> Tuple[str, int]:
+        rolling_sum = 0
+        for kd in self._dataset_order:
+            next_rolling_sum = rolling_sum + len(self._datasets[kd])
+            if idx > rolling_sum and idx < next_rolling_sum:
+                return (kd, idx - rolling_sum)
+            rolling_sum = next_rolling_sum
+        raise IndexError(f"Index {idx} out of range {len(self)}")
+
+    def __len__(self):
+        return sum(len(d) for d in self._datasets.values())
+
+    def __getitem__(self, idx: int):
+        dataset_key, dataset_idx = self._get_key_idx(idx)
+        return self._datasets[dataset_key][dataset_idx]
+
+
 class SmartEMPostgresDataLoader(SmartEMDataLoader):
     def __init__(
         self,
@@ -305,6 +329,7 @@ _standard_labels = {
 class SmartEMDiskDataLoader(SmartEMDataLoader):
     def __init__(
         self,
+        name: str,
         level: str,
         data_dir: Path,
         full_res: bool = False,
@@ -315,6 +340,7 @@ class SmartEMDiskDataLoader(SmartEMDataLoader):
         seed: int = 0,
     ):
         super().__init__(
+            name,
             level,
             full_res=full_res,
             num_samples=num_samples,
