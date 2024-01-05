@@ -296,6 +296,7 @@ class SmartEMPostgresDataLoader(SmartEMDataLoader):
 _standard_labels = {
     "accummotiontotal": True,
     "ctfmaxresolution": True,
+    "particlecount": False,
     "estimatedresolution": True,
     "maxvalueprobdistribution": False,
 }
