@@ -1,4 +1,5 @@
 import functools
+from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -58,7 +59,9 @@ class SmartEMDataLoader(Dataset):
         physical_sub_sample_size: Optional[PhysicalSubset] = None,
         allowed_labels: Optional[Dict[str, bool]] = None,
         transform: Compose | None = None,
+        restricted_indices: Optional[List[int]] = None,
         seed: int = 0,
+        dataframe: pd.DataFrame | None = None,
     ):
         np.random.seed(seed)
         self.name = name
@@ -79,6 +82,7 @@ class SmartEMDataLoader(Dataset):
         else:
             self._sub_sample_size = sub_sample_size or (256, 256)
         self._allowed_labels = allowed_labels or list(_standard_labels.keys())
+        self._restricted_indices = restricted_indices or []
         self._transform = transform or Compose([])
         self._lower_better_label = (
             [allowed_labels[k] for k in self._allowed_labels]
@@ -92,8 +96,23 @@ class SmartEMDataLoader(Dataset):
 
         self._full_res_extension = ""
         self._data_dir = Path("/")
-        self._df = pd.DataFrame()
+        self._df = dataframe or pd.DataFrame()
         self._saved_thresholds: pd.DataFrame | None = None
+
+    def restrict_indices(self, restricted_indices: List[int]):
+        return SmartEMDataLoader(
+            self.name,
+            self._level,
+            full_res=self._use_full_res,
+            num_samples=self._num_samples,
+            sub_sample_size=self._sub_sample_size,
+            allowed_labels={
+                k: k in self._lower_better_label for k in self._allowed_labels
+            },
+            transform=self._transform,
+            restricted_indices=restricted_indices,
+            dataframe=self._df,
+        )
 
     def _determine_extension(self):
         if Path(self._df.iloc[0]["grid_square"]).with_suffix(".mrc").exists():
@@ -134,11 +153,15 @@ class SmartEMDataLoader(Dataset):
             )
 
     def __len__(self) -> int:
+        if self._restricted_indices:
+            return len(self._restricted_indices)
         if self._level == "grid_square" and self._num_samples:
             return self._df[self._level].nunique() * self._num_samples
         return self._df[self._level].nunique()
 
     def __getitem__(self, idx: int) -> Tuple[Tensor, int]:
+        if self._restricted_indices:
+            idx = self._restricted_indices[idx]
         sub_sample_boundaries = (-1, -1)
         if self._level == "grid_square" and self._num_samples:
             sub_sample_boundaries = (
@@ -277,6 +300,33 @@ class SmartEMDataLoader(Dataset):
                     str(self._data_dir / self._df.iloc[idx][self._level])
                 )
         return self._transform(image), self.compute_label(image, annotations=labels)
+
+    def split_indices(
+        self,
+        equal_label_populations: bool = True,
+        probs_per_set: Dict[str, float] = {"train": 0.8, "val": 0.1, "test": 0.1},
+    ) -> Dict[str, List[int]]:
+        data_set_names = []
+        probs = []
+        for k, v in probs_per_set.items():
+            data_set_names.append(k)
+            probs.append(v)
+        selected_indices: Dict[str, List[int]] = {dn: [] for dn in data_set_names}
+        label_counts = None
+        if equal_label_populations:
+            label_counts = Counter([p[1] for p in self])
+            assigned_label_counts = {k: 0 for k in label_counts.keys()}
+        for i in range(len(self)):
+            if self[i][1] < 2:
+                if label_counts:
+                    if assigned_label_counts[self[i][1]] <= min(label_counts.values()):
+                        data_set = np.random.choice(data_set_names, p=probs)
+                        selected_indices[data_set].append(i)
+                        assigned_label_counts[self[i][1]] += 1
+                else:
+                    data_set = np.random.choice(data_set_names, p=probs)
+                    selected_indices[data_set].append(i)
+        return selected_indices
 
     def compute_label(
         self,
