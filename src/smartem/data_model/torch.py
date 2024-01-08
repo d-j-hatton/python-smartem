@@ -102,7 +102,7 @@ class SmartEMDataset(Dataset):
         self._boundary_points_x = (
             [b[0] for b in boundary_points] if boundary_points else []
         )
-        self._boundary_points_x = (
+        self._boundary_points_y = (
             [b[1] for b in boundary_points] if boundary_points else []
         )
 
@@ -239,7 +239,7 @@ class SmartEMDataset(Dataset):
                     ):
                         drop_indices.append(ri)
             selected_df = selected_df.drop(drop_indices)
-            averaged_df = selected_df.groupby("grid_square").mean()
+            averaged_df = selected_df.groupby("grid_square").mean(numeric_only=True)
             if len(averaged_df):
                 labels = [
                     v
