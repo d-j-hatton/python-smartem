@@ -58,11 +58,11 @@ class SmartEMDataset(Dataset):
         sub_sample_size: Optional[Tuple[int, int]] = None,
         physical_sub_sample_size: Optional[PhysicalSubset] = None,
         allowed_labels: Optional[Dict[str, bool]] = None,
-        transform: Compose | None = None,
+        transform: Optional[Compose] = None,
         restricted_indices: Optional[List[int]] = None,
         seed: int = 0,
-        dataframe: pd.DataFrame | None = None,
-        boundary_points: List[Tuple[int, int]] | None = None,
+        dataframe: Optional[pd.DataFrame] = None,
+        boundary_points: Optional[List[Tuple[int, int]]] = None,
     ):
         np.random.seed(seed)
         self.name = name
@@ -347,7 +347,7 @@ class SmartEMDataset(Dataset):
         self,
         image: Tensor,
         annotations: List[float],
-        sigmas: Dict[str, float] | None = None,
+        sigmas: Optional[Dict[str, float]] = None,
     ) -> int:
         imdata = image.detach().numpy()[0]
         pixel_condition = len(imdata[imdata > 60]) / (image.shape[1] * image.shape[2])
@@ -377,7 +377,7 @@ class SmartEMDataset(Dataset):
     def thresholds(
         self,
         quantile: float = 0.7,
-        sigmas: Dict[str, float] | None = None,
+        sigmas: Optional[Dict[str, float]] = None,
         refresh: bool = False,
     ):
         if self._saved_thresholds and not refresh:
