@@ -106,7 +106,7 @@ class DataAPI:
         )
         self.session.commit()
 
-    def get_physcial_subset(
+    def get_physical_subset(
         self, project: str, subset_shape: Tuple[float, float]
     ) -> PhysicalSubset:
         end: Type[Base] = Tile
