@@ -62,6 +62,7 @@ class SmartEMDataset(Dataset):
         restricted_indices: Optional[List[int]] = None,
         seed: int = 0,
         dataframe: pd.DataFrame | None = None,
+        boundary_points: List[Tuple[int, int]] | None = None,
     ):
         np.random.seed(seed)
         self.name = name
@@ -98,6 +99,12 @@ class SmartEMDataset(Dataset):
         self._data_dir = Path("/")
         self._df = dataframe or pd.DataFrame()
         self._saved_thresholds: pd.DataFrame | None = None
+        self._boundary_points_x = (
+            [b[0] for b in boundary_points] if boundary_points else []
+        )
+        self._boundary_points_x = (
+            [b[1] for b in boundary_points] if boundary_points else []
+        )
 
     def restrict_indices(self, restricted_indices: List[int]):
         return SmartEMDataset(
@@ -112,6 +119,13 @@ class SmartEMDataset(Dataset):
             transform=self._transform,
             restricted_indices=restricted_indices,
             dataframe=self._df,
+            boundary_points=[
+                (bx, by)
+                for i, (bx, by) in enumerate(
+                    zip(self._boundary_points_x, self._boundary_points_y)
+                )
+                if i in restricted_indices
+            ],
         )
 
     def _determine_extension(self):
@@ -137,20 +151,21 @@ class SmartEMDataset(Dataset):
                 self._gs_full_res_size = _mrc.data.shape
         with Image.open(self._data_dir / self._df.iloc[0]["grid_square"]) as im:
             self._gs_jpeg_size = im.size
-        if self._use_full_res:
-            self._boundary_points_x = np.random.randint(
-                self._gs_full_res_size[1] - self._sub_sample_size[0], size=len(self)
-            )
-            self._boundary_points_y = np.random.randint(
-                self._gs_full_res_size[0] - self._sub_sample_size[1], size=len(self)
-            )
-        else:
-            self._boundary_points_x = np.random.randint(
-                self._gs_jpeg_size[0] - self._sub_sample_size[0], size=len(self)
-            )
-            self._boundary_points_y = np.random.randint(
-                self._gs_jpeg_size[1] - self._sub_sample_size[1], size=len(self)
-            )
+        if not self._boundary_points_x:
+            if self._use_full_res:
+                self._boundary_points_x = np.random.randint(
+                    self._gs_full_res_size[1] - self._sub_sample_size[0], size=len(self)
+                )
+                self._boundary_points_y = np.random.randint(
+                    self._gs_full_res_size[0] - self._sub_sample_size[1], size=len(self)
+                )
+            else:
+                self._boundary_points_x = np.random.randint(
+                    self._gs_jpeg_size[0] - self._sub_sample_size[0], size=len(self)
+                )
+                self._boundary_points_y = np.random.randint(
+                    self._gs_jpeg_size[1] - self._sub_sample_size[1], size=len(self)
+                )
 
     def __len__(self) -> int:
         if self._restricted_indices:
