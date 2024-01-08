@@ -48,7 +48,7 @@ def tiff_to_tensor(tiff_file: Path) -> Tensor:
     return reshape(tensor_2d, (1, shape[0], shape[1])).repeat(3, 1, 1)
 
 
-class SmartEMDataLoader(Dataset):
+class SmartEMDataset(Dataset):
     def __init__(
         self,
         name: str,
@@ -91,7 +91,7 @@ class SmartEMDataLoader(Dataset):
         )
         if self._level not in ("grid_square", "foil_hole"):
             raise ValueError(
-                f"Unrecognised SmartEMDataLoader level {self._level}: accepted values are grid_square or foil_hole"
+                f"Unrecognised SmartEMDataset level {self._level}: accepted values are grid_square or foil_hole"
             )
 
         self._full_res_extension = ""
@@ -100,7 +100,7 @@ class SmartEMDataLoader(Dataset):
         self._saved_thresholds: pd.DataFrame | None = None
 
     def restrict_indices(self, restricted_indices: List[int]):
-        return SmartEMDataLoader(
+        return SmartEMDataset(
             self.name,
             self._level,
             full_res=self._use_full_res,
@@ -380,8 +380,8 @@ class SmartEMDataLoader(Dataset):
         return res
 
 
-class SmartEMMultiDataLoader(Dataset):
-    def __init__(self, *args: SmartEMDataLoader):
+class SmartEMMultiDataset(Dataset):
+    def __init__(self, *args: SmartEMDataset):
         self._datasets = {d.name: d for d in args}
         self._dataset_order = list(self._datasets.keys())
 
@@ -402,7 +402,7 @@ class SmartEMMultiDataLoader(Dataset):
         return self._datasets[dataset_key][dataset_idx]
 
 
-class SmartEMPostgresDataLoader(SmartEMDataLoader):
+class SmartEMPostgresDataset(SmartEMDataset):
     def __init__(
         self,
         level: str,
@@ -433,7 +433,7 @@ _standard_labels = {
 }
 
 
-class SmartEMDiskDataLoader(SmartEMDataLoader):
+class SmartEMDiskDataset(SmartEMDataset):
     def __init__(
         self,
         name: str,
@@ -467,7 +467,7 @@ class SmartEMDiskDataLoader(SmartEMDataLoader):
         self._stage_calibration = StageCalibration(**sc)
 
 
-class SmartEMMaskDataLoader(Dataset):
+class SmartEMMaskDataset(Dataset):
     def __init__(self, data_dir: Path, labels_csv: str = "labels.csv"):
         self._data_dir = data_dir
         self._df = (
