@@ -106,23 +106,24 @@ class SmartEMDataset(Dataset):
             [b[1] for b in boundary_points] if boundary_points else []
         )
 
-    def restrict_indices(self, restricted_indices: List[int]):
-        return SmartEMDataset(
-            self.name,
-            self._level,
-            full_res=self._use_full_res,
-            num_samples=self._num_samples,
-            sub_sample_size=self._sub_sample_size,
+    @classmethod
+    def restrict_indices(cls, restricted_indices: List[int], base: "SmartEMDataset"):
+        return cls(
+            base.name,
+            base._level,
+            full_res=base._use_full_res,
+            num_samples=base._num_samples,
+            sub_sample_size=base._sub_sample_size,
             allowed_labels={
-                k: k in self._lower_better_label for k in self._allowed_labels
+                k: k in base._lower_better_label for k in base._allowed_labels
             },
-            transform=self._transform,
+            transform=base._transform,
             restricted_indices=restricted_indices,
-            dataframe=self._df,
+            dataframe=base._df,
             boundary_points=[
                 (bx, by)
                 for i, (bx, by) in enumerate(
-                    zip(self._boundary_points_x, self._boundary_points_y)
+                    zip(base._boundary_points_x, base._boundary_points_y)
                 )
                 if i in restricted_indices
             ],
@@ -427,6 +428,7 @@ class SmartEMPostgresDataset(SmartEMDataset):
         **kwargs,
     ):
         super().__init__(name, level, **kwargs)
+        self._projects = projects
         self._data_api: DataAPI = data_api or DataAPI()
         self._df = get_dataframe(self._data_api, projects)
         super()._determine_extension()
@@ -438,6 +440,30 @@ class SmartEMPostgresDataset(SmartEMDataset):
             self._stage_calibration = calibrate_coordinate_system(dm)
             if self._stage_calibration:
                 break
+
+    @classmethod
+    def restrict_indices(cls, restricted_indices: List[int], base: "SmartEMDataset"):
+        return cls(
+            base.name,
+            base._level,
+            base._projects,
+            full_res=base._use_full_res,
+            num_samples=base._num_samples,
+            sub_sample_size=base._sub_sample_size,
+            allowed_labels={
+                k: k in base._lower_better_label for k in base._allowed_labels
+            },
+            transform=base._transform,
+            restricted_indices=restricted_indices,
+            dataframe=base._df,
+            boundary_points=[
+                (bx, by)
+                for i, (bx, by) in enumerate(
+                    zip(base._boundary_points_x, base._boundary_points_y)
+                )
+                if i in restricted_indices
+            ],
+        )
 
 
 _standard_labels = {
