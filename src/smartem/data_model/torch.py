@@ -97,7 +97,7 @@ class SmartEMDataset(Dataset):
 
         self._full_res_extension = ""
         self._data_dir = Path("/")
-        self._df = dataframe or pd.DataFrame()
+        self._df = pd.DataFrame() if dataframe is None else dataframe
         self._saved_thresholds: pd.DataFrame | None = None
         self._boundary_points_x = (
             [b[0] for b in boundary_points] if boundary_points else []
@@ -380,7 +380,7 @@ class SmartEMDataset(Dataset):
         sigmas: Optional[Dict[str, float]] = None,
         refresh: bool = False,
     ):
-        if self._saved_thresholds and not refresh:
+        if self._saved_thresholds is not None and not refresh:
             return self._saved_thresholds
         required_columns = [*_standard_labels, self._level]
         newdf = self._df[required_columns]
