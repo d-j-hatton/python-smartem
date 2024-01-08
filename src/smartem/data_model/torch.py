@@ -420,12 +420,13 @@ class SmartEMMultiDataset(Dataset):
 class SmartEMPostgresDataset(SmartEMDataset):
     def __init__(
         self,
+        name: str,
         level: str,
         projects: List[str],
         data_api: Optional[DataAPI] = None,
         **kwargs,
     ):
-        super().__init__(level, **kwargs)
+        super().__init__(name, level, **kwargs)
         self._data_api: DataAPI = data_api or DataAPI()
         self._df = get_dataframe(self._data_api, projects)
         super()._determine_extension()

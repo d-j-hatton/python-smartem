@@ -2,7 +2,7 @@ from typing import Any, List, Optional, Sequence, Set, Tuple, Type, Union
 
 from sqlalchemy import create_engine, delete, select
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.engine.row import LegacyRow
+from sqlalchemy.engine.row import LegacyRow, Row
 from sqlalchemy.orm import Load, load_only, sessionmaker
 
 from smartem.data_model import (
@@ -116,7 +116,8 @@ class DataAPI:
         query = query.join(Project, Project.atlas_id == Tile.atlas_id).filter(
             Project.project_name == project
         )
-        grid_square = query.first()
+        grid_square_res: Row = query.first()
+        grid_square = grid_square_res[0]
         assert isinstance(grid_square, GridSquare)
         end = FoilHole
         primary_filter = grid_square.grid_square_name
