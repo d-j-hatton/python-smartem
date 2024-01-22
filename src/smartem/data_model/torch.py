@@ -412,7 +412,7 @@ class SmartEMMultiDataset(Dataset):
         rolling_sum = 0
         for kd in self._dataset_order:
             next_rolling_sum = rolling_sum + len(self._datasets[kd])
-            if idx > rolling_sum and idx < next_rolling_sum:
+            if idx >= rolling_sum and idx < next_rolling_sum:
                 return (kd, idx - rolling_sum)
             rolling_sum = next_rolling_sum
         raise IndexError(f"Index {idx} out of range {len(self)}")
@@ -465,9 +465,7 @@ class SmartEMPostgresDataset(SmartEMDataset):
             dataframe=base._df,
             boundary_points=[
                 (bx, by)
-                for i, (bx, by) in enumerate(
-                    zip(base._boundary_points_x, base._boundary_points_y)
-                )
+                for (bx, by) in (zip(base._boundary_points_x, base._boundary_points_y))
             ],
         )
 
@@ -491,8 +489,13 @@ class SmartEMDiskDataset(SmartEMDataset):
         labels_csv: str = "labels.csv",
         num_samples: int = 0,
         sub_sample_size: Optional[Tuple[int, int]] = None,
+        physical_sub_sample_size: Optional[PhysicalSubset] = None,
+        transform: Optional[Compose] = None,
         allowed_labels: Optional[Dict[str, bool]] = None,
+        restricted_indices: Optional[List[int]] = None,
         seed: int = 0,
+        dataframe: Optional[pd.DataFrame] = None,
+        boundary_points: Optional[List[Tuple[int, int]]] = None,
     ):
         super().__init__(
             name,
@@ -500,11 +503,21 @@ class SmartEMDiskDataset(SmartEMDataset):
             full_res=full_res,
             num_samples=num_samples,
             sub_sample_size=sub_sample_size,
+            physical_sub_sample_size=physical_sub_sample_size,
+            transform=transform,
             allowed_labels=allowed_labels,
+            restricted_indices=restricted_indices,
             seed=seed,
+            boundary_points=boundary_points,
         )
         self._data_dir = data_dir
-        self._df = pd.read_csv(self._data_dir / labels_csv)
+        if dataframe:
+            self._df = dataframe
+        else:
+            self._df = pd.read_csv(self._data_dir / labels_csv)
+            self._df["grid_square"] = f"{self._data_dir}/" + self._df[
+                "grid_square"
+            ].astype(str)
         super()._determine_extension()
 
         try:
@@ -513,6 +526,27 @@ class SmartEMDiskDataset(SmartEMDataset):
         except FileNotFoundError:
             sc = {"inverted": False, "x_flip": False, "y_flip": True}
         self._stage_calibration = StageCalibration(**sc)
+
+    @classmethod
+    def restrict_indices(cls, restricted_indices: List[int], base: "SmartEMDataset"):
+        return cls(
+            base.name,
+            base._level,
+            base._data_dir,
+            full_res=base._use_full_res,
+            num_samples=base._num_samples,
+            sub_sample_size=base._sub_sample_size,
+            allowed_labels={
+                k: k in base._lower_better_label for k in base._allowed_labels
+            },
+            transform=base._transform,
+            restricted_indices=restricted_indices,
+            dataframe=base._df,
+            boundary_points=[
+                (bx, by)
+                for (bx, by) in (zip(base._boundary_points_x, base._boundary_points_y))
+            ],
+        )
 
 
 class SmartEMMaskDataset(Dataset):
