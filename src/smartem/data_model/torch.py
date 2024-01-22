@@ -315,7 +315,12 @@ class SmartEMDataset(Dataset):
                 image = read_image(
                     str(self._data_dir / self._df.iloc[idx][self._level])
                 )
-        return self._transform(image), self.compute_label(image, annotations=labels)
+
+        label = self.compute_label(image, annotations=labels)
+        if self._transform:
+            image = self._transform(image)
+            image = (image - image.min()) / image.max()
+        return self._transform(image), label
 
     def split_indices(
         self,
@@ -361,6 +366,8 @@ class SmartEMDataset(Dataset):
         }
         ths = self.thresholds(sigmas=sigmas)
         labels = [(k, v) for k, v in _standard_labels.items()]
+        if np.inf in annotations:
+            return 3
         conds = [
             annotations[i] < ths[labels[i][0]].iloc[0]
             if labels[i][1]
@@ -461,7 +468,6 @@ class SmartEMPostgresDataset(SmartEMDataset):
                 for i, (bx, by) in enumerate(
                     zip(base._boundary_points_x, base._boundary_points_y)
                 )
-                if i in restricted_indices
             ],
         )
 
