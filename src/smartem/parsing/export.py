@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import numpy as np
+import xmltodict
 import yaml
 from pandas import DataFrame
 
@@ -180,6 +181,7 @@ def export_foil_holes(
         "particlecount": [],
         "estimatedresolution": [],
         "maxvalueprobdistribution": [],
+        "image_defocus": [],
     }
 
     for project in projects:
@@ -235,6 +237,7 @@ def export_foil_holes(
         gs_pixel_sizes = {}
 
         for gs in grid_squares:
+            grid_square_image_defocus = None
             if gs.thumbnail:
                 gs_dir = out_dir / gs.grid_square_name
                 gs_dir.mkdir()
@@ -248,6 +251,10 @@ def export_foil_holes(
                             alternative_extension or ".mrc"
                         ).name,
                     )
+                    with open(thumbnail_path.with_suffix(".xml")) as gs_xml:
+                        grid_square_image_defocus = xmltodict.parse(gs_xml.read())[
+                            "MicroscopeImage"
+                        ]["microscopeData"]["optics"]["Defocus"]
                     out_gs_paths[gs.grid_square_name] = (
                         gs_dir / thumbnail_path.name
                     ).relative_to(out_dir)
@@ -337,6 +344,7 @@ def export_foil_holes(
                             fh.foil_hole_name
                         ]
                     )
+                    data["image_defocus"].append(grid_square_image_defocus)
 
     df = DataFrame.from_dict(data)
     df.to_csv(out_dir / "labels.csv", index=False)
