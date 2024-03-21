@@ -251,9 +251,7 @@ def export_foil_holes(
                             alternative_extension or ".mrc"
                         ).name,
                     )
-                    with open(
-                        gs_dir / thumbnail_path.with_suffix(".xml").name
-                    ) as gs_xml:
+                    with open(thumbnail_path.with_suffix(".xml")) as gs_xml:
                         grid_square_image_defocus = xmltodict.parse(gs_xml.read())[
                             "MicroscopeImage"
                         ]["microscopeData"]["optics"]["Defocus"]
