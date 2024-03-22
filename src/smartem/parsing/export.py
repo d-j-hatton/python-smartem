@@ -252,9 +252,12 @@ def export_foil_holes(
                         ).name,
                     )
                     with open(thumbnail_path.with_suffix(".xml")) as gs_xml:
-                        grid_square_image_defocus = xmltodict.parse(gs_xml.read())[
-                            "MicroscopeImage"
-                        ]["microscopeData"]["optics"]["Defocus"]
+                        custom_data = xmltodict.parse(gs_xml.read())["MicroscopeImage"][
+                            "CustomData"
+                        ]["a:KeyValueOfstringanyType"]
+                        for elem in custom_data:
+                            if elem["a:Key"] == "AppliedDefocus":
+                                grid_square_image_defocus = elem["a:Value"]["#text"]
                     out_gs_paths[gs.grid_square_name] = (
                         gs_dir / thumbnail_path.name
                     ).relative_to(out_dir)
