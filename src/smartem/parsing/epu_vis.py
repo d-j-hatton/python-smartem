@@ -345,8 +345,8 @@ class GridSquare:
                         (((-1) ** self._flip_powers[0]) * p[self._switch_indices[0]])
                         / self._pixel_size
                     )
-                    + int(self._stage_position[1] / self._pixel_size)
-                    + self._readout_area[0] // 2
+                    + int(self._stage_position[self._switch_indices[0]] / self._pixel_size)
+                    + self._readout_area[1] // 2
                     for p in self._foil_hole_stage_locations.values()
                 ],
                 [
@@ -354,8 +354,8 @@ class GridSquare:
                         (((-1) ** self._flip_powers[1]) * p[self._switch_indices[1]])
                         / self._pixel_size
                     )
-                    + (self._stage_position[0] / self._pixel_size)
-                    + self._readout_area[1] // 2
+                    - (self._stage_position[self._switch_indices[1]] / self._pixel_size)
+                    + self._readout_area[0] // 2
                     for p in self._foil_hole_stage_locations.values()
                 ],
                 marker="x",
@@ -385,8 +385,8 @@ class GridSquare:
                         )
                         / self._pixel_size
                     )
-                    + (self._stage_position[1] / self._pixel_size)
-                    + self._readout_area[0] // 2
+                    + (self._stage_position[self._switch_indices[0]] / self._pixel_size)
+                    + self._readout_area[1] // 2
                     for p in foil_holes
                 ],
                 [
@@ -397,8 +397,8 @@ class GridSquare:
                         )
                         / self._pixel_size
                     )
-                    + (self._stage_position[0] / self._pixel_size)
-                    + self._readout_area[1] // 2
+                    - (self._stage_position[self._switch_indices[1]] / self._pixel_size)
+                    + self._readout_area[0] // 2
                     for p in foil_holes
                 ],
                 marker="x",
