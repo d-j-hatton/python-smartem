@@ -61,10 +61,13 @@ def metadata_grid_square_positions(xml_path: Path) -> Dict[str, Tuple[int, int]]
         if not required_key:
             continue
         for gs in nodes[required_key]:
-            gs_pix_positions[gs["key"]] = (
-                int(float(gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:x"])),
-                int(float(gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:y"])),
-            )
+            try:
+                gs_pix_positions[gs["key"]] = (
+                    int(float(gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:x"])),
+                    int(float(gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:y"])),
+                )
+            except TypeError:
+                pass
     return gs_pix_positions
 
 
