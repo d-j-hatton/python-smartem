@@ -56,8 +56,19 @@ def run():
         exit("If --atlas-dir is specified then --sample must also be specified")
 
     if args.atlas_dir:
-        a = Atlas(Path(args.atlas_dir), args.sample, epu_data_dir=Path(args.epu_dir))
+        a = Atlas(
+            Path(args.atlas_dir),
+            args.sample,
+            epu_data_dir=Path(args.epu_dir),
+            flip=(args.flip_x, args.flip_y),
+            switch=args.switch_xy,
+        )
         a.display()
     else:
-        gs = GridSquare(Path(args.epu_dir), args.grid_square)
+        gs = GridSquare(
+            Path(args.epu_dir),
+            args.grid_square,
+            flip=(args.flip_x, args.flip_y),
+            switch=args.switch_xy,
+        )
         gs.display()
