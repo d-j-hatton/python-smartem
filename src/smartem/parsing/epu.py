@@ -90,10 +90,15 @@ def metadata_grid_square_stage(xml_path: Path) -> Dict[str, Tuple[float, float]]
         if not required_key:
             continue
         for gs in nodes[required_key]:
-            gs_stage_positions[gs["key"]] = (
-                float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:x"]) * 1e9,
-                float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:y"]) * 1e9,
-            )
+            try:
+                gs_stage_positions[gs["key"]] = (
+                    float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:x"])
+                    * 1e9,
+                    float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:y"])
+                    * 1e9,
+                )
+            except TypeError:
+                pass
     return gs_stage_positions
 
 
