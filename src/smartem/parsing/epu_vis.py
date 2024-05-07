@@ -4,6 +4,7 @@ from typing import Tuple
 import matplotlib.pyplot as plt
 import mrcfile
 import numpy as np
+import tifffile
 
 from smartem.parsing.epu import (
     metadata_foil_hole_positions,
@@ -271,9 +272,13 @@ class GridSquare:
 
     @property
     def image(self) -> np.array:
-        img_file = list(self._epu_location.glob("*.mrc"))[0]
-        with mrcfile.open(img_file) as mrc:
-            return mrc.data
+        img_file_mrc_list = list(self._epu_location.glob("*.mrc"))
+        if img_file_mrc_list:
+            img_file = img_file_mrc_list[0]
+            with mrcfile.open(img_file) as mrc:
+                return mrc.data
+        img_file = list(self._epu_location.glob("*.tiff"))[0]
+        return tifffile.imread(img_file)
 
     def display(
         self,
