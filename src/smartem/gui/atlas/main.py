@@ -13,6 +13,7 @@ from pydantic import BaseModel
 recording = solara.Reactive("Good")
 good_records = solara.Reactive([])
 bad_records = solara.Reactive([])
+max_size = solara.Reactive(10)
 records = {"Good": good_records, "Bad": bad_records}
 
 
@@ -48,18 +49,24 @@ def Page():
             imdata = mrcfile.read(atlas_data.image_path)
         else:
             imdata = tifffile.imread(atlas_data.image_path)
+        imdata_full = imdata.copy()
+        imdata = imdata[::10, ::10]
         names = [gs.name for gs in atlas_data.grid_squares]
         df = pd.DataFrame(
             {
-                "x": [gs.position_x for gs in atlas_data.grid_squares],
-                "y": [gs.position_y for gs in atlas_data.grid_squares],
+                "x": [gs.position_x // 10 for gs in atlas_data.grid_squares],
+                "y": [gs.position_y // 10 for gs in atlas_data.grid_squares],
                 "name": names,
                 "score": [gs.score for gs in atlas_data.grid_squares],
             }
         )
         im = px.imshow(imdata)
+        im_full = px.imshow(imdata_full)
+        im_full.update_layout(
+            coloraxis_showscale=False, height=800, xaxis_range=[0, len(imdata_full)]
+        )
         scatter = px.scatter(
-            df, x="x", y="y", size="score", hover_data=["name"], size_max=10
+            df, x="x", y="y", size="score", hover_data=["name"], size_max=max_size.value
         )
         im.add_traces(list(scatter.select_traces()))
         im.update_layout(
@@ -67,16 +74,23 @@ def Page():
         )
 
         def _set_record(click_data: dict):
-            clicked_name = names[click_data["points"]["point_indexes"][0]]
-            if clicked_name in records[recording.value].value:
-                records[recording.value].value = [
-                    r for r in records[recording.value].value if r != clicked_name
-                ]
-            else:
-                records[recording.value].value = [
-                    *records[recording.value].value,
-                    clicked_name,
-                ]
+            try:
+                clicked_name = names[click_data["points"]["point_indexes"][0]]
+                if clicked_name in records[recording.value].value:
+                    records[recording.value].value = [
+                        r for r in records[recording.value].value if r != clicked_name
+                    ]
+                else:
+                    records[recording.value].value = [
+                        *records[recording.value].value,
+                        clicked_name,
+                    ]
+            except Exception:
+                return
 
-        solara.FigurePlotly(im, on_click=_set_record)
+        with solara.VBox():
+            solara.SliderInt("Size", value=max_size, min=1, max=30, step=5)
+            with solara.HBox():
+                solara.FigurePlotly(im, on_click=_set_record)
+                solara.FigurePlotly(im_full)
     return main
