@@ -39,12 +39,22 @@ def _read_atlas_data(atlas_json_path: Path) -> AtlasScores:
 @solara.component
 def Page():
     with solara.HBox() as main:
+        file_path = Path(os.environ["SMARTEM_ATLAS_BASEPATH"]) / "atlas.json"
+
+        def _save_record():
+            with open(file_path.parent / f"{file_path.stem}-annotated.json", "w") as js:
+                annotation_data = {
+                    "good": good_records.value,
+                    "bad": bad_records.value,
+                }
+                json.dump(annotation_data, js)
+
         with solara.Card("Record"):
             with solara.VBox():
                 solara.ToggleButtonsSingle(value=recording, values=["Good", "Bad"])
                 for r in records[recording.value].value:
                     solara.Markdown(r)
-        file_path = Path(os.environ["SMARTEM_ATLAS_BASEPATH"]) / "atlas.json"
+                solara.Button(label="Save", on_click=_save_record)
         atlas_data = _read_atlas_data(file_path)
         if atlas_data.image_path.suffix == ".mrc":
             imdata = mrcfile.read(atlas_data.image_path)
