@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, List
 
 import mrcfile
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import solara
@@ -119,12 +120,15 @@ def Page():
                 score_threshold = sorted([gs.score for gs in atlas_data.grid_squares])[
                     -1
                 ]
+            scores = [gs.score for gs in atlas_data.grid_squares]
+            scores -= np.min(scores)
+            scores /= np.max(scores)
             df = pd.DataFrame(
                 {
                     "x": [int(gs.position_x / 10) for gs in atlas_data.grid_squares],
                     "y": [int(gs.position_y / 10) for gs in atlas_data.grid_squares],
                     "name": names,
-                    "score": [gs.score for gs in atlas_data.grid_squares],
+                    "score": scores,
                     "suggested": [
                         gs.score >= score_threshold for gs in atlas_data.grid_squares
                     ],
