@@ -14,6 +14,7 @@ recording = solara.Reactive("Good")
 good_records = solara.Reactive([])
 bad_records = solara.Reactive([])
 max_size = solara.Reactive(10)
+num_suggested = solara.Reactive(15)
 records = {"Good": good_records, "Bad": bad_records}
 
 
@@ -52,12 +53,18 @@ def Page():
         imdata_full = imdata.copy()
         imdata = imdata[::10, ::10]
         names = [gs.name for gs in atlas_data.grid_squares]
+        score_threshold = sorted([gs.score for gs in atlas_data.grid_squares])[
+            -num_suggested.value
+        ]
         df = pd.DataFrame(
             {
                 "x": [gs.position_x // 10 for gs in atlas_data.grid_squares],
                 "y": [gs.position_y // 10 for gs in atlas_data.grid_squares],
                 "name": names,
                 "score": [gs.score for gs in atlas_data.grid_squares],
+                "suggested": [
+                    gs.score >= score_threshold for gs in atlas_data.grid_squares
+                ],
             }
         )
         im = px.imshow(imdata)
@@ -66,7 +73,13 @@ def Page():
             coloraxis_showscale=False, height=800, xaxis_range=[0, len(imdata_full)]
         )
         scatter = px.scatter(
-            df, x="x", y="y", size="score", hover_data=["name"], size_max=max_size.value
+            df,
+            x="x",
+            y="y",
+            size="score",
+            hover_data=["name"],
+            size_max=max_size.value,
+            color="suggested",
         )
         im.add_traces(list(scatter.select_traces()))
         im.update_layout(
@@ -90,6 +103,12 @@ def Page():
 
         with solara.VBox():
             solara.SliderInt("Size", value=max_size, min=1, max=30, step=5)
+            solara.SliderInt(
+                "No. of suggested squares",
+                value=num_suggested,
+                min=1,
+                max=len(atlas_data.grid_squares),
+            )
             with solara.HBox():
                 solara.FigurePlotly(im, on_click=_set_record)
                 solara.FigurePlotly(im_full)
